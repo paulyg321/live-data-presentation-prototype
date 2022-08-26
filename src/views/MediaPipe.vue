@@ -3,18 +3,21 @@
 import { onMounted, ref, toRaw } from "vue";
 import { Hands } from "@mediapipe/hands";
 
+import { validateCurrentPose, type MultiHandednessObject } from "@/utils";
 import WebcamVue from "./Webcam.vue";
 
 interface PredictionObject {
   className: string;
   probability: number;
 }
+
 const MODEL_IDS = {
   first_iteration: "jsB8IiKon",
   second_iteration: "zWA9pkcjy",
+  stripped_down: "NZyGd_Hkq",
 };
 
-const URL = `https://teachablemachine.withgoogle.com/models/${MODEL_IDS.second_iteration}`;
+const URL = `https://teachablemachine.withgoogle.com/models/${MODEL_IDS.stripped_down}`;
 const MODEL_URL = `${URL}/model.json`;
 const METADATA_URL = `${URL}/metadata.json`;
 const MEDIA_PIPE_URL = (file: string) =>
@@ -25,6 +28,8 @@ const canvasCtx = ref<CanvasRenderingContext2D | null>(null);
 const hands = ref<Hands | null>(null);
 const model = ref<tmPose.CustomPoseNet | null>(null);
 const maxPredictions = ref<number>(0);
+const multiHandLandmarks = ref<any>([]);
+const multiHandedness = ref<any>([]);
 const predictions = ref<PredictionObject[]>([]);
 
 function initializeHands() {
@@ -45,32 +50,30 @@ async function initializeModel() {
   maxPredictions.value = model.value.getTotalClasses();
 }
 
-async function onResults(results: { image: any; multiHandLandmarks: any }) {
+function onResults(results: {
+  image: any;
+  multiHandLandmarks: any;
+  multiHandedness: MultiHandednessObject[];
+}) {
+  multiHandLandmarks.value = results.multiHandLandmarks;
+  multiHandedness.value = results.multiHandedness;
+}
+
+async function renderVideoOnCanvas(video: any) {
   const width = canvas.value?.width || 1280;
   const height = canvas.value?.height || 720;
-  canvasCtx.value?.save();
   canvasCtx.value?.clearRect(0, 0, width, height);
-  canvasCtx.value?.scale(-1, 1);
-  canvasCtx.value?.translate(-width, 0);
-  canvasCtx.value?.drawImage(results.image, 0, 0, width || 1280, height || 720);
-
-  await getPosePrediction(canvas.value);
-
-  if (results.multiHandLandmarks && canvasCtx.value) {
-    for (const [index, landmarks] of results.multiHandLandmarks.entries()) {
-      landmarks.forEach((mark: any) => {
-        if (canvasCtx.value) {
-          const x = width * mark.x;
-          const y = height * mark.y;
-          canvasCtx.value.beginPath();
-          canvasCtx.value.arc(x, y, 5, 0, 2 * Math.PI, false);
-          canvasCtx.value.fillStyle = "red";
-          canvasCtx.value.fill();
-        }
-      });
-    }
+  if (canvasCtx.value) {
+    canvasCtx.value?.drawImage(video, 0, 0, width || 1280, height || 720);
+    const currentPose = validateCurrentPose(
+      canvasCtx.value,
+      predictions.value,
+      multiHandLandmarks.value,
+      { width, height },
+      multiHandedness.value
+    );
   }
-  canvasCtx.value?.restore();
+  await getPosePrediction(canvas.value);
 }
 
 async function getPosePrediction(video: any) {
@@ -89,18 +92,7 @@ async function runDetection(video: any) {
   if (hands.value) {
     await toRaw(hands.value).send({ image: video });
   }
-
-  const currentPose = predictions.value.reduce(
-    (maxPrediction: PredictionObject, currentPrediction: PredictionObject) => {
-      if (currentPrediction.probability > maxPrediction.probability) {
-        return currentPrediction;
-      }
-      return maxPrediction;
-    },
-    { className: "unknown", probability: -Infinity } as PredictionObject
-  );
-
-  console.log(currentPose);
+  await renderVideoOnCanvas(video);
   requestAnimationFrame(() => runDetection(video));
 }
 
@@ -115,6 +107,9 @@ async function setVideoDimensions(video: any) {
 onMounted(() => {
   if (canvas.value) {
     canvasCtx.value = canvas.value.getContext("2d");
+    const width = canvas.value?.width || 1280;
+    canvasCtx.value?.scale(-1, 1);
+    canvasCtx.value?.translate(-width, 0);
   }
   initializeHands();
   initializeModel();
