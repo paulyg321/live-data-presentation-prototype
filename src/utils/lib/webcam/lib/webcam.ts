@@ -1,4 +1,4 @@
-import type { VideoSourcesTypes } from "../types/webcam.d";
+import type { VideoSourcesTypes } from "../types/lib/webcam";
 
 export async function getVideoSources() {
   const sources: VideoSourcesTypes[] = [];

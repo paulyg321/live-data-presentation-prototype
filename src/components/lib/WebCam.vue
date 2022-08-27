@@ -4,7 +4,7 @@ import {
   getVideoSources,
   getVideoStream,
   type VideoSourcesTypes,
-} from "../utils";
+} from "@/utils";
 defineEmits(["loaded-data", "loaded-metadata"]);
 
 const stream = ref();

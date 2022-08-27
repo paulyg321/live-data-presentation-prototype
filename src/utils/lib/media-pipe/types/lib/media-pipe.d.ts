@@ -1,4 +1,4 @@
-import type { CoordinatesObject } from "../../calculations";
+import type { CoordinatesObject } from "../../../calculations";
 
 export interface MultiHandednessObject {
   index: number;

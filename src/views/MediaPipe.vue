@@ -4,7 +4,13 @@ import { onMounted, ref, toRaw } from "vue";
 import { Hands } from "@mediapipe/hands";
 
 import { validateCurrentPose, type MultiHandednessObject } from "@/utils";
-import WebcamVue from "./Webcam.vue";
+
+// components
+import WebcamVue from "@/components/lib/WebCam.vue";
+import CanvasWrapper from "@/components/lib/CanvasWrapper.vue";
+import ChartAxes from "@/components/lib/axes/ChartAxes.vue";
+import ChartWrapper from "@/components/lib/axes/ChartWrapper.vue";
+import LineCanvas from "@/components/lib/line/LineCanvas.vue";
 
 interface PredictionObject {
   className: string;
@@ -119,12 +125,37 @@ onMounted(() => {
 <template>
   <div class="about">
     <video class="input_video" ref="video"></video>
-    <canvas
-      class="output_canvas"
-      width="1020"
-      height="765"
-      ref="canvas"
-    ></canvas>
+    <CanvasWrapper
+      :width="1020"
+      :height="765"
+      v-slot="{ width, height, className }"
+    >
+      <canvas
+        class="output_canvas"
+        :width="width"
+        :height="height"
+        :class="className"
+        ref="canvas"
+      ></canvas>
+      <ChartWrapper
+        :width="width"
+        :height="height"
+        :class="className"
+        v-slot="{ xAxis, yAxis, xScaleLine }"
+      >
+        <ChartAxes
+          :width="width"
+          :height="height"
+          :xAxis="xAxis"
+          :yAxis="yAxis"
+        />
+        <LineCanvas
+          :canvasDimensions="{ width, height }"
+          :xScale="xScaleLine"
+          :className="className"
+        />
+      </ChartWrapper>
+    </CanvasWrapper>
     <WebcamVue
       @loaded-data="runDetection"
       @loaded-metadata="setVideoDimensions"

@@ -3,7 +3,7 @@ import { onMounted, ref, computed, toRaw } from "vue";
 import * as handtrack from "handtrackjs";
 import * as d3 from "d3";
 import _ from "lodash";
-import WebcamVue from "./views/Webcam.vue";
+import WebcamVue from "@/components/lib/WebCam.vue";
 
 const canvas = ref<HTMLCanvasElement | null>(null);
 const context = computed(() => canvas.value?.getContext("2d"));

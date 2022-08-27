@@ -15,6 +15,7 @@
     "@mediapipe/control_utils": "^0.6.1629159505",
     "@mediapipe/drawing_utils": "^0.3.1620248257",
     "@mediapipe/hands": "^0.4.1646424915",
+    "@types/d3": "^7.4.0",
     "@types/lodash": "^4.14.184",
     "d3": "^7.6.1",
     "handtrackjs": "^0.1.5",

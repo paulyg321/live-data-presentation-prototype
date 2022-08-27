@@ -1,2 +1,2 @@
-export * from "./types/teachable-machine.d";
+export * from "./types";
 export * from "./lib/constants";

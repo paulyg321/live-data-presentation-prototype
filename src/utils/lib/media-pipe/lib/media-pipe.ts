@@ -2,11 +2,12 @@ import {
   calculateAngleBetweenPoints,
   calculateDistance,
 } from "../../calculations";
+import type { ChartDimensions } from "../../chart";
 import { CLASSES, type PredictionObject } from "../../teachable-machine";
 import type {
   MultiHandednessObject,
   ParsedLandmarksObject,
-} from "../types/media-pipe.d";
+} from "../types/lib/media-pipe";
 import { HAND_LANDMARK_IDS } from "./constants";
 
 export function mirrorLandmarkHorizontally(
@@ -45,7 +46,7 @@ export function validateCurrentPose(
   canvasCtx: CanvasRenderingContext2D,
   predictions: PredictionObject[],
   multiHandLandmarks: any,
-  chartDimensions: { width: number; height: number },
+  chartDimensions: ChartDimensions,
   multiHandedness: MultiHandednessObject[]
 ) {
   const handIndices = getLeftVsRightIndex(multiHandedness);
@@ -89,8 +90,11 @@ export function validateCurrentPose(
 function validatePlayback(
   canvasCtx: CanvasRenderingContext2D,
   multiHandLandmarks: any,
-  chartDimensions: { width: number; height: number },
-  handIndices: any
+  chartDimensions: ChartDimensions,
+  handIndices: {
+    left?: number;
+    right?: number;
+  }
 ) {
   // 8, 5, 0 indicate landmarks on the index finger tip (8), MCP joint of the index finger (5), wrist (0)
   const LANDMARKS_TO_VALIDATE = [
@@ -155,8 +159,11 @@ function isCorrectPlaybackSelectionHandLandmark(
 function validateEmphasis(
   canvasCtx: CanvasRenderingContext2D,
   multiHandLandmarks: any,
-  chartDimensions: { width: number; height: number },
-  handIndices: any,
+  chartDimensions: ChartDimensions,
+  handIndices: {
+    left?: number;
+    right?: number;
+  },
   type: string
 ) {
   const LANDMARKS_TO_VALIDATE = [
