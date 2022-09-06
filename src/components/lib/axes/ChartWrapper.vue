@@ -23,15 +23,22 @@ const CHART_POSITION = {
 };
 
 const chartBounds = {
-  start: CHART_POSITION.x + CHART_DIMENSIONS.margin.left,
-  end:
-    CHART_POSITION.x + (CHART_DIMENSIONS.width - CHART_DIMENSIONS.margin.right),
+  x: {
+    start: CHART_POSITION.x + CHART_DIMENSIONS.margin.left,
+    end:
+      CHART_POSITION.x +
+      (CHART_DIMENSIONS.width - CHART_DIMENSIONS.margin.right),
+  },
+  y: {
+    start: CHART_DIMENSIONS.margin.top,
+    end: CHART_DIMENSIONS.height - CHART_DIMENSIONS.margin.bottom,
+  },
 };
 
 // ---- X SCALE FOR AXIS ----
 
 const xDomain = [new Date(2000, 0, 1), new Date(2020, 12, 31)];
-const xRange = [chartBounds.start, chartBounds.end];
+const xRange = [chartBounds.x.start, chartBounds.x.end];
 const xScale = d3.scaleTime(xDomain, xRange);
 const xAxisVerticalPos = CHART_DIMENSIONS.height - CHART_DIMENSIONS.margin.top;
 
@@ -44,10 +51,7 @@ const xAxis = {
 // ---- Y SCALE FOR AXIS ----
 
 const yDomain = [0, 100];
-const yRange = [
-  CHART_DIMENSIONS.margin.top,
-  CHART_DIMENSIONS.height - CHART_DIMENSIONS.margin.bottom,
-];
+const yRange = [chartBounds.y.start, chartBounds.y.end];
 const yScale = d3.scaleLinear(yDomain, yRange);
 const yAxisHorizontalPos = CHART_POSITION.x + CHART_DIMENSIONS.margin.left;
 
@@ -59,12 +63,17 @@ const yAxis = {
 
 // ---- X SCALE FOR LINE ---
 const xDomainLine = [0, 100];
-const xRangeLine = [chartBounds.start, chartBounds.end];
+const xRangeLine = [chartBounds.x.start, chartBounds.x.end];
 const xScaleLine = d3.scaleLinear(xDomainLine, xRangeLine);
 </script>
 
 <template>
-  <slot :xAxis="xAxis" :yAxis="yAxis" :xScaleLine="xScaleLine"></slot>
+  <slot
+    :xAxis="xAxis"
+    :yAxis="yAxis"
+    :xScaleLine="xScaleLine"
+    :chartBounds="chartBounds"
+  ></slot>
 </template>
 
 <style></style>

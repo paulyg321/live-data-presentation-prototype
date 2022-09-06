@@ -11,7 +11,7 @@ export interface ChartDimensions {
   margin?: ChartMargin;
 }
 
-export interface LinePoint {
+export interface Coordinates {
   x: number;
   y: number;
 }

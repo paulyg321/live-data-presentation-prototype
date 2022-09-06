@@ -1,3 +1,5 @@
+import { CLASSES } from "../../teachable-machine";
+
 export const HANDS = {
   LEFT: "Left",
   RIGHT: "Right",
@@ -26,3 +28,9 @@ export const HAND_LANDMARK_IDS = {
   pinky_dip: 19,
   pinky_tip: 20,
 };
+
+export const NONE_OBJECT = {
+  class: CLASSES.NONE,
+  left: undefined,
+  right: undefined,
+}

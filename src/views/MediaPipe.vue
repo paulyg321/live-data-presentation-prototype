@@ -1,9 +1,14 @@
 <!-- eslint-disable @typescript-eslint/no-non-null-assertion -->
 <script setup lang="ts">
-import { onMounted, ref, toRaw } from "vue";
+import { onMounted, ref, toRaw, computed } from "vue";
 import { Hands } from "@mediapipe/hands";
 
-import { validateCurrentPose, type MultiHandednessObject } from "@/utils";
+import {
+  CLASSES,
+  HAND_LANDMARK_IDS,
+  validateCurrentPose,
+  type MultiHandednessObject,
+} from "@/utils";
 
 // components
 import WebcamVue from "@/components/lib/WebCam.vue";
@@ -37,6 +42,49 @@ const maxPredictions = ref<number>(0);
 const multiHandLandmarks = ref<any>([]);
 const multiHandedness = ref<any>([]);
 const predictions = ref<PredictionObject[]>([]);
+const currentPose = ref<{
+  class: string;
+  left: any;
+  right: any;
+}>();
+const handPosition = computed(() => {
+  const isPlayback = currentPose.value?.class === CLASSES.PLAYBACK;
+
+  if (
+    currentPose.value?.right &&
+    isPlayback &&
+    canvas.value &&
+    currentPose.value?.left
+  ) {
+    const right_xPos =
+      (1 - currentPose?.value.right[HAND_LANDMARK_IDS.middle_finger_tip].x) *
+      canvas.value?.width;
+
+    const right_yPos =
+      currentPose?.value.right[HAND_LANDMARK_IDS.middle_finger_tip].y *
+      canvas.value.height;
+
+    const left_xPos =
+      (1 - currentPose?.value.left[HAND_LANDMARK_IDS.index_finger_tip].x) *
+      canvas.value?.width;
+
+    const left_yPos =
+      currentPose?.value.left[HAND_LANDMARK_IDS.index_finger_tip].y *
+      canvas.value.height;
+    return {
+      left: {
+        x: left_xPos,
+        y: left_yPos,
+      },
+      right: {
+        x: right_xPos,
+        y: right_yPos,
+      },
+    };
+  }
+
+  return undefined;
+});
 
 function initializeHands() {
   hands.value = new Hands({
@@ -71,7 +119,7 @@ async function renderVideoOnCanvas(video: any) {
   canvasCtx.value?.clearRect(0, 0, width, height);
   if (canvasCtx.value) {
     canvasCtx.value?.drawImage(video, 0, 0, width || 1280, height || 720);
-    const currentPose = validateCurrentPose(
+    currentPose.value = validateCurrentPose(
       canvasCtx.value,
       predictions.value,
       multiHandLandmarks.value,
@@ -141,7 +189,7 @@ onMounted(() => {
         :width="width"
         :height="height"
         :class="className"
-        v-slot="{ xAxis, yAxis, xScaleLine }"
+        v-slot="{ xAxis, yAxis, xScaleLine, chartBounds }"
       >
         <ChartAxes
           :width="width"
@@ -151,8 +199,10 @@ onMounted(() => {
         />
         <LineCanvas
           :canvasDimensions="{ width, height }"
+          :chartBounds="chartBounds"
           :xScale="xScaleLine"
           :className="className"
+          :handPosition="handPosition"
         />
       </ChartWrapper>
     </CanvasWrapper>

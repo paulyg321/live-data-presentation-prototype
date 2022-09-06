@@ -8,7 +8,7 @@ import type {
   MultiHandednessObject,
   ParsedLandmarksObject,
 } from "../types/lib/media-pipe";
-import { HAND_LANDMARK_IDS } from "./constants";
+import { HAND_LANDMARK_IDS, NONE_OBJECT } from "./constants";
 
 export function mirrorLandmarkHorizontally(
   width: number,
@@ -81,7 +81,7 @@ export function validateCurrentPose(
       break;
     case CLASSES.NONE:
     default:
-      validatedPose = CLASSES.NONE;
+      validatedPose = NONE_OBJECT;
       break;
   }
   return validatedPose;
@@ -106,6 +106,7 @@ function validatePlayback(
   // Verify left hand is pointing
   if (handIndices.left !== undefined && handIndices.right !== undefined) {
     const leftHandLandmarks = multiHandLandmarks[handIndices.left];
+    const rightHandLandmarks = multiHandLandmarks[handIndices.right];
 
     const parsedLandmarks: ParsedLandmarksObject = LANDMARKS_TO_VALIDATE.reduce(
       (parsedLandmarks, landmark) => {
@@ -127,10 +128,14 @@ function validatePlayback(
     );
 
     if (isCorrectPlaybackSelectionHandLandmark(parsedLandmarks)) {
-      return CLASSES.PLAYBACK;
+      return {
+        class: CLASSES.PLAYBACK,
+        left: leftHandLandmarks,
+        right: rightHandLandmarks,
+      };
     }
   } else {
-    return CLASSES.NONE;
+    return NONE_OBJECT;
   }
 }
 
@@ -172,7 +177,7 @@ function validateEmphasis(
   ];
 
   if (handIndices.left === undefined || handIndices.right === undefined) {
-    return CLASSES.NONE;
+    return NONE_OBJECT;
   }
 
   const leftHandLandmarks = multiHandLandmarks[handIndices.left];
@@ -217,10 +222,14 @@ function validateEmphasis(
       rightHand: parsedLandmarks.right,
     })
   ) {
-    return type;
+    return {
+      class: type,
+      left: leftHandLandmarks,
+      right: rightHandLandmarks,
+    };
   }
 
-  return CLASSES.NONE;
+  return NONE_OBJECT;
 }
 
 // Ensure right landmarks to validate is setup

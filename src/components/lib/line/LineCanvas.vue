@@ -1,34 +1,70 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
-import { generateLineData, keepBetween, Line } from "@/utils";
+import { computed, onMounted, ref, type ComputedRef } from "vue";
+import {
+  generateLineData,
+  keepBetween,
+  Legend,
+  legendPosition,
+  Line,
+  type Coordinates,
+} from "@/utils";
 
 const props = defineProps<{
   canvasDimensions: {
     width: number;
     height: number;
   };
+  chartBounds: {
+    x: {
+      start: number;
+      end: number;
+    };
+    y: {
+      start: number;
+      end: number;
+    };
+  };
   xScale: any;
   className?: string;
+  handPosition?: {
+    left: Coordinates;
+    right: Coordinates;
+  };
 }>();
 const canvas = ref<HTMLCanvasElement | null>(null);
 const canvasCtx = ref<CanvasRenderingContext2D | null>(null);
-const line = ref<Line[]>([]);
-const endIndex = ref<number>(0);
-const fps = ref<number>(10);
+const lines = ref<Line[]>([]);
+const legends = ref<Legend[]>([]);
+const fps = ref<number>(60);
 const then = ref(Date.now());
+
+const computedIndex: ComputedRef<number> = computed(() => {
+  if (props.handPosition) {
+    const val = keepBetween({
+      value: props.xScale.invert(props.handPosition.right.x),
+      range: { start: 0, end: 100 },
+      roundValue: true,
+    });
+
+    return val;
+  }
+
+  return computedIndex.value;
+});
 
 function initializeLines() {
   const lineData = generateLineData(30, 200);
-  const lineData2 = generateLineData(30, 200);
+  const lineData2 = generateLineData(50, 200);
 
-  line.value = [
-    ...line.value,
+  lines.value = [
+    ...lines.value,
     new Line({
       data: lineData,
       context: canvasCtx.value,
       xScale: props.xScale,
       canvasDimensions: props.canvasDimensions,
       color: "blue",
+      label: "USA",
     }),
     new Line({
       data: lineData2,
@@ -36,21 +72,24 @@ function initializeLines() {
       xScale: props.xScale,
       canvasDimensions: props.canvasDimensions,
       color: "red",
+      label: "Canada",
     }),
   ];
 }
 
-function handleMouseMove (event: any) {
-  const canvasPosition = event.currentTarget.getBoundingClientRect();
-  const x = event.pageX - canvasPosition.left;
-
-  const currentIndex = keepBetween({
-    value: props.xScale.invert(x),
-    range: { start: 0, end: 100 },
-    roundValue: true,
+function initializeLegends() {
+  legends.value = lines.value.map((line, index) => {
+    return new Legend({
+      label: line.getLabel(),
+      context: canvasCtx.value,
+      color: line.getColor(),
+      position: {
+        x: legendPosition.x,
+        y: legendPosition.y + index * Legend.height,
+      },
+      line: line as Line,
+    });
   });
-
-  endIndex.value = currentIndex;
 }
 
 function drawLines() {
@@ -58,14 +97,17 @@ function drawLines() {
   const difference = now - then.value;
   if (difference > 1000 / fps.value) {
     canvasCtx.value?.clearRect(
-      0,
-      0,
+      props.chartBounds.x.start,
+      props.chartBounds.y.start,
       props.canvasDimensions.width,
-      props.canvasDimensions.height
+      props.chartBounds.y.end - props.chartBounds.y.start
     );
-    line.value.forEach((line) => {
-      line.setEndIndex(endIndex.value);
-      line.setIsSelected(true);
+    legends.value.forEach((legend, index) => {
+      const line = legend.getLine();
+      if (props.handPosition) {
+        legend.handleHover(props.handPosition.left, computedIndex.value);
+      }
+
       line.drawLine();
     });
     then.value = now;
@@ -74,12 +116,20 @@ function drawLines() {
   requestAnimationFrame(drawLines);
 }
 
+function drawLegend() {
+  legends.value.forEach((legend) => {
+    legend.drawLegend();
+  });
+}
+
 onMounted(() => {
   if (canvas.value) {
     canvasCtx.value = canvas.value.getContext("2d");
   }
   initializeLines();
+  initializeLegends();
   drawLines();
+  drawLegend();
 });
 </script>
 
@@ -89,9 +139,7 @@ onMounted(() => {
     :height="canvasDimensions.height"
     :class="className"
     ref="canvas"
-    @mousemove="handleMouseMove"
   ></canvas>
-  <p>HERE</p>
 </template>
 
 <style>
