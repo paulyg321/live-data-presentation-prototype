@@ -1,3 +1,4 @@
+import { HORIZONTAL_ORDER, VERTICAL_ORDER } from "../../media-pipe";
 import type { CoordinatesObject } from "../types/lib/calculations";
 
 export function calculateAngleBetweenPoints(
@@ -14,9 +15,17 @@ export function calculateDistance(
   pointA: CoordinatesObject,
   pointB: CoordinatesObject
 ) {
+  const verticalDistance = pointA.y - pointB.y;
+  const horizontalDistance = pointA.x - pointB.x;
   return {
-    horizontalDistance: Math.abs(pointA.x - pointB.x),
-    verticalDistance: Math.abs(pointA.y - pointB.y),
+    horizontalDistance: {
+      order: horizontalDistance < 0 ? HORIZONTAL_ORDER.LEFT : HORIZONTAL_ORDER.RIGHT,
+      value: Math.abs(horizontalDistance),
+    },
+    verticalDistance: {
+      order: verticalDistance < 0 ? VERTICAL_ORDER.ABOVE : VERTICAL_ORDER.BELOW,
+      value: Math.abs(verticalDistance),
+    },
     euclideanDistance: Math.sqrt(
       Math.pow(pointA.x - pointB.x, 2) + Math.pow(pointA.y - pointB.y, 2)
     ),

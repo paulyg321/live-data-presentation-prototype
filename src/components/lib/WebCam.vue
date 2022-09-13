@@ -53,10 +53,11 @@ onMounted(async () => {
 
 <style>
 .canvasbox {
+  display: none;
   border-radius: 3px;
   margin-right: 10px;
-  width: 450px;
-  height: 338px;
+  width: 640px;
+  height: 480px;
   border-bottom: 3px solid #0063ff;
   box-shadow: 0 2px 3px 0 rgba(0, 0, 0, 0.2), 0 4px 10px 0 #00000030;
 }

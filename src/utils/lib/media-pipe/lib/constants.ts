@@ -1,8 +1,18 @@
-import { CLASSES } from "../../teachable-machine";
+import { POSES } from "../../teachable-machine";
 
 export const HANDS = {
   LEFT: "Left",
   RIGHT: "Right",
+};
+
+export const VERTICAL_ORDER = {
+  ABOVE: 1,
+  BELOW: -1,
+};
+
+export const HORIZONTAL_ORDER = {
+  LEFT: 1,
+  RIGHT: -1,
 };
 
 export const HAND_LANDMARK_IDS = {
@@ -30,7 +40,7 @@ export const HAND_LANDMARK_IDS = {
 };
 
 export const NONE_OBJECT = {
-  class: CLASSES.NONE,
+  class: POSES.NONE,
   left: undefined,
   right: undefined,
 }

@@ -10,8 +10,8 @@ export interface LegendConstructorArgs {
 }
 
 export const legendPosition = {
-  x: 150,
-  y: 580,
+  x: 100,
+  y: 375,
 };
 
 export class Legend {
@@ -65,10 +65,10 @@ export class Legend {
 
   isInRange(position: Coordinates) {
     if (
-      position.x >= this.bounds.x.start &&
-      position.x <= this.bounds.x.end &&
-      position.y >= this.bounds.y.start &&
-      position.y <= this.bounds.y.end
+      position.x > this.bounds.x.start &&
+      position.x < this.bounds.x.end &&
+      position.y > this.bounds.y.start &&
+      position.y < this.bounds.y.end
     ) {
       return true;
     }
@@ -77,12 +77,6 @@ export class Legend {
   }
 
   handleHover(position: Coordinates, endIndex: number) {
-    console.log({
-      label: this.label,
-      position,
-      isInRange: this.isInRange(position),
-      bounds: this.bounds,
-    });
     if (this.isInRange(position)) {
       this.line.setEndIndex(endIndex);
     }

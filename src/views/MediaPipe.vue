@@ -4,10 +4,14 @@ import { onMounted, ref, toRaw, computed } from "vue";
 import { Hands } from "@mediapipe/hands";
 
 import {
-  CLASSES,
+  POSES,
   HAND_LANDMARK_IDS,
   validateCurrentPose,
   type MultiHandednessObject,
+  mirrorLandmarkHorizontally,
+  calculateDistance,
+  scaleLandmarksToChart,
+VERTICAL_ORDER,
 } from "@/utils";
 
 // components
@@ -16,6 +20,8 @@ import CanvasWrapper from "@/components/lib/CanvasWrapper.vue";
 import ChartAxes from "@/components/lib/axes/ChartAxes.vue";
 import ChartWrapper from "@/components/lib/axes/ChartWrapper.vue";
 import LineCanvas from "@/components/lib/line/LineCanvas.vue";
+
+const MIN_DIFF = 70;
 
 interface PredictionObject {
   className: string;
@@ -47,8 +53,15 @@ const currentPose = ref<{
   left: any;
   right: any;
 }>();
-const handPosition = computed(() => {
-  const isPlayback = currentPose.value?.class === CLASSES.PLAYBACK;
+const emphasisStack = ref<any[]>([]);
+const previousEmphasisDistance = ref<number>(0);
+const processedLandmarks = ref<any>();
+const timeoutId = ref<any>();
+const emphasisCount = ref<number>(1);
+const shouldIncrement = ref<boolean>(true);
+
+const playbackHandPosition = computed(() => {
+  const isPlayback = currentPose.value?.class === POSES.PLAYBACK;
 
   if (
     currentPose.value?.right &&
@@ -56,17 +69,21 @@ const handPosition = computed(() => {
     canvas.value &&
     currentPose.value?.left
   ) {
-    const right_xPos =
-      (1 - currentPose?.value.right[HAND_LANDMARK_IDS.middle_finger_tip].x) *
-      canvas.value?.width;
+    const right_xPos = mirrorLandmarkHorizontally(
+      canvas.value?.width,
+      currentPose?.value.right[HAND_LANDMARK_IDS.middle_finger_tip].x *
+        canvas.value.width
+    );
 
     const right_yPos =
       currentPose?.value.right[HAND_LANDMARK_IDS.middle_finger_tip].y *
       canvas.value.height;
 
-    const left_xPos =
-      (1 - currentPose?.value.left[HAND_LANDMARK_IDS.index_finger_tip].x) *
-      canvas.value?.width;
+    const left_xPos = mirrorLandmarkHorizontally(
+      canvas.value?.width,
+      currentPose?.value.left[HAND_LANDMARK_IDS.middle_finger_tip].x *
+        canvas.value.width
+    );
 
     const left_yPos =
       currentPose?.value.left[HAND_LANDMARK_IDS.index_finger_tip].y *
@@ -113,19 +130,134 @@ function onResults(results: {
   multiHandedness.value = results.multiHandedness;
 }
 
+function handleInitialPoseDetection() {
+  const previousPose = emphasisStack.value[0];
+  const diff = calculateDistance(
+    previousPose.handPosition.left[HAND_LANDMARK_IDS.middle_finger_tip],
+    processedLandmarks.value.left[HAND_LANDMARK_IDS.middle_finger_tip]
+  );
+  if (diff.euclideanDistance < 30) {
+    emphasisStack.value.push({
+      handPosition: {
+        left: processedLandmarks.value.left,
+        right: processedLandmarks.value.right,
+      },
+      distance: {
+        left: calculateDistance(
+          processedLandmarks.value.left[HAND_LANDMARK_IDS.middle_finger_tip],
+          processedLandmarks.value.left[HAND_LANDMARK_IDS.wrist]
+        ),
+        right: calculateDistance(
+          processedLandmarks.value.right[HAND_LANDMARK_IDS.middle_finger_tip],
+          processedLandmarks.value.right[HAND_LANDMARK_IDS.wrist]
+        ),
+      },
+    });
+  } else {
+    emphasisStack.value = [];
+    clearTimeout(timeoutId.value);
+    timeoutId.value = undefined;
+  }
+}
+
 async function renderVideoOnCanvas(video: any) {
   const width = canvas.value?.width || 1280;
   const height = canvas.value?.height || 720;
   canvasCtx.value?.clearRect(0, 0, width, height);
   if (canvasCtx.value) {
     canvasCtx.value?.drawImage(video, 0, 0, width || 1280, height || 720);
-    currentPose.value = validateCurrentPose(
+    const pose = validateCurrentPose(
       canvasCtx.value,
       predictions.value,
       multiHandLandmarks.value,
       { width, height },
       multiHandedness.value
     );
+    currentPose.value = pose;
+    // EMPHASIS TRIGGER
+    if (pose?.class === POSES.EMPHASIS) {
+      processedLandmarks.value = {
+        left: scaleLandmarksToChart({
+          landmarks: pose.left,
+          canvasDimensions: { width, height },
+          indices: [
+            HAND_LANDMARK_IDS.middle_finger_tip,
+            HAND_LANDMARK_IDS.wrist,
+          ],
+        }),
+        right: scaleLandmarksToChart({
+          landmarks: pose.right,
+          canvasDimensions: { width, height },
+          indices: [
+            HAND_LANDMARK_IDS.middle_finger_tip,
+            HAND_LANDMARK_IDS.wrist,
+          ],
+        }),
+      };
+      if (emphasisStack.value.length === 0) {
+        emphasisStack.value.push({
+          handPosition: {
+            left: processedLandmarks.value.left,
+            right: processedLandmarks.value.right,
+          },
+          distance: {
+            left: calculateDistance(
+              processedLandmarks.value.left[
+                HAND_LANDMARK_IDS.middle_finger_tip
+              ],
+              processedLandmarks.value.left[HAND_LANDMARK_IDS.wrist]
+            ),
+            right: calculateDistance(
+              processedLandmarks.value.right[
+                HAND_LANDMARK_IDS.middle_finger_tip
+              ],
+              processedLandmarks.value.right[HAND_LANDMARK_IDS.wrist]
+            ),
+          },
+        });
+      } else if (emphasisStack.value.length === 1) {
+        if (!timeoutId.value) {
+          timeoutId.value = setTimeout(handleInitialPoseDetection, 2000);
+        }
+      } else {
+        const previousPose = emphasisStack.value[1];
+        // order is important here
+        const diff = calculateDistance(
+          previousPose.handPosition.left[HAND_LANDMARK_IDS.middle_finger_tip],
+          processedLandmarks.value.left[HAND_LANDMARK_IDS.middle_finger_tip]
+        );
+        if (
+          diff.verticalDistance.value > 0 &&
+          diff.verticalDistance.order === VERTICAL_ORDER.ABOVE
+        ) {
+          if (previousEmphasisDistance.value > diff.verticalDistance.value && shouldIncrement.value) {
+            emphasisCount.value = emphasisCount.value + 1;
+            console.log(emphasisCount.value);
+            shouldIncrement.value = false;
+          } else {
+            previousEmphasisDistance.value = diff.verticalDistance.value;
+          }
+        } else {
+          shouldIncrement.value = true;
+        }
+      }
+    }
+    emphasisStack.value.forEach((pose) => {
+      if (canvasCtx.value) {
+        canvasCtx.value?.beginPath();
+        canvasCtx.value?.arc(
+          pose.handPosition.left[HAND_LANDMARK_IDS.middle_finger_tip].x,
+          pose.handPosition.left[HAND_LANDMARK_IDS.middle_finger_tip].y,
+          5,
+          0,
+          2 * Math.PI,
+          false
+        );
+        canvasCtx.value.fillStyle = "blue";
+        canvasCtx.value?.fill();
+      }
+    });
+    // EMPHASIS TRIGGER
   }
   await getPosePrediction(canvas.value);
 }
@@ -158,6 +290,16 @@ async function setVideoDimensions(video: any) {
   }
 }
 
+// CLEAR EXISTING POINTS
+window.addEventListener("keypress", (event) => {
+  event.preventDefault();
+  if (event.key === " " || event.code === "Space") {
+    emphasisStack.value = [];
+    timeoutId.value = undefined;
+  }
+});
+// CLEAR EXISTING POINTS
+
 onMounted(() => {
   if (canvas.value) {
     canvasCtx.value = canvas.value.getContext("2d");
@@ -172,10 +314,9 @@ onMounted(() => {
 
 <template>
   <div class="about">
-    <video class="input_video" ref="video"></video>
     <CanvasWrapper
-      :width="1020"
-      :height="765"
+      :width="640"
+      :height="480"
       v-slot="{ width, height, className }"
     >
       <canvas
@@ -202,7 +343,8 @@ onMounted(() => {
           :chartBounds="chartBounds"
           :xScale="xScaleLine"
           :className="className"
-          :handPosition="handPosition"
+          :handPosition="playbackHandPosition"
+          :fps="emphasisCount"
         />
       </ChartWrapper>
     </CanvasWrapper>
@@ -214,12 +356,11 @@ onMounted(() => {
 </template>
 
 <style>
-@media (min-width: 1024px) {
-  .about {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
+.about {
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 </style>

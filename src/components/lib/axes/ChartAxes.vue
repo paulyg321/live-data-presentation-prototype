@@ -36,7 +36,6 @@ onMounted(() => {
       props.xAxis?.xExtent ?? [0, 0]
     );
 
-    console.log("here");
     drawYAxis(
       canvasCtx.value,
       props.yAxis?.yScale,

@@ -1,5 +1,4 @@
 import { createApp } from "vue";
-import App from "./App.vue";
 import MediaPipe from "./views/MediaPipe.vue";
 // import router from "./router";
 

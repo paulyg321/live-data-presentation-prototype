@@ -3,7 +3,7 @@ import {
   calculateDistance,
 } from "../../calculations";
 import type { ChartDimensions } from "../../chart";
-import { CLASSES, type PredictionObject } from "../../teachable-machine";
+import { POSES, type PredictionObject } from "../../teachable-machine";
 import type {
   MultiHandednessObject,
   ParsedLandmarksObject,
@@ -57,12 +57,12 @@ export function validateCurrentPose(
       }
       return maxPrediction;
     },
-    { className: CLASSES.NONE, probability: -Infinity } as PredictionObject
+    { className: POSES.NONE, probability: -Infinity } as PredictionObject
   );
 
   let validatedPose;
   switch (currentPose.className) {
-    case CLASSES.PLAYBACK:
+    case POSES.PLAYBACK:
       validatedPose = validatePlayback(
         canvasCtx,
         multiHandLandmarks,
@@ -70,16 +70,16 @@ export function validateCurrentPose(
         handIndices
       );
       break;
-    case CLASSES.EMPHASIS:
+    case POSES.EMPHASIS:
       validatedPose = validateEmphasis(
         canvasCtx,
         multiHandLandmarks,
         chartDimensions,
         handIndices,
-        CLASSES.EMPHASIS
+        POSES.EMPHASIS
       );
       break;
-    case CLASSES.NONE:
+    case POSES.NONE:
     default:
       validatedPose = NONE_OBJECT;
       break;
@@ -129,7 +129,7 @@ function validatePlayback(
 
     if (isCorrectPlaybackSelectionHandLandmark(parsedLandmarks)) {
       return {
-        class: CLASSES.PLAYBACK,
+        class: POSES.PLAYBACK,
         left: leftHandLandmarks,
         right: rightHandLandmarks,
       };
@@ -266,8 +266,8 @@ function isCorrectInitiateEmphasisHandLandmark({
     );
 
     if (
-      handDistance.horizontalDistance < 400 &&
-      handDistance.verticalDistance < 300
+      handDistance.horizontalDistance.value < 400 &&
+      handDistance.verticalDistance.value < 300
     ) {
       return true;
     }
@@ -275,4 +275,43 @@ function isCorrectInitiateEmphasisHandLandmark({
   }
 
   return false;
+}
+
+export function scaleLandmarksToChart({
+  landmarks,
+  canvasDimensions,
+  indices,
+}: {
+  landmarks: any;
+  canvasDimensions: {
+    width: number;
+    height: number;
+  };
+  indices?: number[];
+}) {
+  if (indices && indices.length > 0) {
+    const processedLandmarks = [...landmarks];
+
+    indices.forEach((index: number) => {
+      processedLandmarks[index] = {
+        x: mirrorLandmarkHorizontally(
+          canvasDimensions.width,
+          canvasDimensions.width * processedLandmarks[index].x
+        ),
+        y: canvasDimensions.height * processedLandmarks[index].y,
+      };
+    });
+
+    return processedLandmarks;
+  }
+
+  return landmarks.map((landmark: any) => {
+    return {
+      x: mirrorLandmarkHorizontally(
+        canvasDimensions.width,
+        canvasDimensions.width * landmark.x
+      ),
+      y: canvasDimensions.height * landmark.y,
+    };
+  });
 }

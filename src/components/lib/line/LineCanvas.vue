@@ -30,12 +30,12 @@ const props = defineProps<{
     left: Coordinates;
     right: Coordinates;
   };
+  fps: number;
 }>();
 const canvas = ref<HTMLCanvasElement | null>(null);
 const canvasCtx = ref<CanvasRenderingContext2D | null>(null);
 const lines = ref<Line[]>([]);
 const legends = ref<Legend[]>([]);
-const fps = ref<number>(60);
 const then = ref(Date.now());
 
 const computedIndex: ComputedRef<number> = computed(() => {
@@ -95,7 +95,7 @@ function initializeLegends() {
 function drawLines() {
   const now = Date.now();
   const difference = now - then.value;
-  if (difference > 1000 / fps.value) {
+  if (difference > 1000 / props.fps) {
     canvasCtx.value?.clearRect(
       props.chartBounds.x.start,
       props.chartBounds.y.start,

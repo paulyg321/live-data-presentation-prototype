@@ -30,8 +30,8 @@ const chartBounds = {
       (CHART_DIMENSIONS.width - CHART_DIMENSIONS.margin.right),
   },
   y: {
-    start: CHART_DIMENSIONS.margin.top,
-    end: CHART_DIMENSIONS.height - CHART_DIMENSIONS.margin.bottom,
+    start: CHART_DIMENSIONS.height - CHART_DIMENSIONS.margin.bottom,
+    end: CHART_DIMENSIONS.margin.top,
   },
 };
 
