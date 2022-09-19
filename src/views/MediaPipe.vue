@@ -2,6 +2,7 @@
 <script setup lang="ts">
 import { onMounted, ref, toRaw, computed } from "vue";
 import { Hands } from "@mediapipe/hands";
+import StyledWindowDiv from "@/components/lib/styled-components/StyledWindowDiv.vue";
 
 import {
   POSES,
@@ -11,7 +12,7 @@ import {
   mirrorLandmarkHorizontally,
   calculateDistance,
   scaleLandmarksToChart,
-VERTICAL_ORDER,
+  VERTICAL_ORDER,
 } from "@/utils";
 
 // components
@@ -20,8 +21,7 @@ import CanvasWrapper from "@/components/lib/CanvasWrapper.vue";
 import ChartAxes from "@/components/lib/axes/ChartAxes.vue";
 import ChartWrapper from "@/components/lib/axes/ChartWrapper.vue";
 import LineCanvas from "@/components/lib/line/LineCanvas.vue";
-
-const MIN_DIFF = 70;
+import EmphasisLevelCanvas from "../components/lib/line/EmphasisLevelCanvas.vue";
 
 interface PredictionObject {
   className: string;
@@ -57,8 +57,12 @@ const emphasisStack = ref<any[]>([]);
 const previousEmphasisDistance = ref<number>(0);
 const processedLandmarks = ref<any>();
 const timeoutId = ref<any>();
-const emphasisCount = ref<number>(1);
+const emphasisCount = ref<number>(0);
 const shouldIncrement = ref<boolean>(true);
+
+const shouldDecrement = computed(() => {
+  return currentPose.value?.class === POSES.EMPHASIS;
+});
 
 const playbackHandPosition = computed(() => {
   const isPlayback = currentPose.value?.class === POSES.PLAYBACK;
@@ -174,6 +178,10 @@ async function renderVideoOnCanvas(video: any) {
       multiHandedness.value
     );
     currentPose.value = pose;
+    // if (pose?.class === POSES.NONE) {
+    //   emphasisStack.value = [];
+    //   timeoutId.value = undefined;
+    // }
     // EMPHASIS TRIGGER
     if (pose?.class === POSES.EMPHASIS) {
       processedLandmarks.value = {
@@ -217,7 +225,7 @@ async function renderVideoOnCanvas(video: any) {
         });
       } else if (emphasisStack.value.length === 1) {
         if (!timeoutId.value) {
-          timeoutId.value = setTimeout(handleInitialPoseDetection, 2000);
+          timeoutId.value = setTimeout(handleInitialPoseDetection, 1000);
         }
       } else {
         const previousPose = emphasisStack.value[1];
@@ -230,10 +238,14 @@ async function renderVideoOnCanvas(video: any) {
           diff.verticalDistance.value > 0 &&
           diff.verticalDistance.order === VERTICAL_ORDER.ABOVE
         ) {
-          if (previousEmphasisDistance.value > diff.verticalDistance.value && shouldIncrement.value) {
-            emphasisCount.value = emphasisCount.value + 1;
-            console.log(emphasisCount.value);
-            shouldIncrement.value = false;
+          if (
+            previousEmphasisDistance.value > diff.verticalDistance.value &&
+            shouldIncrement.value
+          ) {
+            if (emphasisCount.value < 3) {
+              emphasisCount.value = emphasisCount.value + 1;
+              shouldIncrement.value = false;
+            }
           } else {
             previousEmphasisDistance.value = diff.verticalDistance.value;
           }
@@ -242,19 +254,20 @@ async function renderVideoOnCanvas(video: any) {
         }
       }
     }
-    emphasisStack.value.forEach((pose) => {
-      if (canvasCtx.value) {
+    emphasisStack.value.forEach((pose, index) => {
+      if (canvasCtx.value && canvas.value && index === 0) {
         canvasCtx.value?.beginPath();
-        canvasCtx.value?.arc(
-          pose.handPosition.left[HAND_LANDMARK_IDS.middle_finger_tip].x,
-          pose.handPosition.left[HAND_LANDMARK_IDS.middle_finger_tip].y,
-          5,
+        // canvasCtx.value?.arc(0, 0, 5, 0, 2 * Math.PI, false);
+        canvasCtx.value.moveTo(
           0,
-          2 * Math.PI,
-          false
+          pose.handPosition.left[HAND_LANDMARK_IDS.middle_finger_tip].y
         );
-        canvasCtx.value.fillStyle = "blue";
-        canvasCtx.value?.fill();
+        canvasCtx.value.lineTo(
+          canvas.value.width,
+          pose.handPosition.left[HAND_LANDMARK_IDS.middle_finger_tip].y
+        );
+        canvasCtx.value.strokeStyle = "blue";
+        canvasCtx.value?.stroke();
       }
     });
     // EMPHASIS TRIGGER
@@ -275,8 +288,12 @@ async function getPosePrediction(video: any) {
 }
 
 async function runDetection(video: any) {
-  if (hands.value) {
-    await toRaw(hands.value).send({ image: video });
+  if (hands.value && video) {
+    try {
+      await toRaw(hands.value).send({ image: video });
+    } catch (error) {
+      console.log("error", error);
+    }
   }
   await renderVideoOnCanvas(video);
   requestAnimationFrame(() => runDetection(video));
@@ -288,6 +305,10 @@ async function setVideoDimensions(video: any) {
     video.height = video.width * (video.videoHeight / video.videoWidth); //* (3 / 4);
     video.play();
   }
+}
+
+async function decrementEmphasisCount() {
+  emphasisCount.value = emphasisCount.value - 1;
 }
 
 // CLEAR EXISTING POINTS
@@ -313,7 +334,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="about">
+  <StyledWindowDiv>
     <CanvasWrapper
       :width="640"
       :height="480"
@@ -346,21 +367,20 @@ onMounted(() => {
           :handPosition="playbackHandPosition"
           :fps="emphasisCount"
         />
+        <EmphasisLevelCanvas
+          :canvasDimensions="{ width, height }"
+          :className="className"
+          :level="emphasisCount"
+          :decrementEmphasisCount="decrementEmphasisCount"
+          :canDecrement="shouldDecrement"
+        />
       </ChartWrapper>
     </CanvasWrapper>
     <WebcamVue
       @loaded-data="runDetection"
       @loaded-metadata="setVideoDimensions"
     />
-  </div>
+  </StyledWindowDiv>
 </template>
 
-<style>
-.about {
-  width: 100vw;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-</style>
+<style></style>

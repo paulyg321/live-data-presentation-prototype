@@ -19,7 +19,7 @@ export class Line {
   private color: string;
   private label: string;
 
-  private endIndex = 100;
+  private endIndex = 20;
   private isSelected = false;
   private lineData: Coordinates[] = [];
 
@@ -45,7 +45,9 @@ export class Line {
     const ctx = this.context;
     if (ctx) {
       ctx.beginPath();
+      ctx.lineWidth = 4;
       ctx.strokeStyle = this.color;
+      ctx.lineCap = "round";
 
       this.lineData = this.data.slice(0, this.endIndex);
 
@@ -55,7 +57,6 @@ export class Line {
         }
         ctx.lineTo(this.xScale(point.x), point.y);
       });
-
       ctx.stroke();
     }
   }
@@ -78,5 +79,13 @@ export class Line {
 
   setIsSelected(isSelected: boolean) {
     this.isSelected = isSelected;
+  }
+
+  setData(data: Coordinates[]) {
+    this.data = data;
+  }
+
+  setColor(color: string) {
+    this.color = color;
   }
 }

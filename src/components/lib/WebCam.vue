@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onMounted, ref, watch } from "vue";
 import {
   getVideoSources,
   getVideoStream,
@@ -12,10 +12,9 @@ const videoSources = ref<VideoSourcesTypes[]>([]);
 const currentSource = ref<string>("");
 const video = ref<HTMLVideoElement | null>(null);
 
-async function handleChangeSource(event: any) {
-  currentSource.value = event.target.value;
-  stream.value = await getVideoStream(currentSource.value);
-}
+watch(currentSource, async (newSource) => {
+  stream.value = await getVideoStream(newSource);
+});
 
 onMounted(async () => {
   videoSources.value = await getVideoSources();
@@ -33,32 +32,26 @@ onMounted(async () => {
     @loadeddata="$emit('loaded-data', video)"
     @loadedmetadata="$emit('loaded-metadata', video)"
   ></video>
-  <select
-    :value="currentSource"
-    @change="handleChangeSource"
-    v-model="currentSource"
-  >
-    <option value="" disabled selected>Select Camera</option>
-    <option
-      v-for="videoSource in videoSources"
-      :value="videoSource.id"
-      :key="videoSource.id"
-    >
-      {{ videoSource.label }}
-    </option>
-  </select>
+  <div v-if="currentSource === ''" class="radio-input-container">
+    <span v-for="videoSource in videoSources" :key="videoSource.id">
+      <input type="radio" v-model="currentSource" :value="videoSource.id" />
+      <label>{{ videoSource.label }}</label>
+    </span>
+  </div>
 </template>
-
-<!-- STYLES -->
 
 <style>
 .canvasbox {
   display: none;
-  border-radius: 3px;
-  margin-right: 10px;
-  width: 640px;
-  height: 480px;
-  border-bottom: 3px solid #0063ff;
-  box-shadow: 0 2px 3px 0 rgba(0, 0, 0, 0.2), 0 4px 10px 0 #00000030;
+}
+
+.radio-input-container {
+  display: flex;
+  flex-direction: column;
+  color: #F27405;
+}
+
+.radio-input-container label {
+  margin-left: 10px;
 }
 </style>

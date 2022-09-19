@@ -1,3 +1,5 @@
+const AXES_COLOR = "white";
+
 // Extent is usually the min/max
 export function drawXAxis(
   context: CanvasRenderingContext2D,
@@ -10,7 +12,7 @@ export function drawXAxis(
     xTicks = xScale.ticks(), // You may choose tick counts. ex: xScale.ticks(20)
     xTickFormat = xScale.tickFormat(); // you may choose the format. ex: xScale.tickFormat(tickCount, ".0s")
 
-  context.strokeStyle = "black";
+  context.strokeStyle = AXES_COLOR;
 
   context.beginPath();
   xTicks.forEach((d: any) => {
@@ -28,9 +30,10 @@ export function drawXAxis(
 
   context.textAlign = "center";
   context.textBaseline = "top";
-  context.fillStyle = "black";
+  context.fillStyle = AXES_COLOR;
   xTicks.forEach((d: any) => {
     context.beginPath();
+    context.font = "12px Arial";
     context.fillText(xTickFormat(d), xScale(d), Y + tickSize);
   });
 }
@@ -47,7 +50,7 @@ export function drawYAxis(
     yTicks = yScale.ticks(10),
     yTickFormat = yScale.tickFormat();
 
-  context.strokeStyle = "black";
+  context.strokeStyle = AXES_COLOR;
   context.beginPath();
   yTicks.forEach((d: any) => {
     context.moveTo(X, yScale(d));
@@ -64,9 +67,10 @@ export function drawYAxis(
 
   context.textAlign = "right";
   context.textBaseline = "middle";
-  context.fillStyle = "black";
+  context.fillStyle = AXES_COLOR;
   yTicks.forEach((d: any) => {
     context.beginPath();
+    context.font = "12px Arial";
     context.fillText(yTickFormat(d), X - tickSize - tickPadding, yScale(d));
   });
 }

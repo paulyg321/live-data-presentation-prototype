@@ -37,7 +37,7 @@ export function getRandomArbitrary(min: number, max: number) {
 }
 
 export function generateLineData(minY: number, maxY: number) {
-  return new Array(100)
+  return new Array(20)
     .fill(0)
     .map((val, index) => ({ x: index, y: getRandomArbitrary(minY, maxY) }));
 }

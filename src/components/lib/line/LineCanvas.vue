@@ -9,6 +9,8 @@ import {
   type Coordinates,
 } from "@/utils";
 
+const EMPHASIS_TO_FPS = [10, 20, 40, 60];
+
 const props = defineProps<{
   canvasDimensions: {
     width: number;
@@ -35,6 +37,7 @@ const props = defineProps<{
 const canvas = ref<HTMLCanvasElement | null>(null);
 const canvasCtx = ref<CanvasRenderingContext2D | null>(null);
 const lines = ref<Line[]>([]);
+const handTracker = ref<Line>();
 const legends = ref<Legend[]>([]);
 const then = ref(Date.now());
 
@@ -42,7 +45,7 @@ const computedIndex: ComputedRef<number> = computed(() => {
   if (props.handPosition) {
     const val = keepBetween({
       value: props.xScale.invert(props.handPosition.right.x),
-      range: { start: 0, end: 100 },
+      range: { start: 0, end: 20 },
       roundValue: true,
     });
 
@@ -55,6 +58,7 @@ const computedIndex: ComputedRef<number> = computed(() => {
 function initializeLines() {
   const lineData = generateLineData(30, 200);
   const lineData2 = generateLineData(50, 200);
+  const lineData3 = generateLineData(80, 300);
 
   lines.value = [
     ...lines.value,
@@ -63,7 +67,7 @@ function initializeLines() {
       context: canvasCtx.value,
       xScale: props.xScale,
       canvasDimensions: props.canvasDimensions,
-      color: "blue",
+      color: "rgba(4,217,255,0.8)",
       label: "USA",
     }),
     new Line({
@@ -71,10 +75,27 @@ function initializeLines() {
       context: canvasCtx.value,
       xScale: props.xScale,
       canvasDimensions: props.canvasDimensions,
-      color: "red",
+      color: "rgba(247,33,25,0.8)",
       label: "Canada",
     }),
+    new Line({
+      data: lineData3,
+      context: canvasCtx.value,
+      xScale: props.xScale,
+      canvasDimensions: props.canvasDimensions,
+      color: "rgba(0,255,0,0.6)",
+      label: "Mexico",
+    }),
   ];
+
+  handTracker.value = new Line({
+    data: [],
+    context: canvasCtx.value,
+    xScale: props.xScale,
+    canvasDimensions: props.canvasDimensions,
+    color: "white",
+    label: "Hand Tracker",
+  });
 }
 
 function initializeLegends() {
@@ -95,21 +116,40 @@ function initializeLegends() {
 function drawLines() {
   const now = Date.now();
   const difference = now - then.value;
-  if (difference > 1000 / props.fps) {
+  if (difference > 1000 / EMPHASIS_TO_FPS[props.fps]) {
     canvasCtx.value?.clearRect(
       props.chartBounds.x.start,
       props.chartBounds.y.start,
       props.canvasDimensions.width,
       props.chartBounds.y.end - props.chartBounds.y.start
     );
+    if (canvasCtx.value) {
+      canvasCtx.value.fillStyle = "rgba(0,0,0,0.6)";
+    }
+    canvasCtx.value?.fillRect(
+      props.chartBounds.x.start,
+      props.chartBounds.y.start,
+      props.chartBounds.x.end - props.chartBounds.x.start,
+      props.chartBounds.y.end - props.chartBounds.y.start
+    );
     legends.value.forEach((legend, index) => {
       const line = legend.getLine();
       if (props.handPosition) {
-        legend.handleHover(props.handPosition.left, computedIndex.value);
+        legend.handleHover(props.handPosition.left, computedIndex.value, () => {
+          handTracker.value?.setColor(legend.getLine().getColor());
+        });
       }
 
       line.drawLine();
     });
+    if (props.handPosition) {
+      const RIGHT_X = props.xScale.invert(props.handPosition.right.x);
+      handTracker.value?.setData([
+        { x: RIGHT_X, y: props.chartBounds.y.start - 10 },
+        { x: RIGHT_X, y: props.chartBounds.y.end + 10 },
+      ]);
+      handTracker.value?.drawLine();
+    }
     then.value = now;
   }
 

@@ -1,5 +1,6 @@
 import type { Coordinates } from "../../../types";
 import type { Line } from "./line";
+import { CanvasText } from "./canvas-text";
 
 export interface LegendConstructorArgs {
   label: string;
@@ -11,7 +12,7 @@ export interface LegendConstructorArgs {
 
 export const legendPosition = {
   x: 100,
-  y: 375,
+  y: 350,
 };
 
 export class Legend {
@@ -21,9 +22,10 @@ export class Legend {
   private position: Coordinates;
   private line: Line;
   private bounds: any;
+  private text: CanvasText;
 
   static width = 200;
-  static height = 50;
+  static height = 35;
 
   constructor({
     label,
@@ -47,19 +49,27 @@ export class Legend {
         end: position.y + Legend.height,
       },
     };
+    this.text = new CanvasText({
+      context,
+      position: { x: position.x + 10, y: position.y + 25 },
+      color: "white",
+      label,
+    });
   }
 
   drawLegend() {
     const ctx = this.context;
     if (ctx) {
-      ctx.strokeStyle = this.color;
+      ctx.fillStyle = this.color;
 
-      ctx?.strokeRect(
+      ctx?.fillRect(
         this.position.x,
         this.position.y,
         Legend.width,
         Legend.height
       );
+
+      this.text.drawText();
     }
   }
 
@@ -76,9 +86,12 @@ export class Legend {
     return false;
   }
 
-  handleHover(position: Coordinates, endIndex: number) {
+  handleHover(position: Coordinates, endIndex: number, callback?: () => void) {
     if (this.isInRange(position)) {
       this.line.setEndIndex(endIndex);
+      if (callback) {
+        callback();
+      }
     }
   }
 

@@ -62,7 +62,7 @@ const yAxis = {
 };
 
 // ---- X SCALE FOR LINE ---
-const xDomainLine = [0, 100];
+const xDomainLine = [0, 20];
 const xRangeLine = [chartBounds.x.start, chartBounds.x.end];
 const xScaleLine = d3.scaleLinear(xDomainLine, xRangeLine);
 </script>

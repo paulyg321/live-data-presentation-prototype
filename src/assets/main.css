@@ -25,11 +25,14 @@ a,
   body {
     display: flex;
     place-items: center;
+    background: rgb(255,181,142);
+    background: linear-gradient(0deg, rgba(255,181,142,1) 0%, rgba(255,255,255,1) 100%);
   }
 
   #app {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
     padding: 0 2rem;
+    width: 100%;
+    justify-content: center;
   }
 }
