@@ -31,7 +31,7 @@ a,
 
   #app {
     display: flex;
-    padding: 0 2rem;
+    /* padding: 0 2rem; */
     width: 100%;
     justify-content: center;
   }

@@ -10,9 +10,9 @@ import {
   validateCurrentPose,
   type MultiHandednessObject,
   mirrorLandmarkHorizontally,
-  calculateDistance,
   scaleLandmarksToChart,
-  VERTICAL_ORDER,
+  handleEmphasis,
+  handlePlayback,
 } from "@/utils";
 
 // components
@@ -42,6 +42,8 @@ const MEDIA_PIPE_URL = (file: string) =>
 
 const canvas = ref<HTMLCanvasElement | null>(null);
 const canvasCtx = ref<CanvasRenderingContext2D | null>(null);
+const audienceCanvas = ref<HTMLCanvasElement | null>(null);
+const audienceCanvasCtx = ref<CanvasRenderingContext2D | null>(null);
 const hands = ref<Hands | null>(null);
 const model = ref<tmPose.CustomPoseNet | null>(null);
 const maxPredictions = ref<number>(0);
@@ -54,24 +56,36 @@ const currentPose = ref<{
   right: any;
 }>();
 const emphasisStack = ref<any[]>([]);
-const previousEmphasisDistance = ref<number>(0);
-const processedLandmarks = ref<any>();
-const timeoutId = ref<any>();
 const emphasisCount = ref<number>(0);
-const shouldIncrement = ref<boolean>(true);
+const emphasisHandler = ref<(landmarks: any, count: number) => any>();
+const resetEmphasis = ref<() => any>();
+
+const isPlaybackMode = ref<boolean>(false);
+
+const playbackHandler = ref<(landmarks: any) => any>();
+const resetPlayback = ref<() => void>();
+const chartSize = ref<number>(0.75);
+const chartXPosition = ref<number>(0);
+const chartYPosition = ref<number>(0);
+
+const chartWidth = computed(() => {
+  return 640 * chartSize.value;
+});
+
+const chartHeight = computed(() => {
+  return 480 * chartSize.value;
+});
 
 const shouldDecrement = computed(() => {
   return currentPose.value?.class === POSES.EMPHASIS;
 });
 
 const playbackHandPosition = computed(() => {
-  const isPlayback = currentPose.value?.class === POSES.PLAYBACK;
-
   if (
     currentPose.value?.right &&
-    isPlayback &&
-    canvas.value &&
-    currentPose.value?.left
+    currentPose.value?.left &&
+    isPlaybackMode.value &&
+    canvas.value
   ) {
     const right_xPos = mirrorLandmarkHorizontally(
       canvas.value?.width,
@@ -134,143 +148,92 @@ function onResults(results: {
   multiHandedness.value = results.multiHandedness;
 }
 
-function handleInitialPoseDetection() {
-  const previousPose = emphasisStack.value[0];
-  const diff = calculateDistance(
-    previousPose.handPosition.left[HAND_LANDMARK_IDS.middle_finger_tip],
-    processedLandmarks.value.left[HAND_LANDMARK_IDS.middle_finger_tip]
-  );
-  if (diff.euclideanDistance < 30) {
-    emphasisStack.value.push({
-      handPosition: {
-        left: processedLandmarks.value.left,
-        right: processedLandmarks.value.right,
-      },
-      distance: {
-        left: calculateDistance(
-          processedLandmarks.value.left[HAND_LANDMARK_IDS.middle_finger_tip],
-          processedLandmarks.value.left[HAND_LANDMARK_IDS.wrist]
-        ),
-        right: calculateDistance(
-          processedLandmarks.value.right[HAND_LANDMARK_IDS.middle_finger_tip],
-          processedLandmarks.value.right[HAND_LANDMARK_IDS.wrist]
-        ),
-      },
-    });
-  } else {
-    emphasisStack.value = [];
-    clearTimeout(timeoutId.value);
-    timeoutId.value = undefined;
-  }
-}
-
 async function renderVideoOnCanvas(video: any) {
   const width = canvas.value?.width || 1280;
   const height = canvas.value?.height || 720;
+  // RENDER ON AUDIENCE CANVAS
   canvasCtx.value?.clearRect(0, 0, width, height);
+  audienceCanvasCtx.value?.clearRect(0, 0, width, height);
   if (canvasCtx.value) {
+    // RENDER ON AUDIENCE CANVAS
     canvasCtx.value?.drawImage(video, 0, 0, width || 1280, height || 720);
-    const pose = validateCurrentPose(
+    audienceCanvasCtx.value?.drawImage(
+      video,
+      0,
+      0,
+      width || 1280,
+      height || 720
+    );
+    currentPose.value = validateCurrentPose(
       canvasCtx.value,
       predictions.value,
       multiHandLandmarks.value,
       { width, height },
       multiHandedness.value
     );
-    currentPose.value = pose;
-    // if (pose?.class === POSES.NONE) {
-    //   emphasisStack.value = [];
-    //   timeoutId.value = undefined;
-    // }
-    // EMPHASIS TRIGGER
-    if (pose?.class === POSES.EMPHASIS) {
-      processedLandmarks.value = {
-        left: scaleLandmarksToChart({
-          landmarks: pose.left,
-          canvasDimensions: { width, height },
-          indices: [
-            HAND_LANDMARK_IDS.middle_finger_tip,
-            HAND_LANDMARK_IDS.wrist,
-          ],
-        }),
-        right: scaleLandmarksToChart({
-          landmarks: pose.right,
-          canvasDimensions: { width, height },
-          indices: [
-            HAND_LANDMARK_IDS.middle_finger_tip,
-            HAND_LANDMARK_IDS.wrist,
-          ],
-        }),
-      };
-      if (emphasisStack.value.length === 0) {
-        emphasisStack.value.push({
-          handPosition: {
-            left: processedLandmarks.value.left,
-            right: processedLandmarks.value.right,
-          },
-          distance: {
-            left: calculateDistance(
-              processedLandmarks.value.left[
-                HAND_LANDMARK_IDS.middle_finger_tip
-              ],
-              processedLandmarks.value.left[HAND_LANDMARK_IDS.wrist]
-            ),
-            right: calculateDistance(
-              processedLandmarks.value.right[
-                HAND_LANDMARK_IDS.middle_finger_tip
-              ],
-              processedLandmarks.value.right[HAND_LANDMARK_IDS.wrist]
-            ),
-          },
-        });
-      } else if (emphasisStack.value.length === 1) {
-        if (!timeoutId.value) {
-          timeoutId.value = setTimeout(handleInitialPoseDetection, 1000);
-        }
-      } else {
-        const previousPose = emphasisStack.value[1];
-        // order is important here
-        const diff = calculateDistance(
-          previousPose.handPosition.left[HAND_LANDMARK_IDS.middle_finger_tip],
-          processedLandmarks.value.left[HAND_LANDMARK_IDS.middle_finger_tip]
-        );
-        if (
-          diff.verticalDistance.value > 0 &&
-          diff.verticalDistance.order === VERTICAL_ORDER.ABOVE
-        ) {
-          if (
-            previousEmphasisDistance.value > diff.verticalDistance.value &&
-            shouldIncrement.value
-          ) {
-            if (emphasisCount.value < 3) {
-              emphasisCount.value = emphasisCount.value + 1;
-              shouldIncrement.value = false;
-            }
-          } else {
-            previousEmphasisDistance.value = diff.verticalDistance.value;
-          }
-        } else {
-          shouldIncrement.value = true;
-        }
+
+    // console.log(multiHandedness.value.length);
+    if (multiHandedness.value.length === 0) {
+      if (resetPlayback.value) {
+        resetPlayback.value();
+      }
+      if (resetEmphasis.value) {
+        resetEmphasis.value();
+        emphasisCount.value = 0;
+        emphasisStack.value = [];
       }
     }
-    emphasisStack.value.forEach((pose, index) => {
-      if (canvasCtx.value && canvas.value && index === 0) {
-        canvasCtx.value?.beginPath();
-        // canvasCtx.value?.arc(0, 0, 5, 0, 2 * Math.PI, false);
-        canvasCtx.value.moveTo(
-          0,
-          pose.handPosition.left[HAND_LANDMARK_IDS.middle_finger_tip].y
-        );
-        canvasCtx.value.lineTo(
-          canvas.value.width,
-          pose.handPosition.left[HAND_LANDMARK_IDS.middle_finger_tip].y
-        );
-        canvasCtx.value.strokeStyle = "blue";
-        canvasCtx.value?.stroke();
-      }
-    });
     // EMPHASIS TRIGGER
+    if (currentPose.value?.class === POSES.EMPHASIS) {
+      if (emphasisHandler.value) {
+        const { stack, count } = emphasisHandler.value(
+          {
+            left: scaleLandmarksToChart({
+              landmarks: currentPose.value.left,
+              canvasDimensions: { width, height },
+              indices: [
+                HAND_LANDMARK_IDS.middle_finger_tip,
+                HAND_LANDMARK_IDS.wrist,
+              ],
+            }),
+            right: scaleLandmarksToChart({
+              landmarks: currentPose.value.right,
+              canvasDimensions: { width, height },
+              indices: [
+                HAND_LANDMARK_IDS.middle_finger_tip,
+                HAND_LANDMARK_IDS.wrist,
+              ],
+            }),
+          },
+          emphasisCount.value
+        );
+        emphasisStack.value = stack;
+        emphasisCount.value = count;
+      }
+    }
+
+    if (currentPose.value?.class === POSES.PLAYBACK) {
+      if (playbackHandler.value) {
+        isPlaybackMode.value = playbackHandler.value({
+          left: scaleLandmarksToChart({
+            landmarks: currentPose.value.left,
+            canvasDimensions: { width, height },
+            indices: [
+              HAND_LANDMARK_IDS.middle_finger_tip,
+              HAND_LANDMARK_IDS.wrist,
+            ],
+          }),
+          right: scaleLandmarksToChart({
+            landmarks: currentPose.value.right,
+            canvasDimensions: { width, height },
+            indices: [
+              HAND_LANDMARK_IDS.middle_finger_tip,
+              HAND_LANDMARK_IDS.wrist,
+            ],
+          }),
+        });
+      }
+    }
   }
   await getPosePrediction(canvas.value);
 }
@@ -316,7 +279,6 @@ window.addEventListener("keypress", (event) => {
   event.preventDefault();
   if (event.key === " " || event.code === "Space") {
     emphasisStack.value = [];
-    timeoutId.value = undefined;
   }
 });
 // CLEAR EXISTING POINTS
@@ -328,59 +290,182 @@ onMounted(() => {
     canvasCtx.value?.scale(-1, 1);
     canvasCtx.value?.translate(-width, 0);
   }
+  // RENDER ON AUDIENCE CANVAS
+  if (audienceCanvas.value) {
+    audienceCanvasCtx.value = audienceCanvas.value.getContext("2d");
+    const width = audienceCanvas.value?.width || 1280;
+    audienceCanvasCtx.value?.scale(-1, 1);
+    audienceCanvasCtx.value?.translate(-width, 0);
+  }
   initializeHands();
   initializeModel();
+  const { emphasisHandler: empHandler, resetEmphasis: rstEmphasis } =
+    handleEmphasis();
+  emphasisHandler.value = empHandler;
+  resetEmphasis.value = rstEmphasis;
+  const { playbackHandler: pbHandler, resetPlayback: rstPlayback } =
+    handlePlayback();
+  playbackHandler.value = pbHandler;
+  resetPlayback.value = rstPlayback;
 });
 </script>
 
 <template>
-  <StyledWindowDiv>
-    <CanvasWrapper
-      :width="640"
-      :height="480"
-      v-slot="{ width, height, className }"
-    >
-      <canvas
-        class="output_canvas"
-        :width="width"
-        :height="height"
-        :class="className"
-        ref="canvas"
-      ></canvas>
-      <ChartWrapper
-        :width="width"
-        :height="height"
-        :class="className"
-        v-slot="{ xAxis, yAxis, xScaleLine, chartBounds }"
-      >
-        <ChartAxes
-          :width="width"
-          :height="height"
-          :xAxis="xAxis"
-          :yAxis="yAxis"
+  <div class="container">
+    <div class="form-container">
+      <WebcamVue
+        @loaded-data="runDetection"
+        @loaded-metadata="setVideoDimensions"
+      />
+      <div class="form-item">
+        <label for="chart-size">Chart Size</label>
+        <input
+          v-model="chartSize"
+          type="range"
+          id="chart-size"
+          name="chart-size"
+          min="0"
+          max="1"
+          step="0.1"
         />
-        <LineCanvas
-          :canvasDimensions="{ width, height }"
-          :chartBounds="chartBounds"
-          :xScale="xScaleLine"
-          :className="className"
-          :handPosition="playbackHandPosition"
-          :fps="emphasisCount"
+      </div>
+      <div class="form-item">
+        <label for="chart-x-position">Chart X Position</label>
+        <input
+          v-model="chartXPosition"
+          type="range"
+          id="chart-x-position"
+          name="chart-x-position"
+          min="0"
+          max="300"
         />
-        <EmphasisLevelCanvas
-          :canvasDimensions="{ width, height }"
-          :className="className"
-          :level="emphasisCount"
-          :decrementEmphasisCount="decrementEmphasisCount"
-          :canDecrement="shouldDecrement"
+      </div>
+      <div class="form-item">
+        <label for="chart-y-position">Chart Y Position</label>
+        <input
+          v-model="chartYPosition"
+          type="range"
+          id="chart-y-position"
+          name="chart-y-position"
+          min="0"
+          max="300"
         />
-      </ChartWrapper>
-    </CanvasWrapper>
-    <WebcamVue
-      @loaded-data="runDetection"
-      @loaded-metadata="setVideoDimensions"
-    />
-  </StyledWindowDiv>
+      </div>
+    </div>
+    <div class="canvas-container">
+      <StyledWindowDiv>
+        <CanvasWrapper
+          :width="640"
+          :height="480"
+          v-slot="{ width, height, className }"
+        >
+          <canvas
+            :width="width"
+            :height="height"
+            :class="className"
+            ref="canvas"
+          ></canvas>
+          <ChartWrapper
+            :width="chartWidth"
+            :height="chartHeight"
+            :x_position="chartXPosition"
+            :y_position="chartYPosition"
+            :class="className"
+            v-slot="{ xAxis, yAxis, xScaleLine, yScale, chartBounds }"
+          >
+            <ChartAxes
+              :width="width"
+              :height="height"
+              :xAxis="xAxis"
+              :yAxis="yAxis"
+              :chartBounds="chartBounds"
+              :chartSize="chartSize"
+            />
+            <LineCanvas
+              :canvasDimensions="{ width, height }"
+              :chartBounds="chartBounds"
+              :xScale="xScaleLine"
+              :yScale="yScale"
+              :className="className"
+              :handPosition="playbackHandPosition"
+              :fps="emphasisCount"
+              :chartSize="chartSize"
+            />
+            <EmphasisLevelCanvas
+              :canvasDimensions="{ width, height }"
+              :className="className"
+              :level="emphasisCount"
+              :decrementEmphasisCount="decrementEmphasisCount"
+              :canDecrement="shouldDecrement"
+              :emphasisStack="emphasisStack"
+            />
+          </ChartWrapper>
+        </CanvasWrapper>
+      </StyledWindowDiv>
+      <!-- <StyledWindowDiv>
+        <CanvasWrapper
+          :width="640"
+          :height="480"
+          v-slot="{ width, height, className }"
+        >
+          <canvas
+            :width="width"
+            :height="height"
+            :class="className"
+            ref="audienceCanvas"
+          ></canvas>
+          <ChartWrapper
+            :width="chartWidth"
+            :height="chartHeight"
+            :x_position="0"
+            :y_position="0"
+            :class="className"
+            v-slot="{ xAxis, yAxis, xScaleLine, chartBounds }"
+          >
+            <ChartAxes
+              :width="width"
+              :height="height"
+              :xAxis="xAxis"
+              :yAxis="yAxis"
+              :chartBounds="chartBounds"
+            />
+            <LineCanvas
+              :canvasDimensions="{ width, height }"
+              :chartBounds="chartBounds"
+              :xScale="xScaleLine"
+              :className="className"
+              :handPosition="playbackHandPosition"
+              :fps="emphasisCount"
+            />
+          </ChartWrapper>
+        </CanvasWrapper>
+      </StyledWindowDiv> -->
+    </div>
+  </div>
 </template>
 
-<style></style>
+<style>
+.container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.canvas-container {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  position: relative;
+  justify-content: space-around;
+}
+
+.form-container {
+  color: black;
+}
+
+.form-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+</style>

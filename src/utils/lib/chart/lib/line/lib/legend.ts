@@ -51,7 +51,7 @@ export class Legend {
     };
     this.text = new CanvasText({
       context,
-      position: { x: position.x + 10, y: position.y + 25 },
+      position: { x: position.x + 40, y: position.y + 17 },
       color: "white",
       label,
     });
@@ -62,12 +62,7 @@ export class Legend {
     if (ctx) {
       ctx.fillStyle = this.color;
 
-      ctx?.fillRect(
-        this.position.x,
-        this.position.y,
-        Legend.width,
-        Legend.height
-      );
+      ctx?.fillRect(this.position.x, this.position.y, 20, 20);
 
       this.text.drawText();
     }
@@ -88,6 +83,7 @@ export class Legend {
 
   handleHover(position: Coordinates, endIndex: number, callback?: () => void) {
     if (this.isInRange(position)) {
+      console.log(endIndex);
       this.line.setEndIndex(endIndex);
       if (callback) {
         callback();

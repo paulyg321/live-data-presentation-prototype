@@ -8,6 +8,7 @@ export interface LineConstructorArgs {
   canvasDimensions: ChartDimensions;
   color: string;
   label: string;
+  endIndex: number;
 }
 
 export class Line {
@@ -19,7 +20,7 @@ export class Line {
   private color: string;
   private label: string;
 
-  private endIndex = 20;
+  private endIndex: number;
   private isSelected = false;
   private lineData: Coordinates[] = [];
 
@@ -31,6 +32,7 @@ export class Line {
     canvasDimensions,
     color,
     label,
+    endIndex,
   }: LineConstructorArgs) {
     this.data = data;
     this.context = context;
@@ -39,6 +41,7 @@ export class Line {
     this.canvasDimensions = canvasDimensions;
     this.color = color;
     this.label = label;
+    this.endIndex = endIndex;
   }
 
   drawLine() {
@@ -87,5 +90,12 @@ export class Line {
 
   setColor(color: string) {
     this.color = color;
+  }
+
+  setXscale(scale: any) {
+    this.xScale = scale;
+  }
+  setYscale(scale: any) {
+    this.yScale = scale;
   }
 }

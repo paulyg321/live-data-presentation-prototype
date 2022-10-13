@@ -5,7 +5,8 @@ export function drawXAxis(
   context: CanvasRenderingContext2D,
   xScale: any,
   Y: number,
-  xExtent: number[]
+  xExtent: number[],
+  fontSize: number,
 ) {
   const [startX, endX] = xExtent;
   const tickSize = 6,
@@ -33,7 +34,7 @@ export function drawXAxis(
   context.fillStyle = AXES_COLOR;
   xTicks.forEach((d: any) => {
     context.beginPath();
-    context.font = "12px Arial";
+    context.font = `${fontSize}px Arial`;
     context.fillText(xTickFormat(d), xScale(d), Y + tickSize);
   });
 }
@@ -42,7 +43,8 @@ export function drawYAxis(
   context: CanvasRenderingContext2D,
   yScale: any,
   X: number,
-  yExtent: number[]
+  yExtent: number[],
+  fontSize: number,
 ) {
   const [startY, endY] = yExtent;
   const tickPadding = 3,
@@ -70,7 +72,7 @@ export function drawYAxis(
   context.fillStyle = AXES_COLOR;
   yTicks.forEach((d: any) => {
     context.beginPath();
-    context.font = "12px Arial";
+    context.font = `${fontSize}px Arial`;
     context.fillText(yTickFormat(d), X - tickSize - tickPadding, yScale(d));
   });
 }

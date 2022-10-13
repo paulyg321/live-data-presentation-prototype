@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, type ComputedRef } from "vue";
+import { computed, onMounted, ref, watch, type ComputedRef } from "vue";
 import {
   generateLineData,
   keepBetween,
   Legend,
   legendPosition,
   Line,
+  MOCK_LINE,
+  MOCK_LINE_2,
+  MOCK_LINE_3,
   type Coordinates,
 } from "@/utils";
 
@@ -27,19 +30,75 @@ const props = defineProps<{
     };
   };
   xScale: any;
+  yScale: any;
   className?: string;
   handPosition?: {
     left: Coordinates;
     right: Coordinates;
   };
   fps: number;
+  chartSize: number;
 }>();
-const canvas = ref<HTMLCanvasElement | null>(null);
-const canvasCtx = ref<CanvasRenderingContext2D | null>(null);
+const lineCanvas = ref<HTMLCanvasElement | null>(null);
+const lineCanvasCtx = ref<CanvasRenderingContext2D | null>(null);
+const legendCanvas = ref<HTMLCanvasElement | null>(null);
+const legendCanvasCtx = ref<CanvasRenderingContext2D | null>(null);
 const lines = ref<Line[]>([]);
-const handTracker = ref<Line>();
-const legends = ref<Legend[]>([]);
 const then = ref(Date.now());
+
+const handTracker = computed(() => {
+  return new Line({
+    data: [],
+    context: lineCanvasCtx.value,
+    xScale: props.xScale,
+    canvasDimensions: props.canvasDimensions,
+    color: "white",
+    label: "Hand Tracker",
+    endIndex: 20,
+  });
+});
+const lineData = computed(() => {
+  return MOCK_LINE.map((point) => ({
+    ...point,
+    y: props.yScale(point.y * props.chartSize),
+  }));
+});
+const lineData2 = computed(() => {
+  return MOCK_LINE_2.map((point) => ({
+    ...point,
+    y: props.yScale(point.y * props.chartSize),
+  }));
+});
+const lineData3 = computed(() => {
+  return MOCK_LINE_3.map((point) => ({
+    ...point,
+    y: props.yScale(point.y * props.chartSize),
+  }));
+});
+
+watch(
+  () => props.chartBounds,
+  () => {
+    lines.value = lines.value.map((line) => {
+      switch (line.getLabel()) {
+        case "USA":
+          line.setData(lineData.value);
+          break;
+        case "Canada":
+          line.setData(lineData2.value);
+          break;
+        case "Mexico":
+          line.setData(lineData3.value);
+          break;
+        default:
+          break;
+      }
+      line.setXscale(props.xScale);
+      line.setYscale(props.yScale);
+      return line;
+    });
+  }
+);
 
 const computedIndex: ComputedRef<number> = computed(() => {
   if (props.handPosition) {
@@ -55,54 +114,11 @@ const computedIndex: ComputedRef<number> = computed(() => {
   return computedIndex.value;
 });
 
-function initializeLines() {
-  const lineData = generateLineData(30, 200);
-  const lineData2 = generateLineData(50, 200);
-  const lineData3 = generateLineData(80, 300);
-
-  lines.value = [
-    ...lines.value,
-    new Line({
-      data: lineData,
-      context: canvasCtx.value,
-      xScale: props.xScale,
-      canvasDimensions: props.canvasDimensions,
-      color: "rgba(4,217,255,0.8)",
-      label: "USA",
-    }),
-    new Line({
-      data: lineData2,
-      context: canvasCtx.value,
-      xScale: props.xScale,
-      canvasDimensions: props.canvasDimensions,
-      color: "rgba(247,33,25,0.8)",
-      label: "Canada",
-    }),
-    new Line({
-      data: lineData3,
-      context: canvasCtx.value,
-      xScale: props.xScale,
-      canvasDimensions: props.canvasDimensions,
-      color: "rgba(0,255,0,0.6)",
-      label: "Mexico",
-    }),
-  ];
-
-  handTracker.value = new Line({
-    data: [],
-    context: canvasCtx.value,
-    xScale: props.xScale,
-    canvasDimensions: props.canvasDimensions,
-    color: "white",
-    label: "Hand Tracker",
-  });
-}
-
-function initializeLegends() {
-  legends.value = lines.value.map((line, index) => {
+const legends = computed(() => {
+  return lines.value?.map((line: any, index: number) => {
     return new Legend({
       label: line.getLabel(),
-      context: canvasCtx.value,
+      context: legendCanvasCtx.value,
       color: line.getColor(),
       position: {
         x: legendPosition.x,
@@ -111,28 +127,22 @@ function initializeLegends() {
       line: line as Line,
     });
   });
-}
+});
 
 function drawLines() {
   const now = Date.now();
   const difference = now - then.value;
   if (difference > 1000 / EMPHASIS_TO_FPS[props.fps]) {
-    canvasCtx.value?.clearRect(
-      props.chartBounds.x.start,
-      props.chartBounds.y.start,
+    lineCanvasCtx.value?.clearRect(
+      0,
+      0,
       props.canvasDimensions.width,
-      props.chartBounds.y.end - props.chartBounds.y.start
+      props.canvasDimensions.height
     );
-    if (canvasCtx.value) {
-      canvasCtx.value.fillStyle = "rgba(0,0,0,0.6)";
+    if (lineCanvasCtx.value) {
+      lineCanvasCtx.value.fillStyle = "rgba(0,0,0,0.6)";
     }
-    canvasCtx.value?.fillRect(
-      props.chartBounds.x.start,
-      props.chartBounds.y.start,
-      props.chartBounds.x.end - props.chartBounds.x.start,
-      props.chartBounds.y.end - props.chartBounds.y.start
-    );
-    legends.value.forEach((legend, index) => {
+    legends.value?.forEach((legend: any) => {
       const line = legend.getLine();
       if (props.handPosition) {
         legend.handleHover(props.handPosition.left, computedIndex.value, () => {
@@ -152,22 +162,56 @@ function drawLines() {
     }
     then.value = now;
   }
-
   requestAnimationFrame(drawLines);
 }
 
 function drawLegend() {
-  legends.value.forEach((legend) => {
+  legends.value?.forEach((legend: any) => {
     legend.drawLegend();
   });
 }
 
+function initializeLines() {
+  const endIndex = 20;
+  lines.value = [
+    new Line({
+      data: lineData.value,
+      context: lineCanvasCtx.value,
+      xScale: props.xScale,
+      canvasDimensions: props.canvasDimensions,
+      color: "rgba(4,217,255,0.8)",
+      label: "USA",
+      endIndex,
+    }),
+    new Line({
+      data: lineData2.value,
+      context: lineCanvasCtx.value,
+      xScale: props.xScale,
+      canvasDimensions: props.canvasDimensions,
+      color: "rgba(247,33,25,0.8)",
+      label: "Canada",
+      endIndex,
+    }),
+    new Line({
+      data: lineData3.value,
+      context: lineCanvasCtx.value,
+      xScale: props.xScale,
+      canvasDimensions: props.canvasDimensions,
+      color: "rgba(0,255,0,0.6)",
+      label: "Mexico",
+      endIndex,
+    }),
+  ];
+}
+
 onMounted(() => {
-  if (canvas.value) {
-    canvasCtx.value = canvas.value.getContext("2d");
+  if (lineCanvas.value) {
+    lineCanvasCtx.value = lineCanvas.value.getContext("2d");
+  }
+  if (legendCanvas.value) {
+    legendCanvasCtx.value = legendCanvas.value.getContext("2d");
   }
   initializeLines();
-  initializeLegends();
   drawLines();
   drawLegend();
 });
@@ -178,7 +222,13 @@ onMounted(() => {
     :width="canvasDimensions.width"
     :height="canvasDimensions.height"
     :class="className"
-    ref="canvas"
+    ref="lineCanvas"
+  ></canvas>
+  <canvas
+    :width="canvasDimensions.width"
+    :height="canvasDimensions.height"
+    :class="className"
+    ref="legendCanvas"
   ></canvas>
 </template>
 

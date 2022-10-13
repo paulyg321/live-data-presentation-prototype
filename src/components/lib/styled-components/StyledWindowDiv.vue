@@ -25,7 +25,7 @@
 .window-body {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   padding: 40px;
   width: 100%;
 }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { CanvasText } from "@/utils";
+import { CanvasText, HAND_LANDMARK_IDS, Line } from "@/utils";
+import * as d3 from "d3";
 
 const props = defineProps<{
   canvasDimensions: {
@@ -11,11 +12,46 @@ const props = defineProps<{
   decrementEmphasisCount: () => void;
   canDecrement: boolean;
   className?: string;
+  emphasisStack?: any;
 }>();
 const canvas = ref<HTMLCanvasElement | null>(null);
 const canvasCtx = ref<CanvasRenderingContext2D | null>(null);
 const text = ref<CanvasText>();
 const then = ref(Date.now());
+
+function drawReferenceLine() {
+  if (canvas.value && props.emphasisStack && props.emphasisStack.length > 0) {
+    const lineData = [
+      {
+        x: 0,
+        y: props.emphasisStack[0].handPosition.left[
+          HAND_LANDMARK_IDS.middle_finger_tip
+        ].y,
+      },
+      {
+        x: canvas.value.width,
+        y: props.emphasisStack[0].handPosition.left[
+          HAND_LANDMARK_IDS.middle_finger_tip
+        ].y,
+      },
+    ];
+
+    const referenceLine = new Line({
+      data: lineData,
+      context: canvasCtx.value,
+      xScale: d3.scaleLinear(
+        [0, props.canvasDimensions.width],
+        [0, props.canvasDimensions.width]
+      ),
+      canvasDimensions: props.canvasDimensions,
+      color: "grey",
+      label: "Reference Line",
+      endIndex: 2,
+    });
+    referenceLine.drawLine();
+  }
+  requestAnimationFrame(drawReferenceLine);
+}
 
 function drawText() {
   const now = Date.now();
@@ -52,16 +88,17 @@ function convertLevelToLabel(level: number) {
 }
 
 function convertLevelToColor(level: number) {
-  switch (level) {
-    case 1:
-      return "green";
-    case 2:
-      return "yellow";
-    case 3:
-      return "red";
-    default:
-      return "";
-  }
+  return "grey";
+  // switch (level) {
+  //   case 1:
+  //     return "green";
+  //   case 2:
+  //     return "yellow";
+  //   case 3:
+  //     return "red";
+  //   default:
+  //     return "";
+  // }
 }
 
 onMounted(() => {
@@ -76,6 +113,7 @@ onMounted(() => {
     });
   }
   drawText();
+  drawReferenceLine();
 });
 </script>
 

@@ -8,7 +8,7 @@ import type {
   MultiHandednessObject,
   ParsedLandmarksObject,
 } from "../types/lib/media-pipe";
-import { HAND_LANDMARK_IDS, NONE_OBJECT } from "./constants";
+import { HAND_LANDMARK_IDS } from "./constants";
 
 export function mirrorLandmarkHorizontally(
   width: number,
@@ -21,8 +21,7 @@ export function getLeftVsRightIndex(multiHandedness: MultiHandednessObject[]) {
   return {
     right: multiHandedness.reduce(
       (rightHandIndex: number | undefined, handedness, index) => {
-        // In mediapipe 0 is for the left hand but it's inverted so left is right
-        if (handedness.index === 0) {
+        if (handedness.label === "Left") {
           return index;
         }
         return rightHandIndex;
@@ -31,8 +30,7 @@ export function getLeftVsRightIndex(multiHandedness: MultiHandednessObject[]) {
     ),
     left: multiHandedness.reduce(
       (leftHandIndex: number | undefined, handedness, index) => {
-        // In mediapipe 1 is for the left hand but it's inverted so right is left
-        if (handedness.index === 1) {
+        if (handedness.label === "Right") {
           return index;
         }
         return leftHandIndex;
@@ -81,7 +79,15 @@ export function validateCurrentPose(
       break;
     case POSES.NONE:
     default:
-      validatedPose = NONE_OBJECT;
+      validatedPose = {
+        class: POSES.NONE,
+        left: handIndices.left
+          ? multiHandLandmarks[handIndices.left]
+          : undefined,
+        right: handIndices.right
+          ? multiHandLandmarks[handIndices.right]
+          : undefined,
+      };
       break;
   }
   return validatedPose;
@@ -103,11 +109,17 @@ function validatePlayback(
     HAND_LANDMARK_IDS.wrist,
   ];
 
-  // Verify left hand is pointing
-  if (handIndices.left !== undefined && handIndices.right !== undefined) {
-    const leftHandLandmarks = multiHandLandmarks[handIndices.left];
-    const rightHandLandmarks = multiHandLandmarks[handIndices.right];
+  const leftHandLandmarks =
+    handIndices.left !== undefined
+      ? multiHandLandmarks[handIndices.left]
+      : undefined;
+  const rightHandLandmarks =
+    handIndices.right !== undefined
+      ? multiHandLandmarks[handIndices.right]
+      : undefined;
 
+  // Verify left hand is pointing
+  if (leftHandLandmarks && rightHandLandmarks) {
     const parsedLandmarks: ParsedLandmarksObject = LANDMARKS_TO_VALIDATE.reduce(
       (parsedLandmarks, landmark) => {
         const x = chartDimensions.width * leftHandLandmarks[landmark].x;
@@ -134,9 +146,13 @@ function validatePlayback(
         right: rightHandLandmarks,
       };
     }
-  } else {
-    return NONE_OBJECT;
   }
+
+  return {
+    class: POSES.NONE,
+    left: leftHandLandmarks,
+    right: rightHandLandmarks,
+  };
 }
 
 function isCorrectPlaybackSelectionHandLandmark(
@@ -176,60 +192,68 @@ function validateEmphasis(
     HAND_LANDMARK_IDS.wrist,
   ];
 
-  if (handIndices.left === undefined || handIndices.right === undefined) {
-    return NONE_OBJECT;
-  }
+  const leftHandLandmarks =
+    handIndices.left !== undefined
+      ? multiHandLandmarks[handIndices.left]
+      : undefined;
+  const rightHandLandmarks =
+    handIndices.right !== undefined
+      ? multiHandLandmarks[handIndices.right]
+      : undefined;
 
-  const leftHandLandmarks = multiHandLandmarks[handIndices.left];
-  const rightHandLandmarks = multiHandLandmarks[handIndices.right];
-
-  const parsedLandmarks: {
-    left: ParsedLandmarksObject;
-    right: ParsedLandmarksObject;
-  } = LANDMARKS_TO_VALIDATE.reduce(
-    (parsedLandmarks, landmark) => {
-      const leftX = chartDimensions.width * leftHandLandmarks[landmark].x;
-      const leftY = chartDimensions.height * leftHandLandmarks[landmark].y;
-      const rightX = chartDimensions.width * rightHandLandmarks[landmark].x;
-      const rightY = chartDimensions.height * rightHandLandmarks[landmark].y;
-
-      canvasCtx.beginPath();
-      canvasCtx.arc(leftX, leftY, 5, 0, 2 * Math.PI, false);
-      // canvasCtx.arc(rightX, rightY, 5, 0, 2 * Math.PI, false);
-      canvasCtx.fillStyle = "red";
-      canvasCtx.fill();
-
-      parsedLandmarks.left[landmark] = {
-        x: mirrorLandmarkHorizontally(chartDimensions.width, leftX),
-        y: leftY,
-      };
-      parsedLandmarks.right[landmark] = {
-        x: chartDimensions.width - rightX,
-        y: rightY,
-      };
-
-      return parsedLandmarks;
-    },
-    { left: {}, right: {} } as {
+  if (leftHandLandmarks && rightHandLandmarks) {
+    const parsedLandmarks: {
       left: ParsedLandmarksObject;
       right: ParsedLandmarksObject;
-    }
-  );
+    } = LANDMARKS_TO_VALIDATE.reduce(
+      (parsedLandmarks, landmark) => {
+        const leftX = chartDimensions.width * leftHandLandmarks[landmark].x;
+        const leftY = chartDimensions.height * leftHandLandmarks[landmark].y;
+        const rightX = chartDimensions.width * rightHandLandmarks[landmark].x;
+        const rightY = chartDimensions.height * rightHandLandmarks[landmark].y;
 
-  if (
-    isCorrectInitiateEmphasisHandLandmark({
-      leftHand: parsedLandmarks.left,
-      rightHand: parsedLandmarks.right,
-    })
-  ) {
-    return {
-      class: type,
-      left: leftHandLandmarks,
-      right: rightHandLandmarks,
-    };
+        canvasCtx.beginPath();
+        canvasCtx.arc(leftX, leftY, 5, 0, 2 * Math.PI, false);
+        // canvasCtx.arc(rightX, rightY, 5, 0, 2 * Math.PI, false);
+        canvasCtx.fillStyle = "red";
+        canvasCtx.fill();
+
+        parsedLandmarks.left[landmark] = {
+          x: mirrorLandmarkHorizontally(chartDimensions.width, leftX),
+          y: leftY,
+        };
+        parsedLandmarks.right[landmark] = {
+          x: chartDimensions.width - rightX,
+          y: rightY,
+        };
+
+        return parsedLandmarks;
+      },
+      { left: {}, right: {} } as {
+        left: ParsedLandmarksObject;
+        right: ParsedLandmarksObject;
+      }
+    );
+
+    if (
+      isCorrectInitiateEmphasisHandLandmark({
+        leftHand: parsedLandmarks.left,
+        rightHand: parsedLandmarks.right,
+      })
+    ) {
+      return {
+        class: type,
+        left: leftHandLandmarks,
+        right: rightHandLandmarks,
+      };
+    }
   }
 
-  return NONE_OBJECT;
+  return {
+    class: POSES.NONE,
+    left: leftHandLandmarks,
+    right: rightHandLandmarks,
+  };
 }
 
 // Ensure right landmarks to validate is setup
