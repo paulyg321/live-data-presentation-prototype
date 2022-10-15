@@ -44,7 +44,7 @@ export function validateCurrentPose(
   canvasCtx: CanvasRenderingContext2D,
   predictions: PredictionObject[],
   multiHandLandmarks: any,
-  chartDimensions: ChartDimensions,
+  canvasDimensions: ChartDimensions,
   multiHandedness: MultiHandednessObject[]
 ) {
   const handIndices = getLeftVsRightIndex(multiHandedness);
@@ -58,94 +58,111 @@ export function validateCurrentPose(
     { className: POSES.NONE, probability: -Infinity } as PredictionObject
   );
 
+  const { leftHandLandmarks, rightHandLandmarks, numHands } =
+    getLandmarksPerHand(canvasDimensions, multiHandLandmarks, handIndices);
+
   let validatedPose;
-  switch (currentPose.className) {
-    case POSES.PLAYBACK:
-      validatedPose = validatePlayback(
-        canvasCtx,
-        multiHandLandmarks,
-        chartDimensions,
-        handIndices
-      );
-      break;
-    case POSES.EMPHASIS:
-      validatedPose = validateEmphasis(
-        canvasCtx,
-        multiHandLandmarks,
-        chartDimensions,
-        handIndices,
-        POSES.EMPHASIS
-      );
-      break;
-    case POSES.NONE:
-    default:
-      validatedPose = {
-        class: POSES.NONE,
-        left: handIndices.left
-          ? multiHandLandmarks[handIndices.left]
-          : undefined,
-        right: handIndices.right
-          ? multiHandLandmarks[handIndices.right]
-          : undefined,
-      };
-      break;
+
+  if (numHands === 1) {
+    validatedPose = validatePointing(leftHandLandmarks, rightHandLandmarks);
+  } else if (numHands === 2) {
+    switch (currentPose.className) {
+      case POSES.PLAYBACK:
+        validatedPose = validatePlayback(leftHandLandmarks, rightHandLandmarks);
+        break;
+      case POSES.EMPHASIS:
+        validatedPose = validateEmphasis(
+          POSES.EMPHASIS,
+          leftHandLandmarks,
+          rightHandLandmarks
+        );
+        break;
+      case POSES.NONE:
+      default:
+        validatedPose = {
+          class: POSES.NONE,
+          left: leftHandLandmarks,
+          right: rightHandLandmarks,
+        };
+        break;
+    }
+  } else {
+    validatedPose = {
+      class: POSES.NONE,
+      left: leftHandLandmarks,
+      right: rightHandLandmarks,
+    };
   }
   return validatedPose;
 }
 
-function validatePlayback(
-  canvasCtx: CanvasRenderingContext2D,
-  multiHandLandmarks: any,
-  chartDimensions: ChartDimensions,
-  handIndices: {
-    left?: number;
-    right?: number;
-  }
-) {
-  // 8, 5, 0 indicate landmarks on the index finger tip (8), MCP joint of the index finger (5), wrist (0)
-  const LANDMARKS_TO_VALIDATE = [
-    HAND_LANDMARK_IDS.index_finger_tip,
-    HAND_LANDMARK_IDS.index_finger_mcp,
-    HAND_LANDMARK_IDS.wrist,
-  ];
+function validatePointing(leftHandLandmarks: any, rightHandLandmarks: any) {
+  // const LANDMARKS_TO_VALIDATE = [
+  //   HAND_LANDMARK_IDS.index_finger_tip,
+  //   HAND_LANDMARK_IDS.index_finger_mcp,
+  //   HAND_LANDMARK_IDS.middle_finger_tip,
+  //   HAND_LANDMARK_IDS.middle_finger_mcp,
+  // ];
 
-  const leftHandLandmarks =
-    handIndices.left !== undefined
-      ? multiHandLandmarks[handIndices.left]
-      : undefined;
-  const rightHandLandmarks =
-    handIndices.right !== undefined
-      ? multiHandLandmarks[handIndices.right]
-      : undefined;
-
-  // Verify left hand is pointing
-  if (leftHandLandmarks && rightHandLandmarks) {
-    const parsedLandmarks: ParsedLandmarksObject = LANDMARKS_TO_VALIDATE.reduce(
-      (parsedLandmarks, landmark) => {
-        const x = chartDimensions.width * leftHandLandmarks[landmark].x;
-        const y = chartDimensions.height * leftHandLandmarks[landmark].y;
-        canvasCtx.beginPath();
-        canvasCtx.arc(x, y, 5, 0, 2 * Math.PI, false);
-        // canvasCtx.arc(rightX, rightY, 5, 0, 2 * Math.PI, false);
-        canvasCtx.fillStyle = "red";
-        canvasCtx.fill();
-        parsedLandmarks[landmark] = {
-          x: mirrorLandmarkHorizontally(chartDimensions.width, x),
-          y,
-        };
-
-        return parsedLandmarks;
-      },
-      {} as ParsedLandmarksObject
-    );
-
-    if (isCorrectPlaybackSelectionHandLandmark(parsedLandmarks)) {
+  if (leftHandLandmarks) {
+    if (isCorrectPointingLandmark(leftHandLandmarks)) {
       return {
-        class: POSES.PLAYBACK,
+        class: POSES.POINTING,
         left: leftHandLandmarks,
         right: rightHandLandmarks,
       };
     }
+
+    return {
+      class: POSES.NONE,
+      left: leftHandLandmarks,
+      right: rightHandLandmarks,
+    };
+  }
+
+  if (rightHandLandmarks) {
+    if (isCorrectPointingLandmark(rightHandLandmarks)) {
+      return {
+        class: POSES.POINTING,
+        left: leftHandLandmarks,
+        right: rightHandLandmarks,
+      };
+    }
+  }
+
+  return {
+    class: POSES.NONE,
+    left: leftHandLandmarks,
+    right: rightHandLandmarks,
+  };
+}
+
+function isCorrectPointingLandmark(parsedLandmarks: ParsedLandmarksObject) {
+  if (
+    parsedLandmarks[HAND_LANDMARK_IDS.index_finger_tip].y <
+      parsedLandmarks[HAND_LANDMARK_IDS.index_finger_mcp].y &&
+    parsedLandmarks[HAND_LANDMARK_IDS.middle_finger_tip].y >
+      parsedLandmarks[HAND_LANDMARK_IDS.middle_finger_mcp].y
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function validatePlayback(leftHandLandmarks: any, rightHandLandmarks: any) {
+  // const LANDMARKS_TO_VALIDATE = [
+  //   HAND_LANDMARK_IDS.index_finger_tip,
+  //   HAND_LANDMARK_IDS.index_finger_mcp,
+  //   HAND_LANDMARK_IDS.wrist,
+  // ];
+
+  if (isCorrectPlaybackSelectionHandLandmark(leftHandLandmarks)) {
+    return {
+      class: POSES.PLAYBACK,
+      left: leftHandLandmarks,
+      right: rightHandLandmarks,
+    };
   }
 
   return {
@@ -178,75 +195,26 @@ function isCorrectPlaybackSelectionHandLandmark(
 }
 
 function validateEmphasis(
-  canvasCtx: CanvasRenderingContext2D,
-  multiHandLandmarks: any,
-  chartDimensions: ChartDimensions,
-  handIndices: {
-    left?: number;
-    right?: number;
-  },
-  type: string
+  type: string,
+  leftHandLandmarks: any,
+  rightHandLandmarks: any
 ) {
-  const LANDMARKS_TO_VALIDATE = [
-    HAND_LANDMARK_IDS.middle_finger_tip,
-    HAND_LANDMARK_IDS.wrist,
-  ];
+  // const LANDMARKS_TO_VALIDATE = [
+  //   HAND_LANDMARK_IDS.middle_finger_tip,
+  //   HAND_LANDMARK_IDS.wrist,
+  // ];
 
-  const leftHandLandmarks =
-    handIndices.left !== undefined
-      ? multiHandLandmarks[handIndices.left]
-      : undefined;
-  const rightHandLandmarks =
-    handIndices.right !== undefined
-      ? multiHandLandmarks[handIndices.right]
-      : undefined;
-
-  if (leftHandLandmarks && rightHandLandmarks) {
-    const parsedLandmarks: {
-      left: ParsedLandmarksObject;
-      right: ParsedLandmarksObject;
-    } = LANDMARKS_TO_VALIDATE.reduce(
-      (parsedLandmarks, landmark) => {
-        const leftX = chartDimensions.width * leftHandLandmarks[landmark].x;
-        const leftY = chartDimensions.height * leftHandLandmarks[landmark].y;
-        const rightX = chartDimensions.width * rightHandLandmarks[landmark].x;
-        const rightY = chartDimensions.height * rightHandLandmarks[landmark].y;
-
-        canvasCtx.beginPath();
-        canvasCtx.arc(leftX, leftY, 5, 0, 2 * Math.PI, false);
-        // canvasCtx.arc(rightX, rightY, 5, 0, 2 * Math.PI, false);
-        canvasCtx.fillStyle = "red";
-        canvasCtx.fill();
-
-        parsedLandmarks.left[landmark] = {
-          x: mirrorLandmarkHorizontally(chartDimensions.width, leftX),
-          y: leftY,
-        };
-        parsedLandmarks.right[landmark] = {
-          x: chartDimensions.width - rightX,
-          y: rightY,
-        };
-
-        return parsedLandmarks;
-      },
-      { left: {}, right: {} } as {
-        left: ParsedLandmarksObject;
-        right: ParsedLandmarksObject;
-      }
-    );
-
-    if (
-      isCorrectInitiateEmphasisHandLandmark({
-        leftHand: parsedLandmarks.left,
-        rightHand: parsedLandmarks.right,
-      })
-    ) {
-      return {
-        class: type,
-        left: leftHandLandmarks,
-        right: rightHandLandmarks,
-      };
-    }
+  if (
+    isCorrectInitiateEmphasisHandLandmark({
+      leftHand: leftHandLandmarks,
+      rightHand: rightHandLandmarks,
+    })
+  ) {
+    return {
+      class: type,
+      left: leftHandLandmarks,
+      right: rightHandLandmarks,
+    };
   }
 
   return {
@@ -338,4 +306,45 @@ export function scaleLandmarksToChart({
       y: canvasDimensions.height * landmark.y,
     };
   });
+}
+
+function getLandmarksPerHand(
+  canvasDimensions: any,
+  multiHandLandmarks: any,
+  handIndices: {
+    left?: number;
+    right?: number;
+  }
+) {
+  const leftHandLandmarks =
+    handIndices.left !== undefined
+      ? scaleLandmarksToChart({
+          landmarks: multiHandLandmarks[handIndices.left],
+          canvasDimensions,
+        })
+      : undefined;
+  const rightHandLandmarks =
+    handIndices.right !== undefined
+      ? scaleLandmarksToChart({
+          landmarks: multiHandLandmarks[handIndices.right],
+          canvasDimensions,
+        })
+      : undefined;
+
+  const numHands = [leftHandLandmarks, rightHandLandmarks].reduce(
+    (count, currentLandmark) => {
+      if (currentLandmark !== undefined) {
+        return count + 1;
+      }
+
+      return count;
+    },
+    0
+  );
+
+  return {
+    leftHandLandmarks,
+    rightHandLandmarks,
+    numHands,
+  };
 }

@@ -9,10 +9,9 @@ import {
   HAND_LANDMARK_IDS,
   validateCurrentPose,
   type MultiHandednessObject,
-  mirrorLandmarkHorizontally,
-  scaleLandmarksToChart,
   handleEmphasis,
   handlePlayback,
+  handlePointing,
 } from "@/utils";
 
 // components
@@ -31,10 +30,10 @@ interface PredictionObject {
 const MODEL_IDS = {
   first_iteration: "jsB8IiKon",
   second_iteration: "zWA9pkcjy",
-  stripped_down: "NZyGd_Hkq",
+  latest: "NZyGd_Hkq",
 };
 
-const URL = `https://teachablemachine.withgoogle.com/models/${MODEL_IDS.stripped_down}`;
+const URL = `https://teachablemachine.withgoogle.com/models/${MODEL_IDS.latest}`;
 const MODEL_URL = `${URL}/model.json`;
 const METADATA_URL = `${URL}/metadata.json`;
 const MEDIA_PIPE_URL = (file: string) =>
@@ -55,15 +54,20 @@ const currentPose = ref<{
   left: any;
   right: any;
 }>();
+
 const emphasisStack = ref<any[]>([]);
 const emphasisCount = ref<number>(0);
 const emphasisHandler = ref<(landmarks: any, count: number) => any>();
 const resetEmphasis = ref<() => any>();
 
-const isPlaybackMode = ref<boolean>(false);
+const pointingHandler = ref<(landmarks: any) => any>();
+const resetPointing = ref<() => any>();
+const pointingStack = ref<any[]>([]);
 
+const isPlaybackMode = ref<boolean>(false);
 const playbackHandler = ref<(landmarks: any) => any>();
 const resetPlayback = ref<() => void>();
+
 const chartSize = ref<number>(0.75);
 const chartXPosition = ref<number>(0);
 const chartYPosition = ref<number>(0);
@@ -87,25 +91,15 @@ const playbackHandPosition = computed(() => {
     isPlaybackMode.value &&
     canvas.value
   ) {
-    const right_xPos = mirrorLandmarkHorizontally(
-      canvas.value?.width,
-      currentPose?.value.right[HAND_LANDMARK_IDS.middle_finger_tip].x *
-        canvas.value.width
-    );
-
+    const right_xPos =
+      currentPose?.value.right[HAND_LANDMARK_IDS.middle_finger_tip].x;
     const right_yPos =
-      currentPose?.value.right[HAND_LANDMARK_IDS.middle_finger_tip].y *
-      canvas.value.height;
-
-    const left_xPos = mirrorLandmarkHorizontally(
-      canvas.value?.width,
-      currentPose?.value.left[HAND_LANDMARK_IDS.middle_finger_tip].x *
-        canvas.value.width
-    );
-
+      currentPose?.value.right[HAND_LANDMARK_IDS.middle_finger_tip].y;
+    const left_xPos =
+      currentPose?.value.left[HAND_LANDMARK_IDS.middle_finger_tip].x;
     const left_yPos =
-      currentPose?.value.left[HAND_LANDMARK_IDS.index_finger_tip].y *
-      canvas.value.height;
+      currentPose?.value.left[HAND_LANDMARK_IDS.index_finger_tip].y;
+
     return {
       left: {
         x: left_xPos,
@@ -151,28 +145,28 @@ function onResults(results: {
 async function renderVideoOnCanvas(video: any) {
   const width = canvas.value?.width || 1280;
   const height = canvas.value?.height || 720;
+  const canvasDimensions = { width, height };
   // RENDER ON AUDIENCE CANVAS
   canvasCtx.value?.clearRect(0, 0, width, height);
   audienceCanvasCtx.value?.clearRect(0, 0, width, height);
   if (canvasCtx.value) {
     // RENDER ON AUDIENCE CANVAS
     canvasCtx.value?.drawImage(video, 0, 0, width || 1280, height || 720);
-    audienceCanvasCtx.value?.drawImage(
-      video,
-      0,
-      0,
-      width || 1280,
-      height || 720
-    );
+    // audienceCanvasCtx.value?.drawImage(
+    //   video,
+    //   0,
+    //   0,
+    //   width || 1280,
+    //   height || 720
+    // );
     currentPose.value = validateCurrentPose(
       canvasCtx.value,
       predictions.value,
       multiHandLandmarks.value,
-      { width, height },
+      canvasDimensions,
       multiHandedness.value
     );
 
-    // console.log(multiHandedness.value.length);
     if (multiHandedness.value.length === 0) {
       if (resetPlayback.value) {
         resetPlayback.value();
@@ -182,60 +176,70 @@ async function renderVideoOnCanvas(video: any) {
         emphasisCount.value = 0;
         emphasisStack.value = [];
       }
-    }
-    // EMPHASIS TRIGGER
-    if (currentPose.value?.class === POSES.EMPHASIS) {
-      if (emphasisHandler.value) {
-        const { stack, count } = emphasisHandler.value(
-          {
-            left: scaleLandmarksToChart({
-              landmarks: currentPose.value.left,
-              canvasDimensions: { width, height },
-              indices: [
-                HAND_LANDMARK_IDS.middle_finger_tip,
-                HAND_LANDMARK_IDS.wrist,
-              ],
-            }),
-            right: scaleLandmarksToChart({
-              landmarks: currentPose.value.right,
-              canvasDimensions: { width, height },
-              indices: [
-                HAND_LANDMARK_IDS.middle_finger_tip,
-                HAND_LANDMARK_IDS.wrist,
-              ],
-            }),
-          },
-          emphasisCount.value
-        );
-        emphasisStack.value = stack;
-        emphasisCount.value = count;
+      if (resetPointing.value) {
+        resetPointing.value();
       }
     }
 
+    // POSE HANDLERS
+    if (currentPose.value?.class === POSES.EMPHASIS) {
+      handleCurrentEmphasis();
+    }
+
     if (currentPose.value?.class === POSES.PLAYBACK) {
-      if (playbackHandler.value) {
-        isPlaybackMode.value = playbackHandler.value({
-          left: scaleLandmarksToChart({
-            landmarks: currentPose.value.left,
-            canvasDimensions: { width, height },
-            indices: [
-              HAND_LANDMARK_IDS.middle_finger_tip,
-              HAND_LANDMARK_IDS.wrist,
-            ],
-          }),
-          right: scaleLandmarksToChart({
-            landmarks: currentPose.value.right,
-            canvasDimensions: { width, height },
-            indices: [
-              HAND_LANDMARK_IDS.middle_finger_tip,
-              HAND_LANDMARK_IDS.wrist,
-            ],
-          }),
-        });
-      }
+      handleCurrentPlayback();
+    }
+
+    if (currentPose.value?.class === POSES.POINTING) {
+      handleCurrentPointing();
+    }
+
+    if (pointingStack.value.length >= 1) {
+      pointingStack.value.forEach(({ handPosition }) => {
+        console.log(handPosition);
+        if (!audienceCanvasCtx.value) return;
+        const x = handPosition.right[HAND_LANDMARK_IDS.index_finger_tip].x;
+        const y = handPosition.right[HAND_LANDMARK_IDS.index_finger_tip].y;
+        audienceCanvasCtx.value?.beginPath();
+        audienceCanvasCtx.value?.arc(x, y, 5, 0, 2 * Math.PI, false);
+        audienceCanvasCtx.value.fillStyle = "red";
+        audienceCanvasCtx.value.fill();
+      });
     }
   }
   await getPosePrediction(canvas.value);
+}
+
+async function handleCurrentEmphasis() {
+  if (emphasisHandler.value) {
+    const { stack, count } = emphasisHandler.value(
+      {
+        left: currentPose.value?.left,
+        right: currentPose.value?.right,
+      },
+      emphasisCount.value
+    );
+    emphasisStack.value = stack;
+    emphasisCount.value = count;
+  }
+}
+
+async function handleCurrentPlayback() {
+  if (playbackHandler.value) {
+    isPlaybackMode.value = playbackHandler.value({
+      left: currentPose.value?.left,
+      right: currentPose.value?.right,
+    });
+  }
+}
+
+async function handleCurrentPointing() {
+  if (pointingHandler.value) {
+    pointingStack.value = pointingHandler.value({
+      left: currentPose.value?.left,
+      right: currentPose.value?.right,
+    });
+  }
 }
 
 async function getPosePrediction(video: any) {
@@ -293,20 +297,27 @@ onMounted(() => {
   // RENDER ON AUDIENCE CANVAS
   if (audienceCanvas.value) {
     audienceCanvasCtx.value = audienceCanvas.value.getContext("2d");
-    const width = audienceCanvas.value?.width || 1280;
-    audienceCanvasCtx.value?.scale(-1, 1);
-    audienceCanvasCtx.value?.translate(-width, 0);
+    // const width = audienceCanvas.value?.width || 1280;
+    // audienceCanvasCtx.value?.scale(-1, 1);
+    // audienceCanvasCtx.value?.translate(-width, 0);
   }
   initializeHands();
   initializeModel();
+
   const { emphasisHandler: empHandler, resetEmphasis: rstEmphasis } =
     handleEmphasis();
   emphasisHandler.value = empHandler;
   resetEmphasis.value = rstEmphasis;
+
   const { playbackHandler: pbHandler, resetPlayback: rstPlayback } =
     handlePlayback();
   playbackHandler.value = pbHandler;
   resetPlayback.value = rstPlayback;
+
+  const { pointingHandler: pointHandler, resetPointing: rstPointing } =
+    handlePointing();
+  pointingHandler.value = pointHandler;
+  resetPointing.value = rstPointing;
 });
 </script>
 
@@ -364,6 +375,12 @@ onMounted(() => {
             :height="height"
             :class="className"
             ref="canvas"
+          ></canvas>
+          <canvas
+            :width="width"
+            :height="height"
+            :class="className"
+            ref="audienceCanvas"
           ></canvas>
           <ChartWrapper
             :width="chartWidth"

@@ -83,7 +83,6 @@ export class Legend {
 
   handleHover(position: Coordinates, endIndex: number, callback?: () => void) {
     if (this.isInRange(position)) {
-      console.log(endIndex);
       this.line.setEndIndex(endIndex);
       if (callback) {
         callback();
