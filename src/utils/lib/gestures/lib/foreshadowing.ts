@@ -15,7 +15,7 @@ export function handlePointing() {
       ],
       processedLandmarks[currentHand][HAND_LANDMARK_IDS.index_finger_tip]
     );
-    console.log(diff.euclideanDistance);
+
     if (diff.euclideanDistance < 30) {
       stack.push({
         handPosition: {

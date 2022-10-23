@@ -286,6 +286,7 @@ export function scaleLandmarksToChart({
 
     indices.forEach((index: number) => {
       processedLandmarks[index] = {
+        // mirror because the video the prediction is being detected on is flipped
         x: mirrorLandmarkHorizontally(
           canvasDimensions.width,
           canvasDimensions.width * processedLandmarks[index].x

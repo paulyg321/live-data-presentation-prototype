@@ -12,6 +12,7 @@ import {
   handleEmphasis,
   handlePlayback,
   handlePointing,
+  Line,
 } from "@/utils";
 
 // components
@@ -188,23 +189,71 @@ async function renderVideoOnCanvas(video: any) {
 
     if (currentPose.value?.class === POSES.PLAYBACK) {
       handleCurrentPlayback();
+      if (resetPointing.value) {
+        resetPointing.value();
+      }
     }
 
     if (currentPose.value?.class === POSES.POINTING) {
       handleCurrentPointing();
     }
 
-    if (pointingStack.value.length >= 1) {
+    if (pointingStack.value.length >= 1 && pointingStack.value.length < 4) {
+      let currentHand: string;
       pointingStack.value.forEach(({ handPosition }) => {
-        console.log(handPosition);
         if (!audienceCanvasCtx.value) return;
-        const x = handPosition.right[HAND_LANDMARK_IDS.index_finger_tip].x;
-        const y = handPosition.right[HAND_LANDMARK_IDS.index_finger_tip].y;
-        audienceCanvasCtx.value?.beginPath();
-        audienceCanvasCtx.value?.arc(x, y, 5, 0, 2 * Math.PI, false);
-        audienceCanvasCtx.value.fillStyle = "red";
-        audienceCanvasCtx.value.fill();
+        if (handPosition.right !== undefined && currentHand === undefined) {
+          currentHand = "right";
+        }
+        if (handPosition.left !== undefined && currentHand === undefined) {
+          currentHand = "left";
+        }
+        if (currentHand !== undefined) {
+          const x =
+            handPosition[currentHand][HAND_LANDMARK_IDS.index_finger_tip].x;
+          const y =
+            handPosition[currentHand][HAND_LANDMARK_IDS.index_finger_tip].y;
+          audienceCanvasCtx.value?.beginPath();
+          audienceCanvasCtx.value?.arc(x, y, 5, 0, 2 * Math.PI, false);
+          audienceCanvasCtx.value.fillStyle = "red";
+          audienceCanvasCtx.value.fill();
+        }
       });
+    }
+
+    if (pointingStack.value.length >= 4) {
+      const foreshadowLineData = pointingStack.value.reduce(
+        (newStack, stackItem, index) => {
+          if (index === 1 || index === 3) {
+            return [
+              ...newStack,
+              {
+                x: stackItem.handPosition.right[
+                  HAND_LANDMARK_IDS.index_finger_tip
+                ].x,
+                y: stackItem.handPosition.right[
+                  HAND_LANDMARK_IDS.index_finger_tip
+                ].y,
+              },
+            ];
+          }
+          return newStack;
+        },
+        []
+      );
+
+      const foreshadowingLine = new Line({
+        data: foreshadowLineData,
+        context: audienceCanvasCtx.value,
+        xScale: (value: any) => value,
+        canvasDimensions,
+        color: "grey",
+        label: "foreshadowing",
+        endIndex: 4,
+        lineWidth: 10,
+      });
+
+      foreshadowingLine.drawLine();
     }
   }
   await getPosePrediction(canvas.value);

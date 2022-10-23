@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch, type ComputedRef } from "vue";
 import {
-  generateLineData,
   keepBetween,
   Legend,
   legendPosition,
@@ -172,7 +171,7 @@ function drawLegend() {
 }
 
 function initializeLines() {
-  const endIndex = 20;
+  const endIndex = 0;
   lines.value = [
     new Line({
       data: lineData.value,

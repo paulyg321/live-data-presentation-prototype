@@ -4,11 +4,12 @@ export interface LineConstructorArgs {
   data: Coordinates[];
   context: CanvasRenderingContext2D | null;
   xScale: any;
-  yScale?: any;
   canvasDimensions: ChartDimensions;
   color: string;
   label: string;
   endIndex: number;
+  yScale?: any;
+  lineWidth?: number;
 }
 
 export class Line {
@@ -23,6 +24,7 @@ export class Line {
   private endIndex: number;
   private isSelected = false;
   private lineData: Coordinates[] = [];
+  private lineWidth: number;
 
   constructor({
     data,
@@ -33,6 +35,7 @@ export class Line {
     color,
     label,
     endIndex,
+    lineWidth,
   }: LineConstructorArgs) {
     this.data = data;
     this.context = context;
@@ -42,13 +45,14 @@ export class Line {
     this.color = color;
     this.label = label;
     this.endIndex = endIndex;
+    this.lineWidth = lineWidth ?? 4;
   }
 
   drawLine() {
     const ctx = this.context;
     if (ctx) {
       ctx.beginPath();
-      ctx.lineWidth = 4;
+      ctx.lineWidth = this.lineWidth;
       ctx.strokeStyle = this.color;
       ctx.lineCap = "round";
 

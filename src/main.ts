@@ -1,11 +1,9 @@
 import { createApp } from "vue";
-import MediaPipe from "./views/MediaPipe.vue";
-// import router from "./router";
+// import MediaPipe from "./views/MediaPipe.vue";
 
 import "./assets/main.css";
+import AppVue from "./views/App.vue";
 
-const app = createApp(MediaPipe);
-
-// app.use(router);
+const app = createApp(AppVue);
 
 app.mount("#app");
