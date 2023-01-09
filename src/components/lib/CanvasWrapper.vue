@@ -9,7 +9,7 @@ const childClass = "canvas-elements";
 
 <template>
   <div class="canvas-wrapper">
-    <slot :width="width" :height="height" :className="childClass"></slot>
+    <slot :className="childClass"></slot>
   </div>
 </template>
 

@@ -1,7 +1,7 @@
-import type { ChartDimensions, Coordinates } from "../../../types";
+import type { ChartDimensions, Coordinate } from "../../../types";
 
 export interface LineConstructorArgs {
-  data: Coordinates[];
+  data: Coordinate[];
   context: CanvasRenderingContext2D | null;
   xScale: any;
   canvasDimensions: ChartDimensions;
@@ -13,7 +13,7 @@ export interface LineConstructorArgs {
 }
 
 export class Line {
-  private data: Coordinates[];
+  private data: Coordinate[];
   private context: CanvasRenderingContext2D | null;
   private xScale: any;
   private yScale: any;
@@ -23,7 +23,7 @@ export class Line {
 
   private endIndex: number;
   private isSelected = false;
-  private lineData: Coordinates[] = [];
+  private lineData: Coordinate[] = [];
   private lineWidth: number;
 
   constructor({
@@ -58,7 +58,7 @@ export class Line {
 
       this.lineData = this.data.slice(0, this.endIndex);
 
-      this.lineData.forEach((point: Coordinates, index: number) => {
+      this.lineData.forEach((point: Coordinate, index: number) => {
         if (index === 0) {
           ctx.moveTo(this.xScale(point.x), point.y);
         }
@@ -88,7 +88,7 @@ export class Line {
     this.isSelected = isSelected;
   }
 
-  setData(data: Coordinates[]) {
+  setData(data: Coordinate[]) {
     this.data = data;
   }
 

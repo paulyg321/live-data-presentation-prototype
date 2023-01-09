@@ -1,118 +1,180 @@
+<script setup lang="ts">
+import { onMounted, ref, watch } from "vue";
+// VIEWS
+import PortalView from "../views/PortalView.vue";
+import ChartSettingsTab from "./nav-drawer-tab/ChartSettingsTab.vue";
+import PortalSettingsTab from "./nav-drawer-tab/PortalSettingsTab.vue";
+import VideoSettingsTab from "./nav-drawer-tab/VideoSettingsTab.vue";
+
+// STATE
+import {
+  CanvasSettings,
+  CameraSettings,
+  PortalState,
+} from "./settings-state";
+
+enum SettingsTab {
+  CHART_SETTINGS = "chart-settings",
+  PORTALS = "portals",
+  VIDEO_SETTINGS = "video-settings",
+}
+
+const currentTab = ref<SettingsTab | null>(SettingsTab.CHART_SETTINGS);
+
+async function setVideoDimensions() {
+  if (CameraSettings.video) {
+    CameraSettings.video.width = CanvasSettings.canvasWidth;
+    CameraSettings.video.height = CanvasSettings.canvasHeight; // (3 / 4);
+    CameraSettings.video.play();
+  }
+}
+async function renderVideoOnCanvas() {
+  // CanvasSettings.generalCanvasCtx?.clearRect(
+  //   0,
+  //   0,
+  //   CanvasSettings.canvasWidth,
+  //   CanvasSettings.canvasHeight
+  // );
+  // if (CanvasSettings.generalCanvasCtx && CameraSettings.video) {
+  //   CanvasSettings.generalCanvasCtx.drawImage(
+  //     CameraSettings.video,
+  //     0,
+  //     0,
+  //     CanvasSettings.canvasWidth,
+  //     CanvasSettings.canvasHeight
+  //   );
+  // }
+  // requestAnimationFrame(() => renderVideoOnCanvas());
+}
+
+// onMounted(async () => {
+//   if (CanvasSettings.generalCanvas) {
+//     CanvasSettings.setGeneralCanvasCtx(
+//       CanvasSettings.generalCanvas.getContext("2d")
+//     );
+
+//     if (CameraSettings.mirror === true) {
+//       CanvasSettings.generalCanvasCtx?.save();
+//       CanvasSettings.generalCanvasCtx?.scale(-1, 1);
+//       CanvasSettings.generalCanvasCtx?.translate(
+//         -CanvasSettings.canvasWidth,
+//         0
+//       );
+//     }
+
+//     const threePointBezierCurve = new ThreePointBezierCurve();
+//     animatedLine.animateToNextState({
+//       ctx: CanvasSettings.generalCanvasCtx,
+//       playRemainingStates: true,
+//       // Call like this so we don't lose the this context in ThreePointBezier
+//       transitionFunction: (time: number) => threePointBezierCurve.easeOut(time),
+//     });
+//   }
+
+//   await CameraSettings.setVideoSources();
+// });
+
+function handleTabChange(value: {
+  id: SettingsTab;
+  value: boolean;
+  path: SettingsTab[];
+  event: PointerEvent;
+}) {
+  currentTab.value = value.value ? value.id : null;
+}
+</script>
+
 <template>
   <v-container>
-    <!-- Chart Types -->
-    <v-row>
-      <v-col cols="12">
-        <p class="text-h6 mb-4">Charts:</p>
-
-        <div class="form-row">
-          <v-row no-gutters>
-            <v-col lg="2" sm="12">
-              <p class="text-body-1 font-weight-bold">Chart Type:</p>
-            </v-col>
-
-            <v-col lg="10" sm="12">
-              <span
-                v-for="option in chartOptions"
-                :class="option.class"
-                :key="option.name"
-                @click="() => handleChartSelection(option.name)"
+    <v-app>
+      <v-navigation-drawer theme="dark" rail permanent>
+        <v-list density="compact" nav @click:select="handleTabChange">
+          <v-tooltip text="Chart Settings">
+            <template v-slot:activator="{ props }">
+              <v-list-item
+                prepend-icon="mdi-chart-box-outline"
+                value="chart-settings"
+                v-bind="props"
               >
-                <v-btn :variant="option.selected ? 'tonal' : 'outlined'">
-                  {{ option.name }}
-                </v-btn>
-              </span>
-            </v-col>
-          </v-row>
-        </div>
+              </v-list-item>
+            </template>
+          </v-tooltip>
 
-        <div class="form-row">
-          <v-row no-gutters>
-            <v-col lg="2" sm="12">
-              <p class="text-body-1 font-weight-bold">Settings:</p>
-            </v-col>
+          <v-tooltip text="Portals">
+            <template v-slot:activator="{ props }">
+              <v-list-item
+                prepend-icon="mdi-presentation-play"
+                value="portals"
+                v-bind="props"
+              >
+              </v-list-item>
+            </template>
+          </v-tooltip>
 
-            <v-col lg="10" sm="12">
-              <div class="text-caption">Width</div>
-              <v-slider
-                :min="0"
-                :max="1000"
-                :step="1"
-                v-model="chartWidth"
-                track-color="grey"
-                thumb-label
-              ></v-slider>
-              <div class="text-caption">X Position</div>
-              <v-slider
-                :min="0"
-                :max="1000"
-                :step="1"
-                v-model="xPosition"
-                track-color="grey"
-                thumb-label
-              ></v-slider>
-              <div class="text-caption">Y Position</div>
-              <v-slider
-                :min="0"
-                :max="1000"
-                :step="1"
-                v-model="yPosition"
-                track-color="grey"
-                thumb-label
-              ></v-slider>
-            </v-col>
-          </v-row>
-        </div>
-      </v-col>
-    </v-row>
-    <!-- Views -->
-    <v-row>
-      <v-col cols="12">
-        <p class="text-h6 mb-4">Views:</p>
+          <v-tooltip text="Video Settings">
+            <template v-slot:activator="{ props }">
+              <v-list-item
+                prepend-icon="mdi-video"
+                value="video-settings"
+                v-bind="props"
+                :click="() => void 0"
+              >
+              </v-list-item>
+            </template>
+          </v-tooltip>
+        </v-list>
+      </v-navigation-drawer>
 
-        <div class="form-row">
-          <v-row no-gutters>
-            <v-col lg="6" sm="12">
-              <v-checkbox 
-                label="Presenter"
-                color="red"
-              ></v-checkbox>
-            </v-col>
-          </v-row>
+      <v-navigation-drawer permanent width="450">
+        <!-- Chart Settings -->
+        <div class="form-row" v-if="currentTab === SettingsTab.CHART_SETTINGS">
+          <ChartSettingsTab />
         </div>
-      </v-col>
-    </v-row>
+        <!-- Portals -->
+        <div class="form-row" v-if="currentTab === SettingsTab.PORTALS">
+          <PortalSettingsTab />
+        </div>
+        <!-- Video Settings -->
+        <div class="form-row" v-if="currentTab === SettingsTab.VIDEO_SETTINGS">
+          <VideoSettingsTab />
+        </div>
+      </v-navigation-drawer>
+
+      <v-main>
+        <!-- Views -->
+        <router-view></router-view>
+      </v-main>
+    </v-app>
+    <PortalView
+      :open="PortalState.presenterPortalOpen"
+      :handle-close="() => PortalState.handlePresenterPortalClose()"
+    />
+    <PortalView
+      :open="PortalState.audiencePortalOpen"
+      :handle-close="() => PortalState.handleAudiencePortalClose()"
+    />
+    <video
+      :ref="(el) => CameraSettings.setVideo(el as HTMLVideoElement)"
+      autoplay="true"
+      :srcObject="CameraSettings.stream"
+      @loadeddata="renderVideoOnCanvas"
+      @loadedmetadata="setVideoDimensions"
+    ></video>
   </v-container>
 </template>
 
-<script setup lang="ts">
-import { computed, ref } from "vue";
-
-// CHART TYPE
-const chartType = ref<string>("Line");
-const chartOptions = computed(() => [
-  { class: "pa-2", name: "Line", selected: chartType.value === "Line" },
-  { class: "pa-2", name: "Bar", selected: chartType.value === "Bar" },
-  {
-    class: "pa-2",
-    name: "Scatter",
-    selected: chartType.value === "Scatter",
-  },
-]);
-function handleChartSelection(chart: string) {
-  chartType.value = chart;
-}
-
-// CHART SETTINGS
-const chartWidth = ref<number>(600);
-const yPosition = ref<number>(0);
-const xPosition = ref<number>(0);
-</script>
-
 <style>
 .form-row {
-  padding: 0 50px;
+  padding: 30px 30px;
   align-items: flex-start;
-  margin-bottom: 30px;
+  width: 100%;
+}
+
+.default-checkbox {
+  margin-right: 10px;
+}
+
+video {
+  display: none;
 }
 </style>

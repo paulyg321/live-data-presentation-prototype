@@ -11,6 +11,7 @@
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore"
   },
   "dependencies": {
+    "@mdi/font": "^7.0.96",
     "@mediapipe/camera_utils": "^0.3.1640029074",
     "@mediapipe/control_utils": "^0.6.1629159505",
     "@mediapipe/drawing_utils": "^0.3.1620248257",
@@ -21,6 +22,7 @@
     "d3": "^7.6.1",
     "handtrackjs": "^0.1.5",
     "lodash": "^4.17.21",
+    "monaco-editor": "^0.34.1",
     "vue": "^3.2.37",
     "vue-router": "^4.1.2",
     "vuetify": "3.0.0-beta.14",

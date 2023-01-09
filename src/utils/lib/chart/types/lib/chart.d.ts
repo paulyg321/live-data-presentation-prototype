@@ -11,7 +11,19 @@ export interface ChartDimensions {
   margin?: ChartMargin;
 }
 
-export interface Coordinates {
+export interface Coordinate {
   x: number;
   y: number;
+}
+
+export interface BezierCoordinate {
+  coordinate: Coordinate;
+  cpLeft?: {
+    x: number;
+    y: number;
+  };
+  cpRight?: {
+    x: number;
+    y: number;
+  };
 }

@@ -1,11 +1,11 @@
-import type { Coordinates } from "../../../types";
+import type { Coordinate } from "../../../types";
 import type { Line } from "./line";
 import { CanvasText } from "./canvas-text";
 
 export interface LegendConstructorArgs {
   label: string;
   context: CanvasRenderingContext2D | null;
-  position: Coordinates;
+  position: Coordinate;
   color: string;
   line: Line;
 }
@@ -19,7 +19,7 @@ export class Legend {
   private label: string;
   private context: CanvasRenderingContext2D | null;
   private color: string;
-  private position: Coordinates;
+  private position: Coordinate;
   private line: Line;
   private bounds: any;
   private text: CanvasText;
@@ -68,7 +68,7 @@ export class Legend {
     }
   }
 
-  isInRange(position: Coordinates) {
+  isInRange(position: Coordinate) {
     if (
       position.x > this.bounds.x.start &&
       position.x < this.bounds.x.end &&
@@ -81,7 +81,7 @@ export class Legend {
     return false;
   }
 
-  handleHover(position: Coordinates, endIndex: number, callback?: () => void) {
+  handleHover(position: Coordinate, endIndex: number, callback?: () => void) {
     if (this.isInRange(position)) {
       this.line.setEndIndex(endIndex);
       if (callback) {

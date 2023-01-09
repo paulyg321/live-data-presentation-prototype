@@ -46,16 +46,16 @@ function openPortal() {
   windowRef.value = window.open(
     "",
     "",
-    "width=600,height=400,left=200,top=200"
+    "width=640,height=480,left=200,top=200"
   );
   windowRef.value.document.body.appendChild(el.value);
   copyStyles(window.document, windowRef.value.document);
-  windowRef.value.addEventListener("resize", () => {
-    windowRef.value.resizeTo(
-      windowRef.value.innerWidth,
-      windowRef.value.innerWidth * (1080 / 1920)
-    );
-  });
+  // windowRef.value.addEventListener("resize", () => {
+  //   windowRef.value.resizeTo(
+  //     windowRef.value.innerWidth,
+  //     windowRef.value.innerWidth * (1080 / 1920)
+  //   );
+  // });
   windowRef.value.addEventListener("beforeunload", closePortal);
 }
 

@@ -8,7 +8,7 @@ import {
   MOCK_LINE,
   MOCK_LINE_2,
   MOCK_LINE_3,
-  type Coordinates,
+  type Coordinate,
 } from "@/utils";
 
 const EMPHASIS_TO_FPS = [10, 20, 40, 60];
@@ -32,8 +32,8 @@ const props = defineProps<{
   yScale: any;
   className?: string;
   handPosition?: {
-    left: Coordinates;
-    right: Coordinates;
+    left: Coordinate;
+    right: Coordinate;
   };
   fps: number;
   chartSize: number;

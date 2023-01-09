@@ -17,7 +17,8 @@ watch(currentSource, async (newSource) => {
 });
 
 onMounted(async () => {
-  videoSources.value = await getVideoSources();
+  const sources = await getVideoSources();
+  videoSources.value = sources;
 });
 </script>
 
@@ -32,23 +33,18 @@ onMounted(async () => {
     @loadeddata="$emit('loaded-data', video)"
     @loadedmetadata="$emit('loaded-metadata', video)"
   ></video>
-  <div v-if="currentSource === ''" class="radio-input-container">
-    <span v-for="videoSource in videoSources" :key="videoSource.id">
-      <input type="radio" v-model="currentSource" :value="videoSource.id" />
-      <label>{{ videoSource.label }}</label>
-    </span>
-  </div>
+  <v-select
+    label="Select"
+    item-title="label"
+    item-value="id"
+    :items="videoSources"
+    v-model="currentSource"
+  ></v-select>
 </template>
 
 <style>
 .canvasbox {
   display: none;
-}
-
-.radio-input-container {
-  display: flex;
-  flex-direction: column;
-  color: #F27405;
 }
 
 .radio-input-container label {

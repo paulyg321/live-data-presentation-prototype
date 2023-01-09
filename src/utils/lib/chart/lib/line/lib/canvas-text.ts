@@ -1,8 +1,8 @@
-import type { Coordinates } from "@/utils";
+import type { Coordinate } from "@/utils";
 
 export interface TextConstructorArgs {
   context: CanvasRenderingContext2D | null;
-  position: Coordinates;
+  position: Coordinate;
   color: string;
   label: string;
   fontSize?: number;
@@ -10,7 +10,7 @@ export interface TextConstructorArgs {
 
 export class CanvasText {
   private context: CanvasRenderingContext2D | null;
-  private position: Coordinates;
+  private position: Coordinate;
   private color: string;
   private label: string;
   private fontSize: number;

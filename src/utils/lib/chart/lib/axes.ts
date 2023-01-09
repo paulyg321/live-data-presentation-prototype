@@ -1,4 +1,4 @@
-const AXES_COLOR = "white";
+const AXES_COLOR = "black";
 
 // Extent is usually the min/max
 export function drawXAxis(

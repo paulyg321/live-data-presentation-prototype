@@ -1,0 +1,275 @@
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from "vue";
+import * as monaco from "monaco-editor";
+import { Chart, ChartTypeValue, type ChartType } from "@/utils";
+import _ from "lodash";
+import { ChartSettings } from "../settings-state";
+
+const numPages = 2;
+const chartOptions = [
+  { title: "Line Chart", value: "line" },
+  { title: "Scatter Plot", value: "scatter" },
+  { title: "Bar Chart", value: "bar" },
+];
+/**
+ * Stepper
+ */
+const currentPage = ref(1);
+const buttonContainerClass = computed(() => {
+  const isFirstPage = currentPage.value === 1;
+
+  const isLastPage = currentPage.value === numPages;
+  const singleBtnFormat = isLastPage ? "justify-start" : "justify-end";
+
+  const isFirstOrLastPage = isFirstPage || isFirstPage;
+
+  return `d-flex ${
+    isFirstOrLastPage ? singleBtnFormat : "justify-space-between"
+  }`;
+});
+
+function createChart() {
+  try {
+    const chart = Chart.CreateChart({
+      title: chartTitle.value,
+      type: newChartType.value,
+      data: chartData.value,
+      field: field.value,
+      key: key.value,
+      step: step.value,
+      x: xVal.value,
+      y: yVal.value,
+    });
+    ChartSettings.addChart(chart);
+  } catch (err) {
+    console.log(err);
+    alert(err);
+  }
+}
+
+function handleBack() {
+  if (currentPage.value > 1) {
+    currentPage.value -= 1;
+  }
+}
+
+async function handleNext() {
+  if (currentPage.value === 1) {
+    if (
+      // check all fields are valid
+      newChartType.value === undefined ||
+      chartTitle.value === undefined ||
+      chartData.value === undefined
+    ) {
+      alert("ALL FIELDS ARE REQUIRED");
+      return;
+    }
+    chartData.value = JSON.parse(monacoEditor.getValue());
+    updateFieldOptions();
+  }
+
+  if (currentPage.value === numPages) {
+    // check all fields are valid
+    const hasRequiredFields =
+      field.value !== undefined ||
+      key.value !== undefined ||
+      xVal.value !== undefined ||
+      yVal.value !== undefined;
+
+    if (hasRequiredFields) {
+      if (newChartType.value?.value === "line") {
+        const nestedXVals = xVal.value?.split(".");
+        const nestedYVals = yVal.value?.split(".");
+
+        if (
+          nestedXVals &&
+          nestedYVals &&
+          nestedXVals?.length > 1 &&
+          nestedYVals?.length > 1 &&
+          nestedXVals[0] === nestedYVals[0]
+        ) {
+          if (
+            chartData.value[0][nestedXVals[0]] &&
+            chartData.value[0][nestedXVals[0]][0][nestedXVals[1]] !==
+              undefined &&
+            chartData.value[0][nestedYVals[0]][0][nestedYVals[1]] !== undefined
+          ) {
+            createChart();
+          } else {
+            //set for error
+            console.log({
+              one: chartData.value[0][nestedXVals[0]],
+              two: chartData.value[0][nestedXVals[0]][0][nestedXVals[1]],
+              three: chartData.value[0][nestedYVals[0]][0][nestedYVals[1]],
+            });
+            alert("ERROR - LINE");
+          }
+        } else {
+          //set for error
+          alert("ERROR - LINE");
+        }
+      } else {
+        if (
+          xVal.value &&
+          yVal.value &&
+          chartData.value[0][xVal.value] &&
+          chartData.value[0][yVal.value]
+        ) {
+          createChart();
+        } else {
+          console.log(xVal.value);
+          console.log(yVal.value);
+          alert("ERROR - NON LINE");
+        }
+      }
+    } else {
+      alert("ERROR - Required fields missing");
+    }
+  }
+
+  if (currentPage.value < numPages) {
+    currentPage.value = currentPage.value + 1;
+  }
+}
+
+/**
+ * Form Inputs
+ */
+const chartTitle = ref<string>();
+const newChartType = ref<ChartType | undefined>();
+const chartData = ref<any>([{ hello: "world" }]);
+const dataInput = ref<HTMLElement>();
+let monacoEditor: monaco.editor.IStandaloneCodeEditor;
+const field = ref<string>();
+const key = ref<string>();
+const xVal = ref<string>();
+const yVal = ref<string>();
+const step = ref<number>(500);
+const columnOptions = ref<any>([]);
+watch([field, key], () => {
+  updateFieldOptions();
+});
+
+function updateFieldOptions() {
+  columnOptions.value = _.keys(chartData.value[0]).filter(
+    (objKey) => objKey !== key.value && objKey !== field.value
+  );
+}
+
+function setJsonEditor() {
+  if (dataInput.value) {
+    monacoEditor = monaco.editor.create(dataInput.value, {
+      value: JSON.stringify(chartData.value),
+      language: "json",
+    });
+  }
+}
+
+onMounted(() => {
+  setJsonEditor();
+});
+</script>
+<!---------------------------------------------------------------------------------------------------------->
+<template>
+  <h1 class="text-h4 mb-5">New Chart</h1>
+  <v-card color="lighten-1">
+    <v-container>
+      <div v-show="currentPage === 1">
+        <v-container class="mb-10">
+          <v-row align="start">
+            <v-col lg="12">
+              <v-text-field
+                label="Chart Title"
+                v-model="chartTitle"
+              ></v-text-field>
+            </v-col>
+            <v-col lg="12">
+              <v-select
+                label="Chart Type"
+                :hint="`${newChartType?.title}`"
+                :items="chartOptions"
+                item-title="title"
+                item-value="value"
+                v-model="newChartType"
+                return-object
+              ></v-select>
+            </v-col>
+            <v-col lg="12">
+              <p class="text-body-1 mb-3">Chart Data</p>
+              <v-card class="json-container">
+                <div ref="dataInput" class="h-100"></div>
+              </v-card>
+            </v-col>
+          </v-row>
+        </v-container>
+      </div>
+      <div v-if="currentPage === 2">
+        <v-container class="mb-10">
+          <v-row align="start">
+            <v-col lg="12">
+              <v-select
+                label="Field"
+                :hint="`${field}`"
+                :items="columnOptions"
+                v-model="field"
+              ></v-select>
+            </v-col>
+            <v-col lg="12">
+              <v-select
+                label="Key"
+                :hint="`${key}`"
+                :items="columnOptions"
+                v-model="key"
+              ></v-select>
+            </v-col>
+            <v-col lg="12">
+              <v-text-field
+                v-if="newChartType?.value === ChartTypeValue.LINE"
+                label="X"
+                v-model="xVal"
+              ></v-text-field>
+              <v-select
+                v-else
+                label="X"
+                :hint="`${key}`"
+                :items="columnOptions"
+                v-model="xVal"
+              ></v-select>
+            </v-col>
+            <v-col lg="12">
+              <v-text-field
+                v-if="newChartType?.value === ChartTypeValue.LINE"
+                label="Y"
+                v-model="yVal"
+              ></v-text-field>
+              <v-select
+                v-else
+                label="Y"
+                :hint="`${key}`"
+                :items="columnOptions"
+                v-model="yVal"
+              ></v-select>
+            </v-col>
+            <v-col lg="12">
+              <v-text-field label="Step" v-model="step"></v-text-field>
+            </v-col>
+          </v-row>
+        </v-container>
+      </div>
+      <v-row>
+        <v-col lg="12" :class="buttonContainerClass">
+          <v-btn @click="handleBack()" v-if="currentPage > 1"> Back </v-btn>
+          <v-btn @click="handleNext()" color="primary">
+            {{ currentPage < numPages ? "Next" : "Create" }}
+          </v-btn>
+        </v-col>
+      </v-row>
+    </v-container>
+  </v-card>
+</template>
+<!---------------------------------------------------------------------------------------------------------->
+<style>
+.json-container {
+  height: 300px;
+}
+</style>
