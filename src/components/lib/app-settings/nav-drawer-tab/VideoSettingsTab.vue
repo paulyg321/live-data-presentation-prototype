@@ -1,5 +1,9 @@
 <script lang="ts" setup>
+import { onMounted } from "vue";
 import { CameraSettings } from "../settings-state";
+onMounted(async () => {
+  await CameraSettings.setVideoSources();
+});
 </script>
 <template>
   <v-row>

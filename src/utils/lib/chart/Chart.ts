@@ -19,8 +19,8 @@ export interface NewChartArgs {
   field: string;
   key: string;
   step: number;
-  x: string;
-  y: string;
+  xAccessor: string;
+  yAccessor: string;
 }
 
 export class Chart {
@@ -30,8 +30,8 @@ export class Chart {
   field: string;
   key: string;
   step: number;
-  x: string;
-  y: string;
+  xAccessor: string;
+  yAccessor: string;
   xDomain: any[] = [Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY];
   yDomain: any[] = [Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY];
 
@@ -42,8 +42,8 @@ export class Chart {
     field,
     key,
     step,
-    x,
-    y,
+    xAccessor,
+    yAccessor,
   }: Partial<NewChartArgs>) {
     const hasRequiredFields =
       title !== undefined ||
@@ -52,8 +52,8 @@ export class Chart {
       field !== undefined ||
       key !== undefined ||
       step !== undefined ||
-      x !== undefined ||
-      y !== undefined;
+      xAccessor !== undefined ||
+      yAccessor !== undefined;
 
     if (!hasRequiredFields)
       throw new Error("Please provide all required fields");
@@ -65,8 +65,8 @@ export class Chart {
       field: field!,
       key: key!,
       step: step!,
-      x: x!,
-      y: y!,
+      xAccessor: xAccessor!,
+      yAccessor: yAccessor!,
     });
   }
 
@@ -87,8 +87,8 @@ export class Chart {
     field,
     key,
     step,
-    x = "x",
-    y = "y",
+    xAccessor = "x",
+    yAccessor = "y",
   }: NewChartArgs) {
     this.title = title;
     this.type = type;
@@ -96,10 +96,53 @@ export class Chart {
     this.field = field;
     this.key = key;
     this.step = step;
-    this.x = x;
-    this.y = y;
+    this.xAccessor = xAccessor;
+    this.yAccessor = yAccessor;
 
-    this.setLineChartDomain({ data });
+    this.setDomain();
+  }
+
+  setDomain() {
+    switch (this.type.value) {
+      case ChartTypeValue.LINE:
+        this.setLineChartDomain({ data: this.data });
+        break;
+      default:
+        break;
+    }
+  }
+
+  setLineChartDomain({
+    data,
+    dataKey = this.xAccessor.split(".")[0],
+  }: {
+    data: any;
+    dataKey?: any;
+  }) {
+    if (data.length > 0) {
+      data.forEach((currentData: any) => {
+        const state = currentData[dataKey] as { x: any; y: any }[];
+        const [minX, maxX] = d3.extent(state, (data) => data.x);
+        const [minY, maxY] = d3.extent(state, (data) => data.y);
+
+        const currentMinX = this.xDomain[0];
+        const currentMaxX = this.xDomain[1];
+
+        const currentMinY = this.xDomain[0];
+        const currentMaxY = this.xDomain[1];
+
+        this.xDomain = [
+          d3.min([minX, currentMinX]),
+          d3.max([maxX, currentMaxX]),
+        ];
+        this.yDomain = [
+          d3.min([minY, currentMinY]),
+          d3.max([maxY, currentMaxY]),
+        ];
+      }, {});
+    } else {
+      throw new Error("Non existent data");
+    }
   }
 
   getAnimatedChartItems({
@@ -123,10 +166,10 @@ export class Chart {
   }) {
     switch (this.type.value) {
       case ChartTypeValue.LINE: {
-        const resultantLine = this.convertLineDataToAnimation({
+        return this.createLineAnimationFromData({
           field: this.field,
           key: this.key,
-          dataKey: this.x.split(".")[0],
+          dataKey: this.xAccessor.split(".")[0],
           chartOptions: {
             xScale,
             yScale,
@@ -135,14 +178,13 @@ export class Chart {
             duration,
           },
         });
-        return resultantLine;
       }
       default:
         return undefined;
     }
   }
 
-  convertLineDataToAnimation({
+  createLineAnimationFromData({
     field,
     key,
     dataKey,
@@ -209,38 +251,5 @@ export class Chart {
       },
       {}
     );
-  }
-
-  setLineChartDomain({
-    data,
-    dataKey = this.x.split(".")[0],
-  }: {
-    data: any;
-    dataKey?: any;
-  }) {
-    if (data.length > 0) {
-      data.forEach((currentData: any) => {
-        const state = currentData[dataKey] as { x: any; y: any }[];
-        const [minX, maxX] = d3.extent(state, (data) => data.x);
-        const [minY, maxY] = d3.extent(state, (data) => data.y);
-
-        const currentMinX = this.xDomain[0];
-        const currentMaxX = this.xDomain[1];
-
-        const currentMinY = this.xDomain[0];
-        const currentMaxY = this.xDomain[1];
-
-        this.xDomain = [
-          d3.min([minX, currentMinX]),
-          d3.max([maxX, currentMaxX]),
-        ];
-        this.yDomain = [
-          d3.min([minY, currentMinY]),
-          d3.max([maxY, currentMaxY]),
-        ];
-      }, {});
-    } else {
-      throw new Error("Non existent data");
-    }
   }
 }

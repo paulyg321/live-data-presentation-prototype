@@ -37,12 +37,11 @@ function createChart() {
       field: field.value,
       key: key.value,
       step: step.value,
-      x: xVal.value,
-      y: yVal.value,
+      xAccessor: xAccessor.value,
+      yAccessor: yAccessor.value,
     });
     ChartSettings.addChart(chart);
   } catch (err) {
-    console.log(err);
     alert(err);
   }
 }
@@ -73,13 +72,13 @@ async function handleNext() {
     const hasRequiredFields =
       field.value !== undefined ||
       key.value !== undefined ||
-      xVal.value !== undefined ||
-      yVal.value !== undefined;
+      xAccessor.value !== undefined ||
+      yAccessor.value !== undefined;
 
     if (hasRequiredFields) {
       if (newChartType.value?.value === "line") {
-        const nestedXVals = xVal.value?.split(".");
-        const nestedYVals = yVal.value?.split(".");
+        const nestedXVals = xAccessor.value?.split(".");
+        const nestedYVals = yAccessor.value?.split(".");
 
         if (
           nestedXVals &&
@@ -96,12 +95,6 @@ async function handleNext() {
           ) {
             createChart();
           } else {
-            //set for error
-            console.log({
-              one: chartData.value[0][nestedXVals[0]],
-              two: chartData.value[0][nestedXVals[0]][0][nestedXVals[1]],
-              three: chartData.value[0][nestedYVals[0]][0][nestedYVals[1]],
-            });
             alert("ERROR - LINE");
           }
         } else {
@@ -110,15 +103,13 @@ async function handleNext() {
         }
       } else {
         if (
-          xVal.value &&
-          yVal.value &&
-          chartData.value[0][xVal.value] &&
-          chartData.value[0][yVal.value]
+          xAccessor.value &&
+          yAccessor.value &&
+          chartData.value[0][xAccessor.value] &&
+          chartData.value[0][yAccessor.value]
         ) {
           createChart();
         } else {
-          console.log(xVal.value);
-          console.log(yVal.value);
           alert("ERROR - NON LINE");
         }
       }
@@ -142,8 +133,8 @@ const dataInput = ref<HTMLElement>();
 let monacoEditor: monaco.editor.IStandaloneCodeEditor;
 const field = ref<string>();
 const key = ref<string>();
-const xVal = ref<string>();
-const yVal = ref<string>();
+const xAccessor = ref<string>();
+const yAccessor = ref<string>();
 const step = ref<number>(500);
 const columnOptions = ref<any>([]);
 watch([field, key], () => {
@@ -225,29 +216,29 @@ onMounted(() => {
             <v-col lg="12">
               <v-text-field
                 v-if="newChartType?.value === ChartTypeValue.LINE"
-                label="X"
-                v-model="xVal"
+                label="X Accessor"
+                v-model="xAccessor"
               ></v-text-field>
               <v-select
                 v-else
-                label="X"
+                label="X Accessor"
                 :hint="`${key}`"
                 :items="columnOptions"
-                v-model="xVal"
+                v-model="xAccessor"
               ></v-select>
             </v-col>
             <v-col lg="12">
               <v-text-field
                 v-if="newChartType?.value === ChartTypeValue.LINE"
-                label="Y"
-                v-model="yVal"
+                label="X Accessor"
+                v-model="yAccessor"
               ></v-text-field>
               <v-select
                 v-else
-                label="Y"
+                label="X Accessor"
                 :hint="`${key}`"
                 :items="columnOptions"
-                v-model="yVal"
+                v-model="yAccessor"
               ></v-select>
             </v-col>
             <v-col lg="12">

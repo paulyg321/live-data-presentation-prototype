@@ -10,11 +10,8 @@ export const CanvasSettings = reactive<{
   canvas: { [key: string]: HTMLCanvasElement | null };
   canvasCtx: { [key: string]: CanvasRenderingContext2D | null | undefined };
   setCanvas: (canvas: HTMLCanvasElement | null, key: string) => void;
-  setCanvasCtx: (
-    canvasCtx: CanvasRenderingContext2D | null | undefined,
-    key: string
-  ) => void;
-  initializeCanvas: (key: string) => void;
+  setCanvasCtx: (key: string) => void;
+  initializeCanvas: (key: string, allowMirror: boolean) => void;
 }>({
   canvasWidth: initialCanvasWidth,
   setCanvasWidth(width: number) {
@@ -27,21 +24,18 @@ export const CanvasSettings = reactive<{
     this.canvas[key] = canvas;
   },
   canvasCtx: {},
-  setCanvasCtx(
-    canvasCtx: CanvasRenderingContext2D | null | undefined,
-    key: string
-  ) {
-    this.canvasCtx[key] = canvasCtx;
+  setCanvasCtx(key: string) {
+    this.canvasCtx[key] = this.canvas[key]?.getContext("2d");
   },
-  initializeCanvas(key: string) {
+  initializeCanvas(key: string, allowMirror = true) {
     if (this.canvas[key]) {
-      this.setCanvasCtx(this.canvas[key]?.getContext("2d"), key);
+      this.setCanvasCtx(key);
 
-      // if (CameraSettings.mirror === true) {
-      //   this.canvasCtx[key]?.save();
-      //   this.canvasCtx[key]?.scale(-1, 1);
-      //   this.canvasCtx[key]?.translate(-this.canvasWidth, 0);
-      // }
+      if (CameraSettings.mirror === true && allowMirror) {
+        this.canvasCtx[key]?.save();
+        this.canvasCtx[key]?.scale(-1, 1);
+        this.canvasCtx[key]?.translate(-this.canvasWidth, 0);
+      }
     }
   },
 });

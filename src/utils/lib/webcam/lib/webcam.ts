@@ -7,6 +7,7 @@ export async function getVideoSources() {
     if (device.kind === "videoinput") {
       sources.push({
         label: device.label,
+        // NOTE: If this isn't showing up, the browser needs to allow access to video
         id: device.deviceId,
       });
     }

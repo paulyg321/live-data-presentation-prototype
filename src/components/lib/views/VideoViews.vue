@@ -1,42 +1,24 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onMounted } from "vue";
+import { CanvasSettings } from "../app-settings/settings-state";
 
 type VideoViewsProps = {
-  width: number;
-  height: number;
-  canvas: HTMLCanvasElement | null;
-  canvasCtx: CanvasRenderingContext2D | null | undefined;
   className?: string;
 };
 const props = defineProps<VideoViewsProps>();
 
-const canvas = ref<HTMLCanvasElement | null>(null);
-const canvasCtx = ref<CanvasRenderingContext2D | null>(null);
-
-function renderCanvas() {
-  if (props.canvas) {
-    canvasCtx.value?.clearRect(0, 0, props.width, props.height);
-    canvasCtx.value?.drawImage(props.canvas, 0, 0);
-  }
-  requestAnimationFrame(renderCanvas);
-}
-
 onMounted(() => {
-  if (canvas.value) {
-    canvasCtx.value = canvas.value.getContext("2d");
-  }
-  renderCanvas();
+  CanvasSettings.initializeCanvas("video", true);
 });
 </script>
 
 <template>
   <canvas
-    :width="width"
-    :height="height"
+    :width="CanvasSettings.canvasWidth"
+    :height="CanvasSettings.canvasHeight"
     :class="className"
-    ref="canvas"
+    :ref="(el) => CanvasSettings.setCanvas(el as HTMLCanvasElement, 'video')"
   ></canvas>
 </template>
 
-<style>
-</style>
+<style></style>

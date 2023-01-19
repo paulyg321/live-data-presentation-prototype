@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ThreePointBezierCurve } from "@/utils";
+import { AnimatedLine, DrawingMode } from "@/utils";
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import CanvasWrapper from "../../CanvasWrapper.vue";
@@ -13,13 +13,15 @@ import {
   yAxis,
   chartBounds,
 } from "../settings-state";
+import * as d3 from "d3";
 
 const route = useRoute();
 ChartSettings.setCurrentChart(parseInt(route.params.id as string));
 
-const threePointBezierCurve = new ThreePointBezierCurve();
+const animationBounds = ref(1);
+const drawingMode = ref(DrawingMode.SEQUENTIAL);
 
-const lines = computed(() => {
+const animation = computed(() => {
   return ChartSettings.currentChart?.getAnimatedChartItems({
     xScale: xScale.value,
     yScale: yScale.value,
@@ -38,7 +40,7 @@ const lines = computed(() => {
 watch(
   () => chartBounds.value,
   () => {
-    Object.entries(lines.value).forEach(([key, value]: any) => {
+    Object.entries(animation.value).forEach(([key, value]: any) => {
       value.drawCurrentState({
         ctx: CanvasSettings.canvasCtx[key],
       });
@@ -46,27 +48,64 @@ watch(
   }
 );
 
-function handlePlayState(direction: string) {
-  function play({ line, ctx }: { line: any; ctx: any }) {
-    if (direction === "prev") {
+watch(
+  () => animationBounds.value,
+  (newValue, oldValue) => {
+    Object.entries(animation.value).forEach(([key, value]: any) => {
+      if (checkedLines.value.length === 0) {
+        value.drawCurrentState({
+          ctx: CanvasSettings.canvasCtx[key],
+          bounds: {
+            start: oldValue,
+            end: newValue,
+          },
+        });
+        return;
+      } else if (checkedLines.value.includes(key)) {
+        value.drawCurrentState({
+          ctx: CanvasSettings.canvasCtx[key],
+          bounds: {
+            start: oldValue,
+            end: newValue,
+          },
+        });
+        return;
+      }
+    });
+  }
+);
+
+function handlePlayState(type: string) {
+  function play({ line, ctx }: { line: AnimatedLine; ctx: any }) {
+    if (type === "prev") {
       line.animateToPreviousState({
         ctx,
-        playRemainingStates: true,
+        playRemainingStates: false,
+        // Call like this so we don't lose the this context in ThreePointBezier
+        transitionFunction: d3.easeElasticOut.amplitude(1).period(0.163),
+        mode: drawingMode.value,
+      });
+    } else if (type === "next") {
+      line.animateToNextState({
+        ctx,
+        playRemainingStates: false,
         // Call like this so we don't lose the this context in ThreePointBezier
         transitionFunction: (time: number) =>
-          threePointBezierCurve.easeOut(time),
+          d3.easeExpIn(Math.min(1, time + 0.5)),
+        mode: drawingMode.value,
       });
-    } else {
+    } else if (type === "all") {
       line.animateToNextState({
         ctx,
         playRemainingStates: true,
         // Call like this so we don't lose the this context in ThreePointBezier
-        transitionFunction: (time: number) => threePointBezierCurve.easeOut(time),
+        transitionFunction: d3.easeElasticOut,
+        mode: drawingMode.value,
       });
     }
   }
 
-  Object.entries(lines.value).forEach(([key, value]: any) => {
+  Object.entries(animation.value).forEach(([key, value]: any) => {
     if (checkedLines.value.length === 0) {
       play({
         line: value,
@@ -86,8 +125,8 @@ function handlePlayState(direction: string) {
 const checkedLines = ref<string[]>([]);
 
 onMounted(() => {
-  Object.entries(lines.value).forEach(([key, value]: any) => {
-    CanvasSettings.initializeCanvas(key);
+  Object.entries(animation.value).forEach(([key, value]: any) => {
+    CanvasSettings.initializeCanvas(key, false);
     value.drawCurrentState({
       ctx: CanvasSettings.canvasCtx[key],
     });
@@ -98,7 +137,29 @@ onMounted(() => {
 <template>
   <v-row class="justify-center">
     <v-col lg="12">
-      <div v-for="(_, key) in lines" v-bind:key="key">
+      <v-select
+        label="Animation"
+        :items="[
+          DrawingMode.CONCURRENT,
+          DrawingMode.DROP,
+          DrawingMode.SEQUENTIAL,
+          DrawingMode.SEQUENTIAL_TRANSITION,
+        ]"
+        v-model="drawingMode"
+      ></v-select>
+    </v-col>
+    <v-col lg="12">
+      <v-slider
+        v-model="animationBounds"
+        :min="0"
+        :max="1"
+        thumb-label
+      ></v-slider>
+    </v-col>
+  </v-row>
+  <v-row class="justify-center">
+    <v-col lg="12">
+      <div v-for="(_, key) in animation" v-bind:key="key">
         <input
           type="checkbox"
           :id="`${key}`"
@@ -117,7 +178,11 @@ onMounted(() => {
       ></v-btn>
     </v-col>
     <v-col lg="3">
-      <v-btn icon="mdi-play" color="primary"></v-btn>
+      <v-btn
+        icon="mdi-play"
+        color="primary"
+        @click="() => handlePlayState('all')"
+      ></v-btn>
     </v-col>
     <v-col lg="3">
       <v-btn
@@ -142,7 +207,7 @@ onMounted(() => {
           :chartSize="0.75"
         />
         <canvas
-          v-for="(_, key) in lines"
+          v-for="(_, key) in animation"
           v-bind:key="key"
           :width="CanvasSettings.canvasWidth"
           :height="CanvasSettings.canvasHeight"

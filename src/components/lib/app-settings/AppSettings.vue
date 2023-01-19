@@ -1,17 +1,14 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
+import { ref } from "vue";
 // VIEWS
 import PortalView from "../views/PortalView.vue";
 import ChartSettingsTab from "./nav-drawer-tab/ChartSettingsTab.vue";
 import PortalSettingsTab from "./nav-drawer-tab/PortalSettingsTab.vue";
 import VideoSettingsTab from "./nav-drawer-tab/VideoSettingsTab.vue";
+import { CanvasSettings, CameraSettings } from "../app-settings/settings-state";
 
 // STATE
-import {
-  CanvasSettings,
-  CameraSettings,
-  PortalState,
-} from "./settings-state";
+import { PortalState } from "./settings-state";
 
 enum SettingsTab {
   CHART_SETTINGS = "chart-settings",
@@ -21,59 +18,6 @@ enum SettingsTab {
 
 const currentTab = ref<SettingsTab | null>(SettingsTab.CHART_SETTINGS);
 
-async function setVideoDimensions() {
-  if (CameraSettings.video) {
-    CameraSettings.video.width = CanvasSettings.canvasWidth;
-    CameraSettings.video.height = CanvasSettings.canvasHeight; // (3 / 4);
-    CameraSettings.video.play();
-  }
-}
-async function renderVideoOnCanvas() {
-  // CanvasSettings.generalCanvasCtx?.clearRect(
-  //   0,
-  //   0,
-  //   CanvasSettings.canvasWidth,
-  //   CanvasSettings.canvasHeight
-  // );
-  // if (CanvasSettings.generalCanvasCtx && CameraSettings.video) {
-  //   CanvasSettings.generalCanvasCtx.drawImage(
-  //     CameraSettings.video,
-  //     0,
-  //     0,
-  //     CanvasSettings.canvasWidth,
-  //     CanvasSettings.canvasHeight
-  //   );
-  // }
-  // requestAnimationFrame(() => renderVideoOnCanvas());
-}
-
-// onMounted(async () => {
-//   if (CanvasSettings.generalCanvas) {
-//     CanvasSettings.setGeneralCanvasCtx(
-//       CanvasSettings.generalCanvas.getContext("2d")
-//     );
-
-//     if (CameraSettings.mirror === true) {
-//       CanvasSettings.generalCanvasCtx?.save();
-//       CanvasSettings.generalCanvasCtx?.scale(-1, 1);
-//       CanvasSettings.generalCanvasCtx?.translate(
-//         -CanvasSettings.canvasWidth,
-//         0
-//       );
-//     }
-
-//     const threePointBezierCurve = new ThreePointBezierCurve();
-//     animatedLine.animateToNextState({
-//       ctx: CanvasSettings.generalCanvasCtx,
-//       playRemainingStates: true,
-//       // Call like this so we don't lose the this context in ThreePointBezier
-//       transitionFunction: (time: number) => threePointBezierCurve.easeOut(time),
-//     });
-//   }
-
-//   await CameraSettings.setVideoSources();
-// });
-
 function handleTabChange(value: {
   id: SettingsTab;
   value: boolean;
@@ -82,6 +26,34 @@ function handleTabChange(value: {
 }) {
   currentTab.value = value.value ? value.id : null;
 }
+
+async function setVideoDimensions() {
+  if (CameraSettings.video) {
+    CameraSettings.video.width = CanvasSettings.canvasWidth;
+    CameraSettings.video.height = CanvasSettings.canvasHeight; // (3 / 4);
+    CameraSettings.video.play();
+  }
+}
+
+async function renderVideoOnCanvas() {
+  if (CanvasSettings.canvas["video"] && CameraSettings.video) {
+    CanvasSettings.canvasCtx["video"]?.clearRect(
+      0,
+      0,
+      CanvasSettings.canvasWidth,
+      CanvasSettings.canvasHeight
+    );
+    CanvasSettings.canvasCtx["video"]?.drawImage(
+      CameraSettings.video,
+      0,
+      0,
+      CanvasSettings.canvasWidth,
+      CanvasSettings.canvasHeight
+    );
+  }
+  requestAnimationFrame(() => renderVideoOnCanvas());
+}
+
 </script>
 
 <template>
