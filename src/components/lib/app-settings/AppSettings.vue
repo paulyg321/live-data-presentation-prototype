@@ -1,14 +1,23 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { onMounted, ref, toRaw } from "vue";
 // VIEWS
 import PortalView from "../views/PortalView.vue";
 import ChartSettingsTab from "./nav-drawer-tab/ChartSettingsTab.vue";
 import PortalSettingsTab from "./nav-drawer-tab/PortalSettingsTab.vue";
 import VideoSettingsTab from "./nav-drawer-tab/VideoSettingsTab.vue";
-import { CanvasSettings, CameraSettings } from "../app-settings/settings-state";
+import {
+  CameraSettings,
+  renderVideoOnCanvas,
+  setVideoDimensions,
+} from "../app-settings/settings-state";
+
+// MEDIAPIPE
+import fp from "fingerpose";
+import { Hands } from "@mediapipe/hands";
 
 // STATE
 import { PortalState } from "./settings-state";
+import type { MultiHandednessObject } from "@/utils";
 
 enum SettingsTab {
   CHART_SETTINGS = "chart-settings",
@@ -17,6 +26,10 @@ enum SettingsTab {
 }
 
 const currentTab = ref<SettingsTab | null>(SettingsTab.CHART_SETTINGS);
+
+const MEDIA_PIPE_URL = (file: string) =>
+  `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+const hands = ref<Hands | null>(null);
 
 function handleTabChange(value: {
   id: SettingsTab;
@@ -27,33 +40,56 @@ function handleTabChange(value: {
   currentTab.value = value.value ? value.id : null;
 }
 
-async function setVideoDimensions() {
-  if (CameraSettings.video) {
-    CameraSettings.video.width = CanvasSettings.canvasWidth;
-    CameraSettings.video.height = CanvasSettings.canvasHeight; // (3 / 4);
-    CameraSettings.video.play();
+function onResults(results: {
+  image: any;
+  multiHandLandmarks: any;
+  multiHandedness: MultiHandednessObject[];
+  displayName: any;
+}) {
+  if (results.multiHandLandmarks.length > 0) {
+    const landmarks = results.multiHandLandmarks[0].map(
+      (point: { x: number; y: number; z: number }) => {
+        return [point.x, point.y, point.z];
+      }
+    );
+    const estimatedGestures = GE.estimate(landmarks, 8.5);
+    console.log(estimatedGestures);
   }
 }
 
-async function renderVideoOnCanvas() {
-  if (CanvasSettings.canvas["video"] && CameraSettings.video) {
-    CanvasSettings.canvasCtx["video"]?.clearRect(
-      0,
-      0,
-      CanvasSettings.canvasWidth,
-      CanvasSettings.canvasHeight
-    );
-    CanvasSettings.canvasCtx["video"]?.drawImage(
-      CameraSettings.video,
-      0,
-      0,
-      CanvasSettings.canvasWidth,
-      CanvasSettings.canvasHeight
-    );
-  }
-  requestAnimationFrame(() => renderVideoOnCanvas());
+function initializeHands() {
+  hands.value = new Hands({
+    locateFile: MEDIA_PIPE_URL,
+  });
+  hands.value.setOptions({
+    maxNumHands: 2,
+    modelComplexity: 1,
+    minDetectionConfidence: 0.5,
+    minTrackingConfidence: 0.5,
+  });
+  hands.value.onResults(onResults);
 }
 
+const GE = new fp.GestureEstimator([
+  fp.Gestures.VictoryGesture,
+  fp.Gestures.ThumbsUpGesture,
+]);
+
+async function runDetection() {
+  if (hands.value && CameraSettings.video) {
+    try {
+      await toRaw(hands.value).send({ image: CameraSettings.video });
+    } catch (error) {
+      console.log("error", error);
+    }
+  }
+  await renderVideoOnCanvas();
+  requestAnimationFrame(runDetection);
+}
+
+onMounted(() => {
+  initializeHands();
+});
 </script>
 
 <template>
@@ -129,7 +165,7 @@ async function renderVideoOnCanvas() {
       :ref="(el) => CameraSettings.setVideo(el as HTMLVideoElement)"
       autoplay="true"
       :srcObject="CameraSettings.stream"
-      @loadeddata="renderVideoOnCanvas"
+      @loadeddata="runDetection"
       @loadedmetadata="setVideoDimensions"
     ></video>
   </v-container>

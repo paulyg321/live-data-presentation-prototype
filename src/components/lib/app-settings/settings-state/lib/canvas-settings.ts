@@ -39,3 +39,22 @@ export const CanvasSettings = reactive<{
     }
   },
 });
+
+export async function renderVideoOnCanvas() {
+  if (CanvasSettings.canvas["video"] && CameraSettings.video) {
+    CanvasSettings.canvasCtx["video"]?.clearRect(
+      0,
+      0,
+      CanvasSettings.canvasWidth,
+      CanvasSettings.canvasHeight
+    );
+    CanvasSettings.canvasCtx["video"]?.drawImage(
+      CameraSettings.video,
+      0,
+      0,
+      CanvasSettings.canvasWidth,
+      CanvasSettings.canvasHeight
+    );
+  }
+  requestAnimationFrame(() => renderVideoOnCanvas());
+}

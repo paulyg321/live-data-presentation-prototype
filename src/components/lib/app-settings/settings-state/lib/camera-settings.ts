@@ -4,7 +4,7 @@ import {
   type VideoSourcesTypes,
 } from "@/utils";
 import { reactive, watch } from "vue";
-import { CanvasSettings } from "./general-canvas";
+import { CanvasSettings } from "./canvas-settings";
 
 export const CameraSettings = reactive<{
   videoSources: VideoSourcesTypes[];
@@ -63,3 +63,11 @@ watch(
     }
   }
 );
+
+export async function setVideoDimensions() {
+  if (CameraSettings.video) {
+    CameraSettings.video.width = CanvasSettings.canvasWidth;
+    CameraSettings.video.height = CanvasSettings.canvasHeight; // (3 / 4);
+    CameraSettings.video.play();
+  }
+}
