@@ -74,7 +74,7 @@ export class AnimatedLine {
     this.color = color;
   }
 
-  clearCanvas({ ctx }: { ctx: any }) {
+  clearCanvas({ ctx }: { ctx: CanvasRenderingContext2D }) {
     ctx.clearRect(
       this.canvasBounds.start.x,
       this.canvasBounds.start.y,
@@ -105,7 +105,7 @@ export class AnimatedLine {
     return totalLength;
   }
 
-  drawLabels(ctx: any, points: Coordinate[]) {
+  drawLabels(ctx: CanvasRenderingContext2D, points: Coordinate[]) {
     // draw points
     points.forEach((point) => {
       ctx.beginPath();
@@ -118,9 +118,9 @@ export class AnimatedLine {
         false
       );
       ctx.fill();
-      ctx.font = "10px Arial";
+      ctx.font = "14px Arial";
       ctx.fillText(
-        `(${point.x}, ${point.y})`,
+        `$${Math.round(point.y)}`,
         this.xScale(point.x) + 10,
         this.yScale(point.y) + 10
       );
@@ -128,7 +128,7 @@ export class AnimatedLine {
   }
 
   draw(
-    ctx: any,
+    ctx: CanvasRenderingContext2D,
     coordinates: Coordinate[],
     mode: DrawingMode,
     shape: LineShape,
@@ -213,7 +213,7 @@ export class AnimatedLine {
     ctx,
     bounds,
   }: {
-    ctx: any;
+    ctx: CanvasRenderingContext2D;
     bounds?: { start: number; end: number };
   }) {
     this.draw(
@@ -235,7 +235,7 @@ export class AnimatedLine {
     nextState,
   }: {
     boundedTimeSteps: number[];
-    ctx: any;
+    ctx: CanvasRenderingContext2D;
     transitionFunction?: (time: number) => number;
     currentState: Coordinate[];
     nextState: Coordinate[];
@@ -332,7 +332,7 @@ export class AnimatedLine {
     transitionFunction,
     mode,
   }: {
-    ctx: any;
+    ctx: CanvasRenderingContext2D;
     playRemainingStates: boolean;
     transitionFunction?: (time: number) => number;
     mode: DrawingMode;
@@ -485,7 +485,7 @@ export class AnimatedLine {
     transitionFunction,
     mode,
   }: {
-    ctx: any;
+    ctx: CanvasRenderingContext2D;
     playRemainingStates: boolean;
     transitionFunction?: (time: number) => number;
     mode: DrawingMode;

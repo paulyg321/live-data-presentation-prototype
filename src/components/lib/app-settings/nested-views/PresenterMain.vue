@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { AnimatedLine, DrawingMode } from "@/utils";
+import {
+  AnimatedLine,
+  DrawingMode,
+  HAND_LANDMARK_IDS,
+  Legend,
+  legendPosition,
+  MotionAndPositionTracker,
+} from "@/utils";
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import CanvasWrapper from "../../CanvasWrapper.vue";
@@ -12,14 +19,95 @@ import {
   xAxis,
   yAxis,
   chartBounds,
+  gestureTracker,
+  PlaybackComponentSettings,
 } from "../settings-state";
 import * as d3 from "d3";
+import VideoViews from "../../views/VideoViews.vue";
 
 const route = useRoute();
 ChartSettings.setCurrentChart(parseInt(route.params.id as string));
 
+const underChartTracker = computed(() => {
+  return new MotionAndPositionTracker({
+    position: {
+      x: ChartSettings.xPosition,
+      y: ChartSettings.yPosition + ChartSettings.chartHeight,
+    },
+    size: {
+      width: ChartSettings.chartWidth,
+      height: 50,
+    },
+  });
+});
+
+const dialingPlaybackTracker = computed(() => {
+  return new MotionAndPositionTracker({
+    position: {
+      x: PlaybackComponentSettings.xPosition,
+      y: PlaybackComponentSettings.yPosition,
+    },
+    size: {
+      width: PlaybackComponentSettings.width,
+      height: PlaybackComponentSettings.height,
+    },
+  });
+});
+
 const animationBounds = ref(1);
 const drawingMode = ref(DrawingMode.SEQUENTIAL);
+
+gestureTracker.gestureSubject.subscribe({
+  next: (gestureData) => {
+    const { rightHandLandmarks, rightHandGestures } = gestureData;
+    if (rightHandGestures && rightHandLandmarks) {
+      if (
+        rightHandGestures.gestures.length > 0 &&
+        rightHandGestures.gestures[0].name === "pointing"
+      ) {
+        const position = {
+          x: rightHandLandmarks[HAND_LANDMARK_IDS.index_finger_tip].x,
+          y: rightHandLandmarks[HAND_LANDMARK_IDS.index_finger_tip].y,
+        };
+        const { canTrack, trackingValue } =
+          underChartTracker.value.isInTrackingArea(position);
+
+        if (canTrack && trackingValue) {
+          animationBounds.value = trackingValue;
+        }
+
+        const angle =
+          dialingPlaybackTracker.value.calculateAngleFromCenter(position);
+
+        legend.value.forEach((item: Legend) => {
+          if (item.isInRange(position)) {
+            if (checkedLines.value.includes(item.label)) {
+              checkedLines.value = checkedLines.value.filter((line: any) => {
+                return line !== item.label;
+              });
+            } else {
+              checkedLines.value.push(item.label);
+            }
+          }
+        });
+      }
+    }
+  },
+});
+
+dialingPlaybackTracker.value.playbackSubject.subscribe({
+  next: (value) => {
+    if (value === true) {
+      handlePlayState("next");
+    }
+  },
+});
+
+dialingPlaybackTracker.value.trackingSubject.subscribe({
+  next: (value) => {
+    animationBounds.value = value;
+  },
+});
 
 const animation = computed(() => {
   return ChartSettings.currentChart?.getAnimatedChartItems({
@@ -35,6 +123,23 @@ const animation = computed(() => {
     },
     duration: 3000,
   });
+});
+
+const legend = computed(() => {
+  return Object.entries(animation.value).map(
+    ([key, value]: any, index: number) => {
+      return new Legend({
+        label: key,
+        context: CanvasSettings.canvasCtx[`${key}-legend`],
+        color: value.color,
+        position: {
+          x: legendPosition.x,
+          y: legendPosition.y + index * Legend.height,
+        },
+        line: value,
+      });
+    }
+  );
 });
 
 watch(
@@ -125,17 +230,29 @@ function handlePlayState(type: string) {
 const checkedLines = ref<string[]>([]);
 
 onMounted(() => {
+  CanvasSettings.initializeCanvas("dialing", false);
+  if (CanvasSettings.canvasCtx["dialing"]) {
+    dialingPlaybackTracker.value.renderCenterPoint({
+      ctx: CanvasSettings.canvasCtx["dialing"],
+    });
+  }
   Object.entries(animation.value).forEach(([key, value]: any) => {
     CanvasSettings.initializeCanvas(key, false);
+    CanvasSettings.initializeCanvas(`${key}-legend`, false);
     value.drawCurrentState({
       ctx: CanvasSettings.canvasCtx[key],
     });
+  });
+
+  legend.value.map((item: any) => {
+    item.drawLegend();
   });
 });
 </script>
 <!---------------------------------------------------------------------------------------------------------->
 <template>
   <v-row class="justify-center">
+    <v-col> </v-col>
     <v-col lg="12">
       <v-select
         label="Animation"
@@ -198,6 +315,7 @@ onMounted(() => {
         :height="CanvasSettings.canvasHeight"
         v-slot="{ className }"
       >
+        <VideoViews :className="className" />
         <ChartAxes
           :width="CanvasSettings.canvasWidth"
           :height="CanvasSettings.canvasWidth"
@@ -213,6 +331,20 @@ onMounted(() => {
           :height="CanvasSettings.canvasHeight"
           :class="className"
           :ref="(el) => CanvasSettings.setCanvas(el as HTMLCanvasElement, key as unknown as string)"
+        ></canvas>
+        <canvas
+          v-for="(_, key) in animation"
+          v-bind:key="key"
+          :width="CanvasSettings.canvasWidth"
+          :height="CanvasSettings.canvasHeight"
+          :class="className"
+          :ref="(el) => CanvasSettings.setCanvas(el as HTMLCanvasElement, `${key as unknown as string}-legend`)"
+        ></canvas>
+        <canvas
+          :width="CanvasSettings.canvasWidth"
+          :height="CanvasSettings.canvasHeight"
+          :class="className"
+          :ref="(el) => CanvasSettings.setCanvas(el as HTMLCanvasElement, 'dialing')"
         ></canvas>
       </CanvasWrapper>
     </v-col>

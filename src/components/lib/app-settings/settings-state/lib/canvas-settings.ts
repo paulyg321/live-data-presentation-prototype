@@ -1,7 +1,8 @@
+import { GestureTracker } from "@/utils";
 import { reactive } from "vue";
 import { CameraSettings } from "./camera-settings";
 
-const initialCanvasWidth = 640;
+export const initialCanvasWidth = 640;
 
 export const CanvasSettings = reactive<{
   canvasWidth: number;
@@ -58,3 +59,13 @@ export async function renderVideoOnCanvas() {
   }
   requestAnimationFrame(() => renderVideoOnCanvas());
 }
+
+
+export const gestureTracker = reactive<GestureTracker>(
+  new GestureTracker({
+    canvasDimensions: {
+      width: CanvasSettings.canvasWidth,
+      height: CanvasSettings.canvasHeight,
+    },
+  })
+);

@@ -7,17 +7,17 @@ import PortalSettingsTab from "./nav-drawer-tab/PortalSettingsTab.vue";
 import VideoSettingsTab from "./nav-drawer-tab/VideoSettingsTab.vue";
 import {
   CameraSettings,
+  CanvasSettings,
+  gestureTracker,
   renderVideoOnCanvas,
   setVideoDimensions,
 } from "../app-settings/settings-state";
 
 // MEDIAPIPE
-import fp from "fingerpose";
-import { Hands } from "@mediapipe/hands";
+import { Hands, type Results } from "@mediapipe/hands";
 
 // STATE
 import { PortalState } from "./settings-state";
-import type { MultiHandednessObject } from "@/utils";
 
 enum SettingsTab {
   CHART_SETTINGS = "chart-settings",
@@ -29,7 +29,11 @@ const currentTab = ref<SettingsTab | null>(SettingsTab.CHART_SETTINGS);
 
 const MEDIA_PIPE_URL = (file: string) =>
   `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
-const hands = ref<Hands | null>(null);
+const hands = ref<Hands>(
+  new Hands({
+    locateFile: MEDIA_PIPE_URL,
+  })
+);
 
 function handleTabChange(value: {
   id: SettingsTab;
@@ -40,40 +44,17 @@ function handleTabChange(value: {
   currentTab.value = value.value ? value.id : null;
 }
 
-function onResults(results: {
-  image: any;
-  multiHandLandmarks: any;
-  multiHandedness: MultiHandednessObject[];
-  displayName: any;
-}) {
-  if (results.multiHandLandmarks.length > 0) {
-    const landmarks = results.multiHandLandmarks[0].map(
-      (point: { x: number; y: number; z: number }) => {
-        return [point.x, point.y, point.z];
-      }
-    );
-    const estimatedGestures = GE.estimate(landmarks, 8.5);
-    console.log(estimatedGestures);
-  }
-}
-
 function initializeHands() {
-  hands.value = new Hands({
-    locateFile: MEDIA_PIPE_URL,
-  });
   hands.value.setOptions({
     maxNumHands: 2,
     modelComplexity: 1,
     minDetectionConfidence: 0.5,
     minTrackingConfidence: 0.5,
   });
-  hands.value.onResults(onResults);
+  hands.value.onResults((results: Results) =>
+    gestureTracker.handleMediaPipeResults(results)
+  );
 }
-
-const GE = new fp.GestureEstimator([
-  fp.Gestures.VictoryGesture,
-  fp.Gestures.ThumbsUpGesture,
-]);
 
 async function runDetection() {
   if (hands.value && CameraSettings.video) {

@@ -1,13 +1,13 @@
 import type { Coordinate } from "../../../types";
-import type { Line } from "./line";
 import { CanvasText } from "./canvas-text";
+import type { AnimatedLine } from "./animated-line";
 
 export interface LegendConstructorArgs {
   label: string;
-  context: CanvasRenderingContext2D | null;
+  context?: CanvasRenderingContext2D | null;
   position: Coordinate;
   color: string;
-  line: Line;
+  line: AnimatedLine;
 }
 
 export const legendPosition = {
@@ -16,11 +16,11 @@ export const legendPosition = {
 };
 
 export class Legend {
-  private label: string;
-  private context: CanvasRenderingContext2D | null;
+  label: string;
+  private context: CanvasRenderingContext2D | null | undefined;
   private color: string;
   private position: Coordinate;
-  private line: Line;
+  private line: AnimatedLine;
   private bounds: any;
   private text: CanvasText;
 
@@ -52,7 +52,7 @@ export class Legend {
     this.text = new CanvasText({
       context,
       position: { x: position.x + 40, y: position.y + 17 },
-      color: "white",
+      color: "black",
       label,
     });
   }
@@ -63,7 +63,6 @@ export class Legend {
       ctx.fillStyle = this.color;
 
       ctx?.fillRect(this.position.x, this.position.y, 20, 20);
-
       this.text.drawText();
     }
   }
@@ -81,16 +80,16 @@ export class Legend {
     return false;
   }
 
-  handleHover(position: Coordinate, endIndex: number, callback?: () => void) {
-    if (this.isInRange(position)) {
-      this.line.setEndIndex(endIndex);
-      if (callback) {
-        callback();
-      }
-    }
-  }
+  // handleHover(position: Coordinate, endIndex: number, callback?: () => void) {
+  //   if (this.isInRange(position)) {
+  //     this.line.setEndIndex(endIndex);
+  //     if (callback) {
+  //       callback();
+  //     }
+  //   }
+  // }
 
-  getLine() {
-    return this.line;
-  }
+  // getLine() {
+  //   return this.line;
+  // }
 }

@@ -1,3 +1,4 @@
+import type { Handedness } from "@mediapipe/hands";
 import {
   calculateAngleBetweenPoints,
   calculateDistance,
@@ -17,7 +18,7 @@ export function mirrorLandmarkHorizontally(
   return width - horizontalPosition;
 }
 
-export function getLeftVsRightIndex(multiHandedness: MultiHandednessObject[]) {
+export function getLeftVsRightIndex(multiHandedness: Handedness[]) {
   return {
     right: multiHandedness.reduce(
       (rightHandIndex: number | undefined, handedness, index) => {
@@ -269,10 +270,11 @@ function isCorrectInitiateEmphasisHandLandmark({
   return false;
 }
 
-export function scaleLandmarksToChart({
+export function scaleLandmarksToCanvas({
   landmarks,
   canvasDimensions,
   indices,
+  mirror = true,
 }: {
   landmarks: any;
   canvasDimensions: {
@@ -280,6 +282,7 @@ export function scaleLandmarksToChart({
     height: number;
   };
   indices?: number[];
+  mirror?: boolean;
 }) {
   if (indices && indices.length > 0) {
     const processedLandmarks = [...landmarks];
@@ -287,11 +290,14 @@ export function scaleLandmarksToChart({
     indices.forEach((index: number) => {
       processedLandmarks[index] = {
         // mirror because the video the prediction is being detected on is flipped
-        x: mirrorLandmarkHorizontally(
-          canvasDimensions.width,
-          canvasDimensions.width * processedLandmarks[index].x
-        ),
+        x: mirror
+          ? mirrorLandmarkHorizontally(
+              canvasDimensions.width,
+              canvasDimensions.width * processedLandmarks[index].x
+            )
+          : processedLandmarks[index].x,
         y: canvasDimensions.height * processedLandmarks[index].y,
+        z: processedLandmarks[index].z,
       };
     });
 
@@ -300,35 +306,41 @@ export function scaleLandmarksToChart({
 
   return landmarks.map((landmark: any) => {
     return {
-      x: mirrorLandmarkHorizontally(
-        canvasDimensions.width,
-        canvasDimensions.width * landmark.x
-      ),
+      x: mirror
+        ? mirrorLandmarkHorizontally(
+            canvasDimensions.width,
+            canvasDimensions.width * landmark.x
+          )
+        : landmark.x,
       y: canvasDimensions.height * landmark.y,
+      z: landmark.z,
     };
   });
 }
 
-function getLandmarksPerHand(
+export function getLandmarksPerHand(
   canvasDimensions: any,
   multiHandLandmarks: any,
   handIndices: {
     left?: number;
     right?: number;
-  }
+  },
+  mirror = true
 ) {
   const leftHandLandmarks =
     handIndices.left !== undefined
-      ? scaleLandmarksToChart({
+      ? scaleLandmarksToCanvas({
           landmarks: multiHandLandmarks[handIndices.left],
           canvasDimensions,
+          mirror,
         })
       : undefined;
   const rightHandLandmarks =
     handIndices.right !== undefined
-      ? scaleLandmarksToChart({
+      ? scaleLandmarksToCanvas({
           landmarks: multiHandLandmarks[handIndices.right],
           canvasDimensions,
+          mirror,
         })
       : undefined;
 
