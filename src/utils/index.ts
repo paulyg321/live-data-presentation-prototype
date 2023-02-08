@@ -6,3 +6,5 @@ export * from "./lib/chart";
 export * from "./lib/data-structures";
 export * from "./lib/gestures";
 export * from "./lib/animation";
+export * from "./lib/visual-indicators";
+export * from "./lib/timer";

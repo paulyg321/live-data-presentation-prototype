@@ -1,4 +1,4 @@
-import type { BezierCoordinate, Coordinate } from "../../../types";
+import type { Coordinate2D, Dimensions } from "../../../types";
 import * as d3 from "d3";
 
 /*
@@ -27,22 +27,20 @@ export enum AnimationType {
   DISCRETE = "discrete",
 }
 
-// export interface LineState {
-//   linePoints: Coordinate[];
-// }
-
 export class AnimatedLine {
-  states: Coordinate[][];
+  states: Coordinate2D[][];
   yScale: any;
   xScale: any;
   currentState: number;
   canvasBounds: {
-    start: Coordinate;
-    end: Coordinate;
+    start: Coordinate2D;
+    end: Coordinate2D;
   };
-  chartDimensions: { width: number; height: number };
+  chartDimensions: Dimensions;
   duration = 2000;
-  color;
+  color = "steelblue";
+  lineWidth = 2;
+  opacity = 0.7;
 
   constructor({
     states,
@@ -51,15 +49,19 @@ export class AnimatedLine {
     chartDimensions,
     canvasDimensions,
     duration,
-    color = "steelblue",
+    color,
+    lineWidth,
+    opacity,
   }: {
-    states: Coordinate[][];
+    states: Coordinate2D[][];
     xScale: any;
     yScale: any;
-    chartDimensions: { width: number; height: number };
-    canvasDimensions: { width: number; height: number };
+    chartDimensions: Dimensions;
+    canvasDimensions: Dimensions;
     duration: number;
     color?: string;
+    lineWidth?: number;
+    opacity?: number;
   }) {
     this.chartDimensions = chartDimensions;
     this.xScale = xScale;
@@ -71,7 +73,56 @@ export class AnimatedLine {
       end: { x: canvasDimensions.width, y: canvasDimensions.height },
     };
     this.duration = duration;
-    this.color = color;
+    this.setLineAppearance({
+      color,
+      lineWidth,
+      opacity,
+    });
+  }
+
+  private configureLineContextSettings({
+    ctx,
+  }: {
+    ctx: CanvasRenderingContext2D;
+  }) {
+    ctx.lineWidth = this.lineWidth;
+    ctx.globalAlpha = this.opacity;
+    ctx.strokeStyle = this.color;
+  }
+
+  private configureLabelContextSettings({
+    ctx,
+    variant,
+  }: {
+    ctx: CanvasRenderingContext2D;
+    variant: "arc" | "text";
+  }) {
+    if (variant === "text") {
+      ctx.fillStyle = this.color;
+    } else {
+      ctx.fillStyle = "white";
+    }
+    ctx.strokeStyle = this.color;
+  }
+
+  setLineAppearance({
+    lineWidth,
+    opacity,
+    color,
+  }: {
+    lineWidth?: number;
+    opacity?: number;
+    color?: string;
+  }) {
+    if (lineWidth) {
+      this.lineWidth = lineWidth;
+    }
+    if (opacity) {
+      this.opacity = opacity;
+    }
+    if (color) {
+      this.color = color;
+    }
   }
 
   clearCanvas({ ctx }: { ctx: CanvasRenderingContext2D }) {
@@ -105,9 +156,17 @@ export class AnimatedLine {
     return totalLength;
   }
 
-  drawLabels(ctx: CanvasRenderingContext2D, points: Coordinate[]) {
+  drawLabels(ctx: CanvasRenderingContext2D, points: Coordinate2D[]) {
     // draw points
     points.forEach((point) => {
+      this.configureLabelContextSettings({ ctx, variant: "text" });
+      ctx.font = "12px Arial";
+      ctx.fillText(
+        `$${Math.round(point.y)}`,
+        this.xScale(point.x) + 10,
+        this.yScale(point.y) + 10
+      );
+      this.configureLabelContextSettings({ ctx, variant: "arc" });
       ctx.beginPath();
       ctx.arc(
         this.xScale(point.x),
@@ -118,24 +177,21 @@ export class AnimatedLine {
         false
       );
       ctx.fill();
-      ctx.font = "14px Arial";
-      ctx.fillText(
-        `$${Math.round(point.y)}`,
-        this.xScale(point.x) + 10,
-        this.yScale(point.y) + 10
-      );
+      ctx.stroke();
     });
   }
 
   draw(
     ctx: CanvasRenderingContext2D,
-    coordinates: Coordinate[],
+    coordinates: Coordinate2D[],
     mode: DrawingMode,
     shape: LineShape,
     beforeClear?: () => void,
     endBound = 1,
     startBound = 0
   ) {
+    this.configureLineContextSettings({ ctx });
+
     const data: [number, number][] = coordinates.map((coord) => [
       coord.x,
       coord.y,
@@ -175,9 +231,6 @@ export class AnimatedLine {
 
         const maxIndex = Math.round(boundedTimeStep * data.length);
 
-        // Draw points
-        this.drawLabels(ctx, coordinates.slice(0, maxIndex));
-
         // draw line
         const totalLength = this.lineLength({
           data,
@@ -187,10 +240,11 @@ export class AnimatedLine {
         ctx.setLineDash([totalLength]);
         ctx.lineDashOffset = d3.interpolate(totalLength, 0)(boundedTimeStep);
         drawLine(data);
-        ctx.lineWidth = 1;
-        ctx.opacity = 0.7;
-        ctx.strokeStyle = this.color;
         ctx.stroke();
+
+        // Draw points
+        this.drawLabels(ctx, coordinates.slice(0, maxIndex));
+
         if (boundedTimeStep === endBound) {
           lineTimer.stop();
         }
@@ -202,9 +256,6 @@ export class AnimatedLine {
       }
       ctx.beginPath();
       drawLine(data);
-      ctx.lineWidth = 1;
-      ctx.opacity = 0.7;
-      ctx.strokeStyle = this.color;
       ctx.stroke();
     }
   }
@@ -237,8 +288,8 @@ export class AnimatedLine {
     boundedTimeSteps: number[];
     ctx: CanvasRenderingContext2D;
     transitionFunction?: (time: number) => number;
-    currentState: Coordinate[];
-    nextState: Coordinate[];
+    currentState: Coordinate2D[];
+    nextState: Coordinate2D[];
   }) {
     if (boundedTimeSteps.length === 1) {
       const [boundedTimeStep] = boundedTimeSteps;
@@ -251,7 +302,7 @@ export class AnimatedLine {
       }
 
       const interPolatedState = currentState.map(
-        (coordinate: Coordinate, index: number) => {
+        (coordinate: Coordinate2D, index: number) => {
           // We don't use scale here because the draw() & drawSequential() methods use the scales
           const { x, y } = {
             x: coordinate.x,
@@ -283,7 +334,7 @@ export class AnimatedLine {
       );
     } else {
       const interPolatedState = currentState.map(
-        (coordinate: Coordinate, index: number) => {
+        (coordinate: Coordinate2D, index: number) => {
           const boundedTimeStep = boundedTimeSteps[index];
           let transitionStep: number;
 
@@ -349,7 +400,7 @@ export class AnimatedLine {
           boundedTimeSteps: [boundedTimeStep],
           ctx,
           transitionFunction,
-          currentState: nextStateData.map((coord: Coordinate) => ({
+          currentState: nextStateData.map((coord: Coordinate2D) => ({
             ...coord,
             y: this.chartDimensions.height,
           })),
@@ -504,7 +555,7 @@ export class AnimatedLine {
           ctx,
           transitionFunction,
           // TODO: Make the current state and next state differ by Y position
-          currentState: prevStateData.map((coord: Coordinate) => ({
+          currentState: prevStateData.map((coord: Coordinate2D) => ({
             ...coord,
             y: this.chartDimensions.height,
           })),
@@ -633,5 +684,4 @@ export class AnimatedLine {
       });
     }
   }
-  
 }

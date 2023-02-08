@@ -1,10 +1,5 @@
 import { POSES } from "../../teachable-machine";
 
-export const HANDS = {
-  LEFT: "Left",
-  RIGHT: "Right",
-};
-
 export const VERTICAL_ORDER = {
   ABOVE: 1,
   BELOW: -1,

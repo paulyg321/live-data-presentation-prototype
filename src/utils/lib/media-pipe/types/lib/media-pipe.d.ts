@@ -1,4 +1,4 @@
-import type { CoordinatesObject } from "../../../calculations";
+import type { RequiredCoordinate2D } from "../../../chart";
 
 export interface MultiHandednessObject {
   index: number;
@@ -8,5 +8,5 @@ export interface MultiHandednessObject {
 }
 
 export interface ParsedLandmarksObject {
-  [key: number]: CoordinatesObject;
+  [key: number]: RequiredCoordinate2D;
 }

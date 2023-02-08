@@ -3,7 +3,7 @@ import {
   calculateAngleBetweenPoints,
   calculateDistance,
 } from "../../calculations";
-import type { ChartDimensions } from "../../chart";
+import type { Dimensions } from "../../chart";
 import { POSES, type PredictionObject } from "../../teachable-machine";
 import type {
   MultiHandednessObject,
@@ -45,7 +45,7 @@ export function validateCurrentPose(
   canvasCtx: CanvasRenderingContext2D,
   predictions: PredictionObject[],
   multiHandLandmarks: any,
-  canvasDimensions: ChartDimensions,
+  canvasDimensions: Dimensions,
   multiHandedness: MultiHandednessObject[]
 ) {
   const handIndices = getLeftVsRightIndex(multiHandedness);
@@ -277,10 +277,7 @@ export function scaleLandmarksToCanvas({
   mirror = true,
 }: {
   landmarks: any;
-  canvasDimensions: {
-    width: number;
-    height: number;
-  };
+  canvasDimensions: Dimensions;
   indices?: number[];
   mirror?: boolean;
 }) {

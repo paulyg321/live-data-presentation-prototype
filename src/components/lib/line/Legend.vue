@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Dimensions } from "@/utils";
 import { onMounted, ref } from "vue";
 
 const legendPosition = {
@@ -10,10 +11,7 @@ const RECT_HEIGHT = 50;
 const RECT_WIDTH = 200;
 
 const props = defineProps<{
-  canvasDimensions: {
-    width: number;
-    height: number;
-  };
+  canvasDimensions: Dimensions;
   items: string[];
   className?: string;
 }>();

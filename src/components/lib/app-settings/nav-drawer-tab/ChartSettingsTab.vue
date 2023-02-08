@@ -86,7 +86,7 @@ function getChartColor(type: string) {
                 height="40px"
                 right
                 width="40px"
-                :href="`/app/main/${index}`"
+                :href="`/present/${index}`"
               >
                 <v-icon>mdi-play</v-icon>
               </v-btn>
@@ -106,7 +106,7 @@ function getChartColor(type: string) {
         color="success"
         icon="mdi-plus"
         size="x-large"
-        href="/app/add-chart"
+        href="/add-chart"
       ></v-btn>
     </v-col>
   </v-row>

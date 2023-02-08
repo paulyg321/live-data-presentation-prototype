@@ -1,13 +1,10 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { CanvasText, HAND_LANDMARK_IDS, Line } from "@/utils";
+import { CanvasText, HAND_LANDMARK_IDS, Line, type Dimensions } from "@/utils";
 import * as d3 from "d3";
 
 const props = defineProps<{
-  canvasDimensions: {
-    width: number;
-    height: number;
-  };
+  canvasDimensions: Dimensions;
   level: number;
   decrementEmphasisCount: () => void;
   canDecrement: boolean;

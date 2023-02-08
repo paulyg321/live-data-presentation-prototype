@@ -230,12 +230,12 @@ onMounted(() => {
             <v-col lg="12">
               <v-text-field
                 v-if="newChartType?.value === ChartTypeValue.LINE"
-                label="X Accessor"
+                label="Y Accessor"
                 v-model="yAccessor"
               ></v-text-field>
               <v-select
                 v-else
-                label="X Accessor"
+                label="Y Accessor"
                 :hint="`${key}`"
                 :items="columnOptions"
                 v-model="yAccessor"

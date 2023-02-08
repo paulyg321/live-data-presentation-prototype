@@ -1,9 +1,9 @@
+import type { Coordinate2D } from "../../chart";
 import { HORIZONTAL_ORDER, VERTICAL_ORDER } from "../../media-pipe";
-import type { CoordinatesObject } from "../types/lib/calculations";
 
 export function calculateAngleBetweenPoints(
-  origin: CoordinatesObject,
-  pointB: CoordinatesObject
+  origin: Coordinate2D,
+  pointB: Coordinate2D
 ) {
   const y = pointB.y - origin.y;
   const x = pointB.x - origin.x;
@@ -11,10 +11,7 @@ export function calculateAngleBetweenPoints(
   return -(Math.atan2(y, x) * (180 / Math.PI));
 }
 
-export function calculateDistance(
-  pointA: CoordinatesObject,
-  pointB: CoordinatesObject
-) {
+export function calculateDistance(pointA: Coordinate2D, pointB: Coordinate2D) {
   const verticalDistance = pointA.y - pointB.y;
   const horizontalDistance = pointA.x - pointB.x;
   return {
@@ -66,26 +63,4 @@ export function keepBetween({
   } else {
     return output;
   }
-}
-
-// TODO: Improve this
-export function multiplyArrayByScalar({
-  array,
-  scalar,
-}: {
-  array: number[];
-  scalar: number;
-}) {
-  return array.map((value: number) => {
-    return value * scalar;
-  });
-}
-
-// TODO: Improve this
-export function addArrayValues(arrays: number[][]) {
-  const n = arrays.reduce((max, xs) => Math.max(max, xs.length), 0);
-  const result = Array.from({ length: n });
-  return result.map((_, i) =>
-    arrays.map((xs) => xs[i] || 0).reduce((sum, x) => sum + x, 0)
-  );
 }

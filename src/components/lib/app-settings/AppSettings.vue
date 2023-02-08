@@ -7,7 +7,6 @@ import PortalSettingsTab from "./nav-drawer-tab/PortalSettingsTab.vue";
 import VideoSettingsTab from "./nav-drawer-tab/VideoSettingsTab.vue";
 import {
   CameraSettings,
-  CanvasSettings,
   gestureTracker,
   renderVideoOnCanvas,
   setVideoDimensions,
@@ -52,7 +51,7 @@ function initializeHands() {
     minTrackingConfidence: 0.5,
   });
   hands.value.onResults((results: Results) =>
-    gestureTracker.handleMediaPipeResults(results)
+    gestureTracker.value.handleMediaPipeResults(results)
   );
 }
 

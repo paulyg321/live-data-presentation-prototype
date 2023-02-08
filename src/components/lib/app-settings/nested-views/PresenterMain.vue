@@ -1,12 +1,5 @@
 <script setup lang="ts">
-import {
-  AnimatedLine,
-  DrawingMode,
-  HAND_LANDMARK_IDS,
-  Legend,
-  legendPosition,
-  MotionAndPositionTracker,
-} from "@/utils";
+import { AnimatedLine, Legend } from "@/utils";
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import CanvasWrapper from "../../CanvasWrapper.vue";
@@ -20,92 +13,49 @@ import {
   yAxis,
   chartBounds,
   gestureTracker,
-  PlaybackComponentSettings,
+  LegendSettings,
+  radialPlaybackTracker,
+  temporalPlaybackTracker,
+animationTrack,
 } from "../settings-state";
 import * as d3 from "d3";
 import VideoViews from "../../views/VideoViews.vue";
+import { Subject } from "rxjs";
 
 const route = useRoute();
 ChartSettings.setCurrentChart(parseInt(route.params.id as string));
+const legendSubject = new Subject();
 
-const underChartTracker = computed(() => {
-  return new MotionAndPositionTracker({
-    position: {
-      x: ChartSettings.xPosition,
-      y: ChartSettings.yPosition + ChartSettings.chartHeight,
-    },
-    size: {
-      width: ChartSettings.chartWidth,
-      height: 50,
-    },
-  });
-});
-
-const dialingPlaybackTracker = computed(() => {
-  return new MotionAndPositionTracker({
-    position: {
-      x: PlaybackComponentSettings.xPosition,
-      y: PlaybackComponentSettings.yPosition,
-    },
-    size: {
-      width: PlaybackComponentSettings.width,
-      height: PlaybackComponentSettings.height,
-    },
-  });
-});
-
-const animationBounds = ref(1);
-const drawingMode = ref(DrawingMode.SEQUENTIAL);
-
-gestureTracker.gestureSubject.subscribe({
-  next: (gestureData) => {
-    const { rightHandLandmarks, rightHandGestures } = gestureData;
-    if (rightHandGestures && rightHandLandmarks) {
-      if (
-        rightHandGestures.gestures.length > 0 &&
-        rightHandGestures.gestures[0].name === "pointing"
-      ) {
-        const position = {
-          x: rightHandLandmarks[HAND_LANDMARK_IDS.index_finger_tip].x,
-          y: rightHandLandmarks[HAND_LANDMARK_IDS.index_finger_tip].y,
-        };
-        const { canTrack, trackingValue } =
-          underChartTracker.value.isInTrackingArea(position);
-
-        if (canTrack && trackingValue) {
-          animationBounds.value = trackingValue;
-        }
-
-        const angle =
-          dialingPlaybackTracker.value.calculateAngleFromCenter(position);
-
-        legend.value.forEach((item: Legend) => {
-          if (item.isInRange(position)) {
-            if (checkedLines.value.includes(item.label)) {
-              checkedLines.value = checkedLines.value.filter((line: any) => {
-                return line !== item.label;
-              });
-            } else {
-              checkedLines.value.push(item.label);
-            }
-          }
-        });
-      }
+legendSubject.subscribe({
+  next(value: any) {
+    if (checkedLines.value.includes(value)) {
+      checkedLines.value = checkedLines.value.filter((line: any) => {
+        return line !== value;
+      });
+    } else {
+      checkedLines.value.push(value);
     }
   },
 });
 
-dialingPlaybackTracker.value.playbackSubject.subscribe({
-  next: (value) => {
+// Watch each tracker for the values they emit
+radialPlaybackTracker.value.playbackSubject.subscribe({
+  next(value) {
     if (value === true) {
       handlePlayState("next");
     }
   },
 });
 
-dialingPlaybackTracker.value.trackingSubject.subscribe({
-  next: (value) => {
-    animationBounds.value = value;
+radialPlaybackTracker.value.trackingSubject.subscribe({
+  next(value: any) {
+    animationTrack.value = value;
+  },
+});
+
+temporalPlaybackTracker.value.trackingSubject.subscribe({
+  next(value: any) {
+    animationTrack.value = value;
   },
 });
 
@@ -125,20 +75,33 @@ const animation = computed(() => {
   });
 });
 
+const canvasKeys = computed(() => {
+  // to create canvases for both the legend and the lines
+  return Object.entries(animation.value).reduce((keys, [key]: any) => {
+    return [...keys, key, `${key}-legend`];
+  }, [] as string[]);
+});
+
+// TODO: Watch for changes in legend and redraw to allow settings modification
 const legend = computed(() => {
-  return Object.entries(animation.value).map(
-    ([key, value]: any, index: number) => {
-      return new Legend({
-        label: key,
-        context: CanvasSettings.canvasCtx[`${key}-legend`],
-        color: value.color,
-        position: {
-          x: legendPosition.x,
-          y: legendPosition.y + index * Legend.height,
-        },
-        line: value,
-      });
-    }
+  return Object.entries(animation.value).reduce(
+    (legends, [key, animation]: any, index: number) => {
+      return {
+        ...legends,
+        [`${key}-legend`]: new Legend({
+          label: key,
+          color: animation.color,
+          position: {
+            x: LegendSettings.xPosition,
+            y: LegendSettings.yPosition + index * LegendSettings.height,
+          },
+          line: animation,
+          gestureTracker: gestureTracker.value,
+          legendSubject,
+        }),
+      };
+    },
+    {} as { [key: string]: Legend }
   );
 });
 
@@ -154,7 +117,7 @@ watch(
 );
 
 watch(
-  () => animationBounds.value,
+  () => animationTrack.value,
   (newValue, oldValue) => {
     Object.entries(animation.value).forEach(([key, value]: any) => {
       if (checkedLines.value.length === 0) {
@@ -188,7 +151,7 @@ function handlePlayState(type: string) {
         playRemainingStates: false,
         // Call like this so we don't lose the this context in ThreePointBezier
         transitionFunction: d3.easeElasticOut.amplitude(1).period(0.163),
-        mode: drawingMode.value,
+        mode: ChartSettings.drawingMode,
       });
     } else if (type === "next") {
       line.animateToNextState({
@@ -197,7 +160,7 @@ function handlePlayState(type: string) {
         // Call like this so we don't lose the this context in ThreePointBezier
         transitionFunction: (time: number) =>
           d3.easeExpIn(Math.min(1, time + 0.5)),
-        mode: drawingMode.value,
+        mode: ChartSettings.drawingMode,
       });
     } else if (type === "all") {
       line.animateToNextState({
@@ -205,7 +168,7 @@ function handlePlayState(type: string) {
         playRemainingStates: true,
         // Call like this so we don't lose the this context in ThreePointBezier
         transitionFunction: d3.easeElasticOut,
-        mode: drawingMode.value,
+        mode: ChartSettings.drawingMode,
       });
     }
   }
@@ -231,43 +194,38 @@ const checkedLines = ref<string[]>([]);
 
 onMounted(() => {
   CanvasSettings.initializeCanvas("dialing", false);
+  CanvasSettings.initializeCanvas("emphasis", false);
+  CanvasSettings.initializeCanvas("foreshadowing", false);
   if (CanvasSettings.canvasCtx["dialing"]) {
-    dialingPlaybackTracker.value.renderCenterPoint({
+    radialPlaybackTracker.value.renderReferencePoints({
       ctx: CanvasSettings.canvasCtx["dialing"],
+      canvasDim: {
+        width: CanvasSettings.canvasWidth,
+        height: CanvasSettings.canvasHeight,
+      },
     });
   }
-  Object.entries(animation.value).forEach(([key, value]: any) => {
-    CanvasSettings.initializeCanvas(key, false);
-    CanvasSettings.initializeCanvas(`${key}-legend`, false);
-    value.drawCurrentState({
-      ctx: CanvasSettings.canvasCtx[key],
-    });
-  });
 
-  legend.value.map((item: any) => {
-    item.drawLegend();
+  canvasKeys.value.forEach((key: string) => {
+    CanvasSettings.initializeCanvas(key, false);
+    if (key.includes("legend")) {
+      legend.value[key].drawLegend({
+        ctx: CanvasSettings.canvasCtx[key],
+      });
+    } else {
+      animation.value[key].drawCurrentState({
+        ctx: CanvasSettings.canvasCtx[key],
+      });
+    }
   });
 });
 </script>
 <!---------------------------------------------------------------------------------------------------------->
 <template>
   <v-row class="justify-center">
-    <v-col> </v-col>
-    <v-col lg="12">
-      <v-select
-        label="Animation"
-        :items="[
-          DrawingMode.CONCURRENT,
-          DrawingMode.DROP,
-          DrawingMode.SEQUENTIAL,
-          DrawingMode.SEQUENTIAL_TRANSITION,
-        ]"
-        v-model="drawingMode"
-      ></v-select>
-    </v-col>
     <v-col lg="12">
       <v-slider
-        v-model="animationBounds"
+        v-model="animationTrack"
         :min="0"
         :max="1"
         thumb-label
@@ -325,26 +283,30 @@ onMounted(() => {
           :chartSize="0.75"
         />
         <canvas
-          v-for="(_, key) in animation"
+          v-for="key in canvasKeys"
           v-bind:key="key"
           :width="CanvasSettings.canvasWidth"
           :height="CanvasSettings.canvasHeight"
           :class="className"
-          :ref="(el) => CanvasSettings.setCanvas(el as HTMLCanvasElement, key as unknown as string)"
-        ></canvas>
-        <canvas
-          v-for="(_, key) in animation"
-          v-bind:key="key"
-          :width="CanvasSettings.canvasWidth"
-          :height="CanvasSettings.canvasHeight"
-          :class="className"
-          :ref="(el) => CanvasSettings.setCanvas(el as HTMLCanvasElement, `${key as unknown as string}-legend`)"
+          :ref="(el) => CanvasSettings.setCanvas(el, key as unknown as string)"
         ></canvas>
         <canvas
           :width="CanvasSettings.canvasWidth"
           :height="CanvasSettings.canvasHeight"
           :class="className"
-          :ref="(el) => CanvasSettings.setCanvas(el as HTMLCanvasElement, 'dialing')"
+          :ref="(el) => CanvasSettings.setCanvas(el, 'dialing')"
+        ></canvas>
+        <canvas
+          :width="CanvasSettings.canvasWidth"
+          :height="CanvasSettings.canvasHeight"
+          :class="className"
+          :ref="(el) => CanvasSettings.setCanvas(el, 'emphasis')"
+        ></canvas>
+        <canvas
+          :width="CanvasSettings.canvasWidth"
+          :height="CanvasSettings.canvasHeight"
+          :class="className"
+          :ref="(el) => CanvasSettings.setCanvas(el, 'foreshadowing')"
         ></canvas>
       </CanvasWrapper>
     </v-col>

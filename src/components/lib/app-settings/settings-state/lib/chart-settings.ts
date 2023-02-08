@@ -1,8 +1,8 @@
 import * as d3 from "d3";
-import { reactive, computed } from "vue";
-import { Chart } from "@/utils";
+import { reactive, computed, ref } from "vue";
+import { Chart, DrawingMode } from "@/utils";
 
-const initialChartWidth = 640;
+const initialChartWidth = 400;
 
 export const ChartSettings = reactive<{
   chartWidth: number;
@@ -18,6 +18,8 @@ export const ChartSettings = reactive<{
   addChart: (newChart: any) => void;
   margins: number;
   changeMargins: (margin: number) => void;
+  drawingMode: DrawingMode;
+  setDrawingMode: (mode: DrawingMode) => void;
 }>({
   chartWidth: initialChartWidth,
   chartHeight: initialChartWidth * (3 / 4),
@@ -50,7 +52,13 @@ export const ChartSettings = reactive<{
   changeMargins(margin: number) {
     this.margins = margin;
   },
+  drawingMode: DrawingMode.SEQUENTIAL,
+  setDrawingMode(mode: DrawingMode) {
+    this.drawingMode = mode;
+  },
 });
+
+export const animationTrack = ref(1);
 
 export const CHART_DIMENSIONS = computed(() => {
   return {

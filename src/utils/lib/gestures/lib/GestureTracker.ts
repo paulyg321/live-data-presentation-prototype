@@ -3,28 +3,33 @@ import type { Results } from "@mediapipe/hands";
 import {
   getLeftVsRightIndex,
   getLandmarksPerHand,
-  pointingGesture,
-  openHandGesture,
+  type Coordinate3D,
+  type Dimensions,
 } from "@/utils";
 import { Subject } from "rxjs";
 
+export interface GestureTrackerValues {
+  leftHandLandmarks: any;
+  rightHandLandmarks: any;
+  rightHandGestures: any;
+  leftHandGestures: any;
+}
+
 export class GestureTracker {
   private gestureEstimatorInstance: any;
-  private canvasDimensions: { width: number; height: number };
+  private canvasDimensions: Dimensions;
   gestureSubject: Subject<any>;
 
   constructor({
     canvasDimensions,
+    gestures,
   }: {
-    canvasDimensions: { width: number; height: number };
+    canvasDimensions: Dimensions;
+    gestures: any;
   }) {
     this.canvasDimensions = canvasDimensions;
-    this.gestureEstimatorInstance = new fp.GestureEstimator([
-      // HAVE THESE PASSED AS CONSTRUCTOR ARGS
-      pointingGesture,
-      openHandGesture,
-    ]);
-    this.gestureSubject = new Subject();
+    this.gestureEstimatorInstance = new fp.GestureEstimator(gestures);
+    this.gestureSubject = new Subject<any>();
   }
 
   async handleMediaPipeResults(results: Results) {
@@ -40,24 +45,20 @@ export class GestureTracker {
 
     if (handIndices.left != undefined) {
       leftHandGestures = this.gestureEstimatorInstance.estimate(
-        multiHandLandmarks[handIndices.left].map(
-          (point: { x: number; y: number; z: number }) => {
-            // BECAUSE VIDEO IS MIRRORED WE MIRROR THE X Value
-            return [-point.x, point.y, point.z];
-          }
-        ),
+        multiHandLandmarks[handIndices.left].map((point: Coordinate3D) => {
+          // BECAUSE VIDEO IS MIRRORED WE MIRROR THE X Value
+          return [-point.x, point.y, point.z];
+        }),
         8.5
       );
     }
 
     if (handIndices.right != undefined) {
       rightHandGestures = this.gestureEstimatorInstance.estimate(
-        multiHandLandmarks[handIndices.right].map(
-          (point: { x: number; y: number; z: number }) => {
-            // BECAUSE VIDEO IS MIRRORED WE MIRROR THE X Value
-            return [-point.x, point.y, point.z];
-          }
-        ),
+        multiHandLandmarks[handIndices.right].map((point: Coordinate3D) => {
+          // BECAUSE VIDEO IS MIRRORED WE MIRROR THE X Value
+          return [-point.x, point.y, point.z];
+        }),
         8.5
       );
     }

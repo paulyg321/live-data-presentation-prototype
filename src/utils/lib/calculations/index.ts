@@ -1,2 +1,2 @@
 export * from "./lib/calculations";
-export * from "./types";
+export * from "./lib/array";

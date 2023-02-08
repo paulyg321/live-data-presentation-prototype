@@ -5,25 +5,29 @@ export interface ChartMargin {
   bottom: number;
 }
 
-export interface ChartDimensions {
+export interface Dimensions {
   width: number;
   height: number;
   margin?: ChartMargin;
 }
 
-export interface Coordinate {
+export interface Coordinate2D {
   x: number;
   y: number;
 }
 
+export type PartialCoordinate2D = Partial<Coordinate2D>;
+
+export interface Coordinate3D {
+  x: number;
+  y: number;
+  z: number;
+}
+
+export type PartialCoordinate3D = Partial<Coordinate3D>;
+
 export interface BezierCoordinate {
-  coordinate: Coordinate;
-  cpLeft?: {
-    x: number;
-    y: number;
-  };
-  cpRight?: {
-    x: number;
-    y: number;
-  };
+  coordinate: Coordinate2D;
+  cpLeft?: Coordinate2D;
+  cpRight?: Coordinate2D;
 }

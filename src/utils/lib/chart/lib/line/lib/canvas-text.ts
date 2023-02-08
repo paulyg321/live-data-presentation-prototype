@@ -1,36 +1,27 @@
-import type { Coordinate } from "@/utils";
+import type { Coordinate2D } from "@/utils";
 
 export interface TextConstructorArgs {
   context?: CanvasRenderingContext2D | null;
-  position: Coordinate;
+  position: Coordinate2D;
   color: string;
   label: string;
   fontSize?: number;
 }
 
 export class CanvasText {
-  private context: CanvasRenderingContext2D | null | undefined;
-  private position: Coordinate;
+  private position: Coordinate2D;
   private color: string;
   private label: string;
   private fontSize: number;
 
-  constructor({
-    context,
-    position,
-    color,
-    label,
-    fontSize = 20,
-  }: TextConstructorArgs) {
-    this.context = context;
+  constructor({ position, color, label, fontSize = 20 }: TextConstructorArgs) {
     this.position = position;
     this.color = color;
     this.label = label;
     this.fontSize = fontSize;
   }
 
-  drawText() {
-    const ctx = this.context;
+  drawText({ ctx }: { ctx: CanvasRenderingContext2D }) {
     if (ctx) {
       ctx.fillStyle = this.color;
       ctx.font = `${this.fontSize}px Arial`;

@@ -1,5 +1,5 @@
 import * as d3 from "d3";
-import { AnimatedLine } from "@/utils";
+import { AnimatedLine, type Dimensions } from "@/utils";
 
 export interface ChartType {
   title: "Line Chart" | "Bar Chart" | "Scatter Plot";
@@ -22,6 +22,8 @@ export interface NewChartArgs {
   xAccessor: string;
   yAccessor: string;
 }
+
+const colorArray = d3["schemeCategory10"];
 
 export class Chart {
   title: string;
@@ -154,14 +156,8 @@ export class Chart {
   }: {
     xScale: any;
     yScale: any;
-    chartDimensions: {
-      width: number;
-      height: number;
-    };
-    canvasDimensions: {
-      width: number;
-      height: number;
-    };
+    chartDimensions: Dimensions;
+    canvasDimensions: Dimensions;
     duration: number;
   }) {
     switch (this.type.value) {
@@ -202,14 +198,8 @@ export class Chart {
     chartOptions: {
       xScale: any;
       yScale: any;
-      chartDimensions: {
-        width: number;
-        height: number;
-      };
-      canvasDimensions: {
-        width: number;
-        height: number;
-      };
+      chartDimensions: Dimensions;
+      canvasDimensions: Dimensions;
       duration: number;
     };
   }) {
@@ -234,7 +224,7 @@ export class Chart {
     }, {});
 
     return Object.entries(lines).reduce(
-      (currentLines: any, [key, value]: any) => {
+      (currentLines: any, [key, value]: any, currentIndex: number) => {
         const updatedLines = { ...currentLines };
         const states = value.map(({ data }: any) => {
           return data;
@@ -246,6 +236,7 @@ export class Chart {
           chartDimensions,
           canvasDimensions,
           duration,
+          color: colorArray[currentIndex],
         });
         return updatedLines;
       },
