@@ -1,20 +1,14 @@
 import {
-  DrawingMode,
-  EmphasisMeter,
-  foreshadowingLeftC,
-  foreshadowingLeftL,
-  foreshadowingRightC,
-  foreshadowingRightL,
+  EmphasisGestureListener,
+  ForeshadowingGestureListener,
   GestureTracker,
-  MotionAndPositionTracker,
-  openHandGesture,
-  pointingGesture,
-  SupportedGestures,
-  TrackingType,
+  LinearPlaybackGestureListener,
+  RadialPlaybackGestureListener,
+  RadialTrackerMode,
 } from "@/utils";
-import { computed, shallowRef, watchEffect } from "vue";
+import { shallowRef, watchEffect } from "vue";
 import { CanvasSettings } from "./canvas-settings";
-import { animationTrack, ChartSettings } from "./chart-settings";
+import { ChartSettings } from "./chart-settings";
 import { PlaybackComponentSettings } from "./playback-component-settings";
 
 // -------------------------- GENERAL GESTURE TRACKING --------------------------
@@ -22,221 +16,138 @@ import { PlaybackComponentSettings } from "./playback-component-settings";
 function getArgsForGestureTracker() {
   return {
     canvasDimensions: {
-      width: CanvasSettings.canvasWidth,
-      height: CanvasSettings.canvasHeight,
+      width: CanvasSettings.dimensions.width,
+      height: CanvasSettings.dimensions.height,
     },
-    gestures: [
-      pointingGesture,
-      openHandGesture,
-      foreshadowingLeftL,
-      foreshadowingRightL,
-      foreshadowingLeftC,
-      foreshadowingRightC,
-    ],
   };
 }
 
-export const gestureTracker = computed(
-  () => new GestureTracker(getArgsForGestureTracker())
+export const gestureTracker = shallowRef(
+  new GestureTracker(getArgsForGestureTracker())
 );
 
+watchEffect(() => {
+  gestureTracker.value.changeCanvasDimensions({
+    width: CanvasSettings.dimensions.width,
+    height: CanvasSettings.dimensions.height,
+  });
+});
+
 // -------------------------- EMPHASIS TRACKING --------------------------
-function getArgsForEmphasisTracker() {
-  return {
+
+export const emphasisTracker = shallowRef(
+  new EmphasisGestureListener({
     position: {
-      x: ChartSettings.xPosition + ChartSettings.chartWidth / 2,
-      y: ChartSettings.yPosition + ChartSettings.chartHeight / 2,
+      x: ChartSettings.position.x + ChartSettings.dimensions.width / 2,
+      y: ChartSettings.position.y + ChartSettings.dimensions.height / 2,
     },
     size: {
       width: 100,
       height: 100,
     },
     gestureSubject: gestureTracker.value.gestureSubject,
-    trackerType: TrackingType.EMPHASIS,
-    gestureTypes: [
-      {
-        rightHand: SupportedGestures.OPEN_HAND,
-        leftHand: SupportedGestures.OPEN_HAND,
-      },
-    ],
-  };
-}
-
-export const emphasisPlaybackTracker = shallowRef(
-  new MotionAndPositionTracker(getArgsForEmphasisTracker())
+    canvasDimensions: CanvasSettings.dimensions,
+  })
 );
 
 watchEffect(() => {
-  if (emphasisPlaybackTracker.value) {
-    emphasisPlaybackTracker.value.unsubscribe();
-  }
-
-  emphasisPlaybackTracker.value = new MotionAndPositionTracker(
-    getArgsForEmphasisTracker()
-  );
-
-  emphasisPlaybackTracker.value.emphasisDecrementSubject.subscribe({
-    next: (value: any) => {
-      if (value <= 50) {
-        ChartSettings.setDrawingMode(DrawingMode.SEQUENTIAL_TRANSITION);
-      } else if (value > 50 && value <= 100) {
-        ChartSettings.setDrawingMode(DrawingMode.CONCURRENT);
-      } else if (value > 100 && value <= 150) {
-        ChartSettings.setDrawingMode(DrawingMode.DROP);
-      }
+  emphasisTracker.value.updateState({
+    position: {
+      x: ChartSettings.position.x + ChartSettings.dimensions.width / 2,
+      y: ChartSettings.position.y + ChartSettings.dimensions.height / 2,
     },
   });
-
-  if (CanvasSettings.canvasCtx["emphasis"]) {
-    emphasisPlaybackTracker.value.renderReferencePoints({
-      ctx: CanvasSettings.canvasCtx["emphasis"],
-      canvasDim: {
-        width: CanvasSettings.canvasWidth,
-        height: CanvasSettings.canvasHeight,
-      },
-    });
-  }
-});
-
-export const emphasisMeter = shallowRef(
-  new EmphasisMeter(getArgsForEmphasisMeter())
-);
-
-function getArgsForEmphasisMeter() {
-  return {
-    decrementSubject: emphasisPlaybackTracker.value.emphasisDecrementSubject,
-    incrementSubject: emphasisPlaybackTracker.value.emphasisIncrementSubject,
-    canvasDimensions: {
-      width: CanvasSettings.canvasWidth,
-      height: CanvasSettings.canvasHeight,
-    },
-    context: CanvasSettings.canvasCtx["emphasis"],
-  };
-}
-
-watchEffect(() => {
-  if (emphasisMeter.value) {
-    emphasisMeter.value.unsubscribe({});
-  }
-  emphasisMeter.value = new EmphasisMeter(getArgsForEmphasisMeter());
 });
 
 // -------------------------- PLAYBACK TRACKING --------------------------
-function getArgsForTemporalTracking() {
-  return {
+
+// Linear Tracker
+export const temporalPlaybackTracker = shallowRef(
+  new LinearPlaybackGestureListener({
     position: {
-      x: ChartSettings.xPosition,
-      y: ChartSettings.yPosition + ChartSettings.chartHeight,
+      ...ChartSettings.position,
+      y: ChartSettings.position.y + ChartSettings.dimensions.height,
     },
     size: {
-      width: ChartSettings.chartWidth,
+      width: ChartSettings.dimensions.width,
       height: 50,
     },
     gestureSubject: gestureTracker.value.gestureSubject,
-    trackerType: TrackingType.LINEAR,
-    gestureTypes: [
-      {
-        rightHand: SupportedGestures.POINTING,
-        leftHand: SupportedGestures.POINTING,
-      },
-    ],
-  };
-}
+    canvasDimensions: CanvasSettings.dimensions,
+  })
+);
 
-export const temporalPlaybackTracker = computed(() => {
-  if (temporalPlaybackTracker.value) {
-    temporalPlaybackTracker.value.unsubscribe();
-  }
-  return new MotionAndPositionTracker(getArgsForTemporalTracking());
+export const linearTrackerSubject = shallowRef<any | undefined>(undefined);
+
+watchEffect(() => {
+  const position = {
+    x: ChartSettings.position.x,
+    y: ChartSettings.position.y + ChartSettings.dimensions.height,
+  };
+
+  const size = {
+    width: ChartSettings.dimensions.width,
+    height: 50,
+  };
+
+  temporalPlaybackTracker.value.updateState({
+    position,
+    size,
+  });
+
+  linearTrackerSubject.value = temporalPlaybackTracker.value.getSubject(
+    LinearPlaybackGestureListener.trackingSubjectKey
+  );
 });
 
-function getArgsForPlaybackTracker() {
-  return {
-    position: {
-      x: PlaybackComponentSettings.xPosition,
-      y: PlaybackComponentSettings.yPosition,
-    },
-    size: {
-      width: PlaybackComponentSettings.width,
-      height: PlaybackComponentSettings.height,
-    },
+// radial tracker
+export const radialPlaybackTracker = shallowRef(
+  new RadialPlaybackGestureListener({
+    position: PlaybackComponentSettings.position,
+    size: PlaybackComponentSettings.dimensions,
     gestureSubject: gestureTracker.value.gestureSubject,
-    trackerType: TrackingType.RADIAL,
-    gestureTypes: [
-      {
-        rightHand: SupportedGestures.POINTING,
-        leftHand: SupportedGestures.POINTING,
-      },
-    ],
-  };
-}
+    canvasDimensions: CanvasSettings.dimensions,
+    mode: RadialTrackerMode.TRACKING,
+  })
+);
 
-export const radialPlaybackTracker = computed(() => {
-  if (radialPlaybackTracker.value) {
-    radialPlaybackTracker.value.unsubscribe();
-  }
-  return new MotionAndPositionTracker(getArgsForPlaybackTracker());
+export const radialDiscreteTrackerSubject = shallowRef<any | undefined>(undefined);
+export const radialContinuousTrackerSubject = shallowRef<any | undefined>(undefined);
+
+watchEffect(() => {
+  radialPlaybackTracker.value.updateState({
+    position: PlaybackComponentSettings.position,
+    size: PlaybackComponentSettings.dimensions,
+  });
+
+  radialDiscreteTrackerSubject.value = radialPlaybackTracker.value.getSubject(
+    RadialPlaybackGestureListener.discreteTrackingSubjectKey
+  );
+  radialContinuousTrackerSubject.value = radialPlaybackTracker.value.getSubject(
+    RadialPlaybackGestureListener.continuousTrackingSubjectKey
+  );
 });
 
 // ---------------- FORESHADOWING ------------------------
-function getArgsForForeshadowingTracker() {
-  return {
-    position: {
-      x: ChartSettings.xPosition,
-      y: ChartSettings.yPosition,
-    },
-    size: {
-      width: ChartSettings.chartWidth,
-      height: ChartSettings.chartHeight,
-    },
+export const foreshadowingTracker = shallowRef(
+  new ForeshadowingGestureListener({
+    position: ChartSettings.position,
+    size: ChartSettings.dimensions,
     gestureSubject: gestureTracker.value.gestureSubject,
-    trackerType: TrackingType.FORESHADOWING,
-    gestureTypes: [
-      {
-        rightHand: SupportedGestures.FORESHADOWING_RIGHT_L,
-        leftHand: SupportedGestures.FORESHADOWING_LEFT_L,
-      },
-      {
-        rightHand: SupportedGestures.FORESHADOWING_RIGHT_C,
-        leftHand: SupportedGestures.FORESHADOWING_LEFT_C,
-      },
-      {
-        rightHand: SupportedGestures.OPEN_HAND,
-        leftHand: SupportedGestures.OPEN_HAND,
-      },
-    ],
-  };
-}
-
-export const foreshadowingRectTracker = shallowRef(
-  new MotionAndPositionTracker(getArgsForForeshadowingTracker())
+    canvasDimensions: CanvasSettings.dimensions,
+  })
 );
 
+export const foreshadowingTrackerSubject = shallowRef<any | undefined>(undefined);
+
 watchEffect(() => {
-  if (foreshadowingRectTracker.value) {
-    foreshadowingRectTracker.value.unsubscribe();
-  }
-
-  foreshadowingRectTracker.value = new MotionAndPositionTracker(
-    getArgsForForeshadowingTracker()
-  );
-
-  foreshadowingRectTracker.value.trackingSubject.subscribe({
-    next(value: any) {
-      animationTrack.value = value;
-    },
+  foreshadowingTracker.value.updateState({
+    position: ChartSettings.position,
+    size: ChartSettings.dimensions,
   });
 
-  if (CanvasSettings.canvasCtx["foreshadowing"]) {
-    foreshadowingRectTracker.value.setContext(
-      CanvasSettings.canvasCtx["foreshadowing"]
-    );
-    foreshadowingRectTracker.value.renderReferencePoints({
-      ctx: CanvasSettings.canvasCtx["foreshadowing"],
-      canvasDim: {
-        width: CanvasSettings.canvasWidth,
-        height: CanvasSettings.canvasHeight,
-      },
-    });
-  }
+  foreshadowingTrackerSubject.value = foreshadowingTracker.value.getSubject(
+    ForeshadowingGestureListener.trackingSubjectKey
+  );
 });
+

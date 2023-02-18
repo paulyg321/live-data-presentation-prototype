@@ -13,7 +13,7 @@ export function containsValueLargerThanMax(values: number[], max: number) {
     return value > max;
   });
 
-  return !containsLargerValue;
+  return containsLargerValue;
 }
 
 // TODO: Improve this

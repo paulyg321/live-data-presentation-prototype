@@ -1,5 +1,6 @@
+import { EmphasisMeter } from "@/utils";
 import { Subject } from "rxjs";
-import type { Coordinate2D } from "../../chart";
+import { DrawingMode, type Coordinate2D } from "../../chart";
 import { HANDS } from "./gesture-utils";
 import {
   GestureListener,
@@ -9,55 +10,54 @@ import {
 } from "./GestureListener";
 import { SupportedGestures } from "./handGestures";
 
-export interface EmphasisGestureListenerConstructorArgs
-  extends GestureListenerConstructorArgs {
-  gestureTypes: {
-    rightHand: SupportedGestures;
-    leftHand: SupportedGestures;
-  }[];
-}
+export type EmphasisGestureListenerConstructorArgs =
+  GestureListenerConstructorArgs;
 
 export class EmphasisGestureListener extends GestureListener {
+  static emphasisLevelSubjectKey = "emphasisLevelSubject";
+
   private emphasisLevel = 0;
+  private emphasisMeter: EmphasisMeter | undefined;
+
   private isPreviousPositionInRange = false;
   subjects: GestureListenerSubjectMap = {
-    emphasisLevelSubject: new Subject(),
+    [EmphasisGestureListener.emphasisLevelSubjectKey]: new Subject(),
   };
 
   constructor({
     position,
     size,
-    handsToTrack = [HANDS.RIGHT],
+    handsToTrack = [HANDS.RIGHT, HANDS.LEFT],
     gestureTypes = [
       {
         rightHand: SupportedGestures.OPEN_HAND,
         leftHand: SupportedGestures.OPEN_HAND,
       },
     ],
+    gestureSubject,
+    canvasDimensions,
   }: EmphasisGestureListenerConstructorArgs) {
     super({
       position,
       size,
       handsToTrack,
+      gestureSubject,
+      canvasDimensions,
     });
 
     this.gestureTypes = gestureTypes;
   }
 
   // ----------------- INTERACTIONS WITH CANVAS ----------------------
-  private renderState() {
-    // TODO: Use this to render visual indicators
-  }
-
   // Implemented to only track one finger and one hand
-  handleNewData(fingerData: {
+  protected handleNewData(fingerData: {
     left?: ProcessedGestureListenerFingerData;
     right?: ProcessedGestureListenerFingerData;
   }): void {
     let dominantHand;
 
     if (fingerData.left) {
-      dominantHand = fingerData.left;
+      return;
     } else if (fingerData.right) {
       dominantHand = fingerData.right;
     }
@@ -83,11 +83,12 @@ export class EmphasisGestureListener extends GestureListener {
                   this.resetTimer();
                 } else {
                   this.emphasisLevel -= 1;
-                  this.subjects.emphasisLevelSubject.next(this.emphasisLevel);
+                  this.emphasisMeter?.valueHandler(this.emphasisLevel);
                 }
               },
               onCompletion: () => {
                 this.emphasisLevel = 0;
+                this.emphasisMeter?.valueHandler(this.emphasisLevel);
                 this.resetTimer();
               },
             },
@@ -100,13 +101,40 @@ export class EmphasisGestureListener extends GestureListener {
           this.emphasisLevel < 150
         ) {
           this.emphasisLevel += 25;
-          this.subjects.emphasisLevelSubject.next(this.emphasisLevel);
+          this.emphasisMeter?.valueHandler(this.emphasisLevel);
         }
 
         this.isPreviousPositionInRange = true;
       } else {
         this.isPreviousPositionInRange = false;
       }
+    }
+  }
+
+  setContext(ctx: CanvasRenderingContext2D): void {
+    this.context = ctx;
+    if (this.canvasDimensions) {
+      this.emphasisMeter = new EmphasisMeter({
+        canvasDimensions: this.canvasDimensions,
+        context: this.context,
+      });
+    }
+  }
+
+  getAnimationBasedOnEmphasisLevel() {
+    if (this.emphasisLevel <= 50) {
+      return DrawingMode.SEQUENTIAL_TRANSITION;
+    } else if (this.emphasisLevel > 50 && this.emphasisLevel <= 100) {
+      return DrawingMode.CONCURRENT;
+    } else if (this.emphasisLevel > 100 && this.emphasisLevel <= 150) {
+      return DrawingMode.DROP;
+    }
+  }
+
+  renderReferencePoints() {
+    if (this.context) {
+      this.clearCanvas();
+      this.renderBorder();
     }
   }
 }

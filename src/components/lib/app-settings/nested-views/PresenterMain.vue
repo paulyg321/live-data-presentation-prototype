@@ -1,125 +1,112 @@
 <script setup lang="ts">
-import { AnimatedLine, Legend } from "@/utils";
-import { computed, onMounted, ref, watch } from "vue";
+import { DrawingMode, LineEffect, type AnimatedLine } from "@/utils";
+import { onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import CanvasWrapper from "../../CanvasWrapper.vue";
 import ChartAxes from "../../axes/ChartAxes.vue";
 import {
   ChartSettings,
   CanvasSettings,
-  xScale,
-  yScale,
-  xAxis,
-  yAxis,
-  chartBounds,
-  gestureTracker,
-  LegendSettings,
+  animationTrack,
+  linearTrackerSubject,
+  radialDiscreteTrackerSubject,
+  radialContinuousTrackerSubject,
   radialPlaybackTracker,
-  temporalPlaybackTracker,
-animationTrack,
+  emphasisTracker,
+  foreshadowingTracker,
+  foreshadowingTrackerSubject,
+  LegendSettings,
 } from "../settings-state";
 import * as d3 from "d3";
 import VideoViews from "../../views/VideoViews.vue";
-import { Subject } from "rxjs";
 
 const route = useRoute();
 ChartSettings.setCurrentChart(parseInt(route.params.id as string));
-const legendSubject = new Subject();
 
-legendSubject.subscribe({
+/**
+ * Get keys of all the lines/chart items to be plotted and create a legend key for them
+ * This gets used to render the canvases needed for the items and their legend items
+ *
+ * the keys are used to access the canvas Contexts using CanvasSettings.canvasCtx[<key>]
+ */
+const canvasKeys = Object.keys(
+  ChartSettings.currentChart?.getAnimatedElements() ?? {}
+).reduce((keys, key: string) => {
+  return [...keys, key, `${key}-legend`];
+}, [] as string[]);
+
+const gestureCanvasKeys = ["dialing", "emphasis", "foreshadowing"];
+
+const checkedLines = ref<string[]>([]);
+
+LegendSettings.legendSubject.subscribe({
   next(value: any) {
     if (checkedLines.value.includes(value)) {
       checkedLines.value = checkedLines.value.filter((line: any) => {
         return line !== value;
       });
     } else {
-      checkedLines.value.push(value);
+      checkedLines.value = [...checkedLines.value, value];
     }
   },
 });
 
-// Watch each tracker for the values they emit
-radialPlaybackTracker.value.playbackSubject.subscribe({
-  next(value) {
+linearTrackerSubject.value?.subscribe({
+  next(value: any) {
+    animationTrack.value = value;
+  },
+});
+
+radialDiscreteTrackerSubject.value?.subscribe({
+  next(value: any) {
+    animationTrack.value = value;
+  },
+});
+
+foreshadowingTrackerSubject.value?.subscribe({
+  next(value: any) {
+    animationTrack.value = value;
+  },
+});
+
+radialContinuousTrackerSubject.value?.subscribe({
+  next(value: any) {
     if (value === true) {
       handlePlayState("next");
     }
   },
 });
 
-radialPlaybackTracker.value.trackingSubject.subscribe({
-  next(value: any) {
-    animationTrack.value = value;
-  },
-});
+watch(checkedLines, () => {
+  Object.entries(
+    ChartSettings.currentChart?.getAnimatedElements() ?? {}
+  ).forEach(([key, value]: any) => {
+    let lineEffect = LineEffect.DEFAULT;
+    if (checkedLines.value.length > 0) {
+      if (checkedLines.value.includes(key)) {
+        lineEffect = LineEffect.FOCUSED;
+      } else {
+        lineEffect = LineEffect.BACKGROUND;
+      }
+    }
 
-temporalPlaybackTracker.value.trackingSubject.subscribe({
-  next(value: any) {
-    animationTrack.value = value;
-  },
-});
-
-const animation = computed(() => {
-  return ChartSettings.currentChart?.getAnimatedChartItems({
-    xScale: xScale.value,
-    yScale: yScale.value,
-    chartDimensions: {
-      width: ChartSettings.chartWidth,
-      height: ChartSettings.chartHeight,
-    },
-    canvasDimensions: {
-      width: CanvasSettings.canvasWidth,
-      height: CanvasSettings.canvasHeight,
-    },
-    duration: 3000,
+    value.setLineAppearanceFromEffect(lineEffect);
+    value.drawCurrentState({
+      ctx: CanvasSettings.canvasCtx[key],
+      bounds: {
+        end: animationTrack.value,
+      },
+      drawingMode: DrawingMode.CONCURRENT,
+    });
   });
 });
-
-const canvasKeys = computed(() => {
-  // to create canvases for both the legend and the lines
-  return Object.entries(animation.value).reduce((keys, [key]: any) => {
-    return [...keys, key, `${key}-legend`];
-  }, [] as string[]);
-});
-
-// TODO: Watch for changes in legend and redraw to allow settings modification
-const legend = computed(() => {
-  return Object.entries(animation.value).reduce(
-    (legends, [key, animation]: any, index: number) => {
-      return {
-        ...legends,
-        [`${key}-legend`]: new Legend({
-          label: key,
-          color: animation.color,
-          position: {
-            x: LegendSettings.xPosition,
-            y: LegendSettings.yPosition + index * LegendSettings.height,
-          },
-          line: animation,
-          gestureTracker: gestureTracker.value,
-          legendSubject,
-        }),
-      };
-    },
-    {} as { [key: string]: Legend }
-  );
-});
-
-watch(
-  () => chartBounds.value,
-  () => {
-    Object.entries(animation.value).forEach(([key, value]: any) => {
-      value.drawCurrentState({
-        ctx: CanvasSettings.canvasCtx[key],
-      });
-    });
-  }
-);
 
 watch(
   () => animationTrack.value,
   (newValue, oldValue) => {
-    Object.entries(animation.value).forEach(([key, value]: any) => {
+    Object.entries(
+      ChartSettings.currentChart?.getAnimatedElements() ?? {}
+    ).forEach(([key, value]: any) => {
       if (checkedLines.value.length === 0) {
         value.drawCurrentState({
           ctx: CanvasSettings.canvasCtx[key],
@@ -144,10 +131,9 @@ watch(
 );
 
 function handlePlayState(type: string) {
-  function play({ line, ctx }: { line: AnimatedLine; ctx: any }) {
+  function play({ line }: { line: AnimatedLine }) {
     if (type === "prev") {
       line.animateToPreviousState({
-        ctx,
         playRemainingStates: false,
         // Call like this so we don't lose the this context in ThreePointBezier
         transitionFunction: d3.easeElasticOut.amplitude(1).period(0.163),
@@ -155,7 +141,6 @@ function handlePlayState(type: string) {
       });
     } else if (type === "next") {
       line.animateToNextState({
-        ctx,
         playRemainingStates: false,
         // Call like this so we don't lose the this context in ThreePointBezier
         transitionFunction: (time: number) =>
@@ -164,7 +149,6 @@ function handlePlayState(type: string) {
       });
     } else if (type === "all") {
       line.animateToNextState({
-        ctx,
         playRemainingStates: true,
         // Call like this so we don't lose the this context in ThreePointBezier
         transitionFunction: d3.easeElasticOut,
@@ -173,51 +157,55 @@ function handlePlayState(type: string) {
     }
   }
 
-  Object.entries(animation.value).forEach(([key, value]: any) => {
+  Object.entries(
+    ChartSettings.currentChart?.getAnimatedElements() ?? {}
+  ).forEach(([key, value]: any) => {
     if (checkedLines.value.length === 0) {
       play({
         line: value,
-        ctx: CanvasSettings.canvasCtx[key],
       });
       return;
     } else if (checkedLines.value.includes(key)) {
       play({
         line: value,
-        ctx: CanvasSettings.canvasCtx[key],
       });
       return;
     }
   });
 }
 
-const checkedLines = ref<string[]>([]);
-
 onMounted(() => {
-  CanvasSettings.initializeCanvas("dialing", false);
-  CanvasSettings.initializeCanvas("emphasis", false);
-  CanvasSettings.initializeCanvas("foreshadowing", false);
+  /**
+   * Get keys of all the lines/chart items to be plotted and create a legend key for them
+   * This gets used to render the canvases needed for the items and their legend items
+   *
+   * the keys are used to access the canvas Contexts using CanvasSettings.canvasCtx[<key>]
+   */
+
+  // Do whatever you need to do with canvasCtx after this
+  ChartSettings.currentChart?.setContext(CanvasSettings.canvasCtx);
+  ChartSettings.currentChart?.draw();
+
+  LegendSettings.initializeLegendItems();
+  LegendSettings.drawLegendItems();
+
+  // Possibly move these to gesture-settings state
   if (CanvasSettings.canvasCtx["dialing"]) {
-    radialPlaybackTracker.value.renderReferencePoints({
-      ctx: CanvasSettings.canvasCtx["dialing"],
-      canvasDim: {
-        width: CanvasSettings.canvasWidth,
-        height: CanvasSettings.canvasHeight,
-      },
-    });
+    radialPlaybackTracker.value.setContext(CanvasSettings.canvasCtx["dialing"]);
+    radialPlaybackTracker.value.renderReferencePoints();
   }
 
-  canvasKeys.value.forEach((key: string) => {
-    CanvasSettings.initializeCanvas(key, false);
-    if (key.includes("legend")) {
-      legend.value[key].drawLegend({
-        ctx: CanvasSettings.canvasCtx[key],
-      });
-    } else {
-      animation.value[key].drawCurrentState({
-        ctx: CanvasSettings.canvasCtx[key],
-      });
-    }
-  });
+  if (CanvasSettings.canvasCtx["emphasis"]) {
+    emphasisTracker.value.setContext(CanvasSettings.canvasCtx["emphasis"]);
+    emphasisTracker.value.renderReferencePoints();
+  }
+
+  if (CanvasSettings.canvasCtx["foreshadowing"]) {
+    foreshadowingTracker.value.setContext(
+      CanvasSettings.canvasCtx["foreshadowing"]
+    );
+    foreshadowingTracker.value.renderReferencePoints();
+  }
 });
 </script>
 <!---------------------------------------------------------------------------------------------------------->
@@ -230,19 +218,6 @@ onMounted(() => {
         :max="1"
         thumb-label
       ></v-slider>
-    </v-col>
-  </v-row>
-  <v-row class="justify-center">
-    <v-col lg="12">
-      <div v-for="(_, key) in animation" v-bind:key="key">
-        <input
-          type="checkbox"
-          :id="`${key}`"
-          :value="key"
-          v-model="checkedLines"
-        />
-        <label :for="`${key}`">{{ key }}</label>
-      </div>
     </v-col>
   </v-row>
   <v-row class="justify-center">
@@ -269,44 +244,19 @@ onMounted(() => {
   <v-row>
     <v-col lg="12">
       <CanvasWrapper
-        :width="CanvasSettings.canvasWidth"
-        :height="CanvasSettings.canvasHeight"
+        :width="CanvasSettings.dimensions.width"
+        :height="CanvasSettings.dimensions.height"
         v-slot="{ className }"
       >
         <VideoViews :className="className" />
-        <ChartAxes
-          :width="CanvasSettings.canvasWidth"
-          :height="CanvasSettings.canvasWidth"
-          :xAxis="xAxis"
-          :yAxis="yAxis"
-          :chartBounds="chartBounds"
-          :chartSize="0.75"
-        />
+        <ChartAxes :className="className" />
         <canvas
-          v-for="key in canvasKeys"
+          v-for="key in [...canvasKeys, ...gestureCanvasKeys]"
           v-bind:key="key"
-          :width="CanvasSettings.canvasWidth"
-          :height="CanvasSettings.canvasHeight"
+          :width="CanvasSettings.dimensions.width"
+          :height="CanvasSettings.dimensions.height"
           :class="className"
-          :ref="(el) => CanvasSettings.setCanvas(el, key as unknown as string)"
-        ></canvas>
-        <canvas
-          :width="CanvasSettings.canvasWidth"
-          :height="CanvasSettings.canvasHeight"
-          :class="className"
-          :ref="(el) => CanvasSettings.setCanvas(el, 'dialing')"
-        ></canvas>
-        <canvas
-          :width="CanvasSettings.canvasWidth"
-          :height="CanvasSettings.canvasHeight"
-          :class="className"
-          :ref="(el) => CanvasSettings.setCanvas(el, 'emphasis')"
-        ></canvas>
-        <canvas
-          :width="CanvasSettings.canvasWidth"
-          :height="CanvasSettings.canvasHeight"
-          :class="className"
-          :ref="(el) => CanvasSettings.setCanvas(el, 'foreshadowing')"
+          :ref="(el) => CanvasSettings.setCanvas(el, key as unknown as string, false)"
         ></canvas>
       </CanvasWrapper>
     </v-col>

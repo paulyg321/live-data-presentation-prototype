@@ -38,8 +38,8 @@ function getChartColor(type: string) {
         :min="0"
         :max="1000"
         :step="1"
-        :model-value="ChartSettings.chartWidth"
-        @update:modelValue="(value: number) => ChartSettings.changeChartWidth(value)"
+        :model-value="ChartSettings.dimensions.width"
+        @update:modelValue="(value: number) => ChartSettings.changeDimensions(value)"
         track-color="grey"
         thumb-label
       ></v-slider>
@@ -48,8 +48,8 @@ function getChartColor(type: string) {
         :min="0"
         :max="1000"
         :step="1"
-        :model-value="ChartSettings.xPosition"
-        @update:modelValue="(value: number) => ChartSettings.changeXPosition(value)"
+        :model-value="ChartSettings.position.x"
+        @update:modelValue="(value: number) => ChartSettings.changePosition({ x: value })"
         track-color="grey"
         thumb-label
       ></v-slider>
@@ -58,8 +58,8 @@ function getChartColor(type: string) {
         :min="0"
         :max="1000"
         :step="1"
-        :model-value="ChartSettings.yPosition"
-        @update:modelValue="(value: number) => ChartSettings.changeYPosition(value)"
+        :model-value="ChartSettings.position.y"
+        @update:modelValue="(value: number) => ChartSettings.changePosition({ y: value })"
         track-color="grey"
         thumb-label
       ></v-slider>

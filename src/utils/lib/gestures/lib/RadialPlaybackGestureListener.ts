@@ -1,5 +1,6 @@
 import { Subject } from "rxjs";
 import type { Coordinate2D } from "../../chart";
+import { clearArea, drawCircle } from "../../drawing";
 import { HANDS } from "./gesture-utils";
 import {
   GestureListener,
@@ -14,21 +15,20 @@ export enum RadialTrackerMode {
   TRACKING = "tracking",
 }
 
-export interface RadialPlaybackGestureListenerConstructorArgs
-  extends GestureListenerConstructorArgs {
-  gestureTypes: {
-    rightHand: SupportedGestures;
-    leftHand: SupportedGestures;
-  }[];
+export interface RadialPlaybackGestureListenerConstructorArgs extends GestureListenerConstructorArgs {
+  mode: RadialTrackerMode;
 }
 
 export class RadialPlaybackGestureListener extends GestureListener {
+  static discreteTrackingSubjectKey = "discreteTrackingSubject";
+  static continuousTrackingSubjectKey = "continuousTrackingSubject";
+
   private rotations = 0;
   private angleStack: number[] = [];
   private mode: RadialTrackerMode = RadialTrackerMode.NORMAL;
   subjects: GestureListenerSubjectMap = {
-    trackingSubject: new Subject(),
-    playback: new Subject(),
+    [RadialPlaybackGestureListener.discreteTrackingSubjectKey]: new Subject(),
+    [RadialPlaybackGestureListener.continuousTrackingSubjectKey]: new Subject(),
   };
 
   constructor({
@@ -41,14 +41,20 @@ export class RadialPlaybackGestureListener extends GestureListener {
         leftHand: SupportedGestures.POINTING,
       },
     ],
+    gestureSubject,
+    canvasDimensions,
+    mode,
   }: RadialPlaybackGestureListenerConstructorArgs) {
     super({
       position,
       size,
       handsToTrack,
+      gestureTypes,
+      gestureSubject,
+      canvasDimensions,
     });
 
-    this.gestureTypes = gestureTypes;
+    this.mode = mode;
   }
 
   private getCenterPoint(): Coordinate2D {
@@ -73,6 +79,20 @@ export class RadialPlaybackGestureListener extends GestureListener {
   // ----------------- INTERACTIONS WITH CANVAS ----------------------
   private renderState() {
     // TODO: Use this to render visual indicators
+    // this.context.
+  }
+
+  private renderCenterPoint() {
+    const centerPoint = this.getCenterPoint();
+    if (this.context) {
+      drawCircle({
+        context: this.context,
+        coordinates: centerPoint,
+        radius: 5,
+        fillStyle: "skyblue",
+        strokeStyle: "skyblue",
+      });
+    }
   }
 
   setTrackingMode(mode: RadialTrackerMode) {
@@ -86,11 +106,10 @@ export class RadialPlaybackGestureListener extends GestureListener {
 
   private handleNewAngle(theta: number) {
     if (this.rotations >= 1 && this.mode === RadialTrackerMode.TRACKING) {
-      this.subjects.trackingSubject.next(theta / 360);
-      return;
-    }
-
-    if (theta <= 90 && this.angleStack.length === 0) {
+      this.subjects[
+        RadialPlaybackGestureListener.discreteTrackingSubjectKey
+      ].next(theta / 360);
+    } else if (theta <= 90 && this.angleStack.length === 0) {
       this.angleStack.push(theta);
 
       // start timer to empty stack if no rotations are completed
@@ -98,17 +117,18 @@ export class RadialPlaybackGestureListener extends GestureListener {
 
       const executeAfterTimerEnds = () => {
         if (this.rotations >= 1 && this.mode === RadialTrackerMode.NORMAL) {
-          this.subjects.playbackSubject.next(true);
+          this.subjects[
+            RadialPlaybackGestureListener.continuousTrackingSubjectKey
+          ].next(true);
+          this.resetAngleState();
         }
-        this.resetAngleState();
+        this.timer = undefined;
       };
 
       if (isFirstRotation) {
-        this.timer = this.startTimerInstance({
-          execute: {
-            onCompletion: executeAfterTimerEnds,
-          },
-          timeout: 2000,
+        this.timer = this.startTimeoutInstance({
+          onCompletion: executeAfterTimerEnds,
+          timeout: 3000,
         });
       }
     } else if (theta <= 180 && theta > 90 && this.angleStack.length === 1) {
@@ -123,7 +143,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
   }
 
   // Implemented to only track one finger and one hand
-  handleNewData(fingerData: {
+  protected handleNewData(fingerData: {
     left?: ProcessedGestureListenerFingerData;
     right?: ProcessedGestureListenerFingerData;
   }): void {
@@ -151,6 +171,27 @@ export class RadialPlaybackGestureListener extends GestureListener {
         const angle = this.calculateAngleFromCenter(fingerPosition);
         this.handleNewAngle(angle);
       }
+    }
+  }
+
+  renderBorder() {
+    const centerPoint = this.getCenterPoint();
+    if (this.context) {
+      drawCircle({
+        context: this.context,
+        coordinates: centerPoint,
+        radius: this.size.width / 2,
+        fillStyle: "skyblue",
+        strokeStyle: "skyblue",
+      });
+    }
+  }
+
+  renderReferencePoints() {
+    if (this.context) {
+      this.clearCanvas();
+      this.renderCenterPoint();
+      this.renderBorder();
     }
   }
 }

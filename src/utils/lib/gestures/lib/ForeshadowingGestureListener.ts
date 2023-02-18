@@ -3,7 +3,7 @@ import {
   calculateDistance,
   containsValueLargerThanMax,
 } from "../../calculations";
-import { distanceBetweenPoints, Legend, type Coordinate2D } from "../../chart";
+import { distanceBetweenPoints, type Coordinate2D } from "../../chart";
 import { HANDS } from "./gesture-utils";
 import {
   GestureListener,
@@ -12,15 +12,10 @@ import {
   type ProcessedGestureListenerFingerData,
 } from "./GestureListener";
 import { SupportedGestures } from "./handGestures";
-import type { MotionAndPositionTracker } from "./MotionAndPositionTracker";
+import { LinearPlaybackGestureListener } from "./LinearPlaybackGestureListener";
 
-export interface ForeshadowingGestureListenerConstructorArgs
-  extends GestureListenerConstructorArgs {
-  gestureTypes: {
-    rightHand: SupportedGestures;
-    leftHand: SupportedGestures;
-  }[];
-}
+export type ForeshadowingGestureListenerConstructorArgs =
+  GestureListenerConstructorArgs;
 
 export enum ForeshadowingType {
   SHAPE = "shape",
@@ -39,15 +34,17 @@ export interface ForeshadowingRangePosition {
 }
 
 export interface ForeshadowingShapePosition {
-  leftFingerOnePosition: Coordinate2D;
-  rightFingerOnePosition: Coordinate2D;
-  leftFingerTwoPosition: Coordinate2D;
-  rightFingerTwoPosition: Coordinate2D;
+  leftIndex: Coordinate2D;
+  leftThumb: Coordinate2D;
+  rightIndex: Coordinate2D;
+  rightThumb: Coordinate2D;
 }
 
 export class ForeshadowingGestureListener extends GestureListener {
+  static trackingSubjectKey = "trackingSubject";
+
   subjects: GestureListenerSubjectMap = {
-    trackingSubject: new Subject(),
+    [ForeshadowingGestureListener.trackingSubjectKey]: new Subject(),
   };
 
   private initialShapePositions: ForeshadowingShapePosition | undefined;
@@ -55,7 +52,7 @@ export class ForeshadowingGestureListener extends GestureListener {
   private initialRangePositions: ForeshadowingRangePosition | undefined;
   private recentRangePositions: ForeshadowingRangePosition | undefined;
   private currentShape: ForeshadowingShapes | undefined;
-  private rangeSlider: MotionAndPositionTracker | undefined;
+  private rangeSlider: LinearPlaybackGestureListener | undefined;
 
   constructor({
     position,
@@ -75,11 +72,15 @@ export class ForeshadowingGestureListener extends GestureListener {
         leftHand: SupportedGestures.OPEN_HAND,
       },
     ],
+    gestureSubject,
+    canvasDimensions,
   }: ForeshadowingGestureListenerConstructorArgs) {
     super({
       position,
       size,
       handsToTrack,
+      gestureSubject,
+      canvasDimensions,
     });
 
     this.gestureTypes = gestureTypes;
@@ -115,6 +116,60 @@ export class ForeshadowingGestureListener extends GestureListener {
     };
   }
 
+  private placeListenerInPosition() {
+    if (this.recentRangePositions) {
+      if (this.rangeSlider) {
+        this.rangeSlider.updateState({
+          position: {
+            x: this.position.x,
+            y: Math.min(
+              this.recentRangePositions.leftFingerPosition.y,
+              this.recentRangePositions.rightFingerPosition.y
+            ),
+          },
+          size: {
+            width: this.size.width,
+            height: 50,
+          },
+          emitRange: {
+            start: this.recentRangePositions.leftFingerPosition,
+            end: this.recentRangePositions.rightFingerPosition,
+          },
+        });
+      } else {
+        this.rangeSlider = new LinearPlaybackGestureListener({
+          position: {
+            x: this.position.x,
+            y: Math.min(
+              this.recentRangePositions.leftFingerPosition.y,
+              this.recentRangePositions.rightFingerPosition.y
+            ),
+          },
+          size: {
+            width: this.size.width,
+            height: 50,
+          },
+          gestureSubject: this.gestureSubject,
+          canvasDimensions: this.canvasDimensions ?? { width: 0, height: 0 },
+          emitRange: {
+            start: this.recentRangePositions.leftFingerPosition,
+            end: this.recentRangePositions.rightFingerPosition,
+          },
+        });
+
+        this.rangeSlider.subjects[
+          LinearPlaybackGestureListener.trackingSubjectKey
+        ].subscribe({
+          next: (value: any) => {
+            this.subjects[ForeshadowingGestureListener.trackingSubjectKey].next(
+              value
+            );
+          },
+        });
+      }
+    }
+  }
+
   private resetRangeGestureState() {
     this.resetTimer();
     this.currentShape = undefined;
@@ -130,19 +185,19 @@ export class ForeshadowingGestureListener extends GestureListener {
   }
 
   private isCircleShape({
-    leftFingerOnePosition,
-    leftFingerTwoPosition,
-    rightFingerOnePosition,
-    rightFingerTwoPosition,
+    leftIndex,
+    leftThumb,
+    rightIndex,
+    rightThumb,
   }: ForeshadowingShapePosition) {
     const fingerOneDist = calculateDistance(
-      leftFingerOnePosition as Coordinate2D,
-      rightFingerOnePosition as Coordinate2D
+      leftIndex as Coordinate2D,
+      rightIndex as Coordinate2D
     );
 
     const fingerTwoDist = calculateDistance(
-      leftFingerTwoPosition as Coordinate2D,
-      rightFingerTwoPosition as Coordinate2D
+      leftThumb as Coordinate2D,
+      rightThumb as Coordinate2D
     );
 
     if (
@@ -156,19 +211,19 @@ export class ForeshadowingGestureListener extends GestureListener {
   }
 
   private isRectShape({
-    leftFingerOnePosition,
-    leftFingerTwoPosition,
-    rightFingerOnePosition,
-    rightFingerTwoPosition,
+    leftIndex,
+    leftThumb,
+    rightIndex,
+    rightThumb,
   }: ForeshadowingShapePosition) {
     const leftThumbRightIndexDist = calculateDistance(
-      leftFingerOnePosition as Coordinate2D,
-      rightFingerTwoPosition as Coordinate2D
+      leftThumb as Coordinate2D,
+      rightIndex as Coordinate2D
     );
 
     const rightThumbLeftIndexDist = calculateDistance(
-      leftFingerTwoPosition as Coordinate2D,
-      rightFingerOnePosition as Coordinate2D
+      rightThumb as Coordinate2D,
+      leftIndex as Coordinate2D
     );
 
     if (
@@ -221,80 +276,28 @@ export class ForeshadowingGestureListener extends GestureListener {
       if (!this.timer) {
         this.initialRangePositions = newRangePosition;
         this.currentShape = ForeshadowingShapes.RANGE;
-        this.startTimerInstance({
-          execute: {
-            onCompletion: () => {
-              if (this.initialRangePositions && this.recentRangePositions) {
-                const diffs = distanceBetweenPoints(
-                  Object.values(this.initialRangePositions),
-                  Object.values(this.recentRangePositions)
-                ).map((diff: any) => diff.euclideanDistance);
+        this.timer = this.startTimeoutInstance({
+          onCompletion: () => {
+            if (this.initialRangePositions && this.recentRangePositions) {
+              const diffs = distanceBetweenPoints(
+                Object.values(this.initialRangePositions),
+                Object.values(this.recentRangePositions)
+              ).map((diff: any) => diff.euclideanDistance);
 
-                if (containsValueLargerThanMax(diffs, 30)) {
-                  if (this.context) {
-                    this.context.clearRect(
-                      this.position.x,
-                      this.position.y,
-                      this.size.width,
-                      this.size.height
-                    );
-                    this.context.strokeStyle = "#EE4B2B";
-                    this.context.globalAlpha = 0.5;
-                    this.context.lineWidth = 15;
-
-                    // TODO: Create a class that handles the drawing of the range
-                    if (this.currentShape === ForeshadowingShapes.RANGE) {
-                      this.context.beginPath();
-                      this.context.moveTo(
-                        this.recentRangePositions.leftFingerPosition.x,
-                        this.recentRangePositions.leftFingerPosition.y
-                      );
-                      this.context.lineTo(
-                        this.recentRangePositions.rightFingerPosition.x,
-                        this.recentRangePositions.rightFingerPosition.y
-                      );
-                      this.context.stroke();
-
-                      //   if (this.rangeSlider) {
-                      //     this.rangeSlider.unsubscribe();
-                      //     this.rangeSlider.trackingSubject.unsubscribe();
-                      //   }
-                      //   this.rangeSlider = new MotionAndPositionTracker({
-                      //     position: {
-                      //       x: this.position.x,
-                      //       y: Math.min(
-                      //         this.recentRangePositions.leftMiddleFingerPosition
-                      //           .y,
-                      //         this.recentRangePositions.rightMiddleFingerPosition
-                      //           .y
-                      //       ),
-                      //     },
-                      //     size: {
-                      //       width: this.size.width,
-                      //       height: 50,
-                      //     },
-                      //     gestureSubject: this.gestureSubject,
-                      //     trackerType: TrackingType.LINEAR,
-                      //     gestureTypes: [
-                      //       {
-                      //         rightHand: SupportedGestures.POINTING,
-                      //         leftHand: SupportedGestures.POINTING,
-                      //       },
-                      //     ],
-                      //   });
-
-                      //   this.rangeSlider.trackingSubject.subscribe({
-                      //     next: (value: any) => {
-                      //       this.trackingSubject.next(value);
-                      //     },
-                      //   });
+              if (!containsValueLargerThanMax(diffs, 30)) {
+                if (this.context) {
+                  if (this.currentShape === ForeshadowingShapes.RANGE) {
+                    if (this.currentShape) {
+                      this.drawVisualIndicator(this.currentShape);
+                      this.placeListenerInPosition();
                     }
-
-                    this.resetRangeGestureState();
                   }
+
+                  this.resetRangeGestureState();
                 }
               }
-            },
+            }
+            this.timer = undefined;
           },
           timeout: 1000,
         });
@@ -304,142 +307,155 @@ export class ForeshadowingGestureListener extends GestureListener {
     }
   }
 
+  private drawVisualIndicator(shape: ForeshadowingShapes) {
+    if (this.context) {
+      this.context.fillStyle = "#EE4B2B";
+      this.context.globalAlpha = 0.5;
+      this.context.clearRect(
+        this.position.x,
+        this.position.y,
+        this.size.width,
+        this.size.height
+      );
+
+      if (
+        shape === ForeshadowingShapes.RECTANGLE &&
+        this.recentShapePositions
+      ) {
+        this.context?.fillRect(
+          this.recentShapePositions.rightIndex.x,
+          this.recentShapePositions.rightThumb.y,
+          this.recentShapePositions.rightThumb.x -
+            this.recentShapePositions.rightIndex.x,
+          this.recentShapePositions.rightIndex.y -
+            this.recentShapePositions.rightThumb.y
+        );
+      }
+      if (shape === ForeshadowingShapes.CIRCLE && this.recentShapePositions) {
+        const circleRadius =
+          (this.recentShapePositions.rightThumb.y -
+            this.recentShapePositions.rightIndex.y) /
+          2;
+        this.context?.beginPath();
+        this.context?.arc(
+          this.recentShapePositions.rightIndex.x,
+          this.recentShapePositions.rightIndex.y + circleRadius,
+          circleRadius,
+          0,
+          2 * Math.PI,
+          false
+        );
+        this.context?.fill();
+      }
+
+      if (shape === ForeshadowingShapes.RANGE && this.recentRangePositions) {
+        this.context.lineWidth = 15;
+        this.context?.beginPath();
+        this.context?.moveTo(
+          this.recentRangePositions.leftFingerPosition.x,
+          this.recentRangePositions.leftFingerPosition.y
+        );
+        this.context?.lineTo(
+          this.recentRangePositions.rightFingerPosition.x,
+          this.recentRangePositions.rightFingerPosition.y
+        );
+        this.context?.stroke();
+      }
+    }
+  }
+
   private handleShapeGesture(fingerData: {
     left: ProcessedGestureListenerFingerData;
     right: ProcessedGestureListenerFingerData;
   }) {
-    const [leftFingerToTrackOne, leftFingerToTrackTwo] =
+    const [leftIndexLandmarkId, leftThumbLandmarkId] =
       fingerData.left.fingersToTrack;
-    const leftFingerOnePosition = fingerData.left.fingerPositions[
-      leftFingerToTrackOne
+    const leftIndex = fingerData.left.fingerPositions[
+      leftIndexLandmarkId
     ] as Coordinate2D;
-    const leftFingerTwoPosition = fingerData.left.fingerPositions[
-      leftFingerToTrackTwo
+    const leftThumb = fingerData.left.fingerPositions[
+      leftThumbLandmarkId
     ] as Coordinate2D;
 
-    const [rightFingerToTrackOne, rightFingerToTrackTwo] =
+    const [rightIndexLandmarkId, rightThumbLandmarkId] =
       fingerData.right.fingersToTrack;
-    const rightFingerOnePosition = fingerData.left.fingerPositions[
-      rightFingerToTrackOne
+    const rightIndex = fingerData.right.fingerPositions[
+      rightIndexLandmarkId
     ] as Coordinate2D;
-    const rightFingerTwoPosition = fingerData.left.fingerPositions[
-      rightFingerToTrackTwo
+    const rightThumb = fingerData.right.fingerPositions[
+      rightThumbLandmarkId
     ] as Coordinate2D;
 
     if (
-      leftFingerOnePosition.x === undefined ||
-      leftFingerOnePosition.y === undefined ||
-      leftFingerTwoPosition.x === undefined ||
-      leftFingerTwoPosition.y === undefined ||
-      rightFingerOnePosition.x === undefined ||
-      rightFingerOnePosition.y === undefined ||
-      rightFingerTwoPosition.x === undefined ||
-      rightFingerTwoPosition.y === undefined
+      leftIndex.x === undefined ||
+      leftIndex.y === undefined ||
+      leftThumb.x === undefined ||
+      leftThumb.y === undefined ||
+      rightIndex.x === undefined ||
+      rightIndex.y === undefined ||
+      rightThumb.x === undefined ||
+      rightThumb.y === undefined
     ) {
       throw new Error(
         "handleShapeGesture - one of the finger positions is undefined"
       );
     }
 
-    const leftFingerOneInRange = this.isWithinObjectBounds(
-      leftFingerOnePosition
-    );
-    const leftFingerTwoInRange = this.isWithinObjectBounds(
-      leftFingerTwoPosition
-    );
-    const rightFingerOneInRange = this.isWithinObjectBounds(
-      rightFingerOnePosition
-    );
-    const rightFingerTwoInRange = this.isWithinObjectBounds(
-      rightFingerTwoPosition
-    );
+    const leftIndexInRange = this.isWithinObjectBounds(leftIndex);
+    const leftThumbInRange = this.isWithinObjectBounds(leftThumb);
+    const rightIndexInRange = this.isWithinObjectBounds(rightIndex);
+    const rightThumbInRange = this.isWithinObjectBounds(rightThumb);
 
     const canEmit =
-      leftFingerOneInRange &&
-      leftFingerTwoInRange &&
-      rightFingerOneInRange &&
-      rightFingerTwoInRange;
+      leftIndexInRange &&
+      leftThumbInRange &&
+      rightIndexInRange &&
+      rightThumbInRange;
 
-    if (canEmit) {
-      const newShapePosition = {
-        leftFingerOnePosition,
-        leftFingerTwoPosition,
-        rightFingerOnePosition,
-        rightFingerTwoPosition,
-      } as ForeshadowingShapePosition;
-      const isCircle = this.isCircleShape(newShapePosition);
-      const isRectangle = this.isRectShape(newShapePosition);
+    const newShapePosition = {
+      leftIndex,
+      leftThumb,
+      rightIndex,
+      rightThumb,
+    } as ForeshadowingShapePosition;
+    const isCircle = this.isCircleShape(newShapePosition);
+    const isRectangle = this.isRectShape(newShapePosition);
 
-      if (isCircle || isRectangle) {
-        if (!this.timer) {
-          this.initialShapePositions = newShapePosition;
-          this.currentShape = isCircle
-            ? ForeshadowingShapes.CIRCLE
-            : isRectangle
-            ? ForeshadowingShapes.RECTANGLE
-            : undefined;
-          this.timer = this.startTimerInstance({
-            execute: {
-              onCompletion: () => {
-                if (this.initialShapePositions && this.recentShapePositions) {
-                  const diffs = distanceBetweenPoints(
-                    Object.values(this.initialShapePositions),
-                    Object.values(this.recentShapePositions)
-                  ).map((diff) => diff.euclideanDistance);
+    if (canEmit && (isCircle || isRectangle)) {
+      if (!this.timer) {
+        this.initialShapePositions = newShapePosition;
+        this.currentShape = isCircle
+          ? ForeshadowingShapes.CIRCLE
+          : isRectangle
+          ? ForeshadowingShapes.RECTANGLE
+          : undefined;
 
-                  if (containsValueLargerThanMax(diffs, 30)) {
-                    if (this.context) {
-                      this.context.clearRect(
-                        this.position.x,
-                        this.position.y,
-                        this.size.width,
-                        this.size.height
-                      );
-                      this.context.fillStyle = "#EE4B2B";
-                      this.context.globalAlpha = 0.5;
-                      // TODO: Create class to draw circle and rectangle;
-                      //   if (this.currentShape === ForeshadowingShapes.RECTANGLE) {
-                      //     this.context.fillRect(
-                      //       this.recentShapePositions.rightIndexPosition.x,
-                      //       this.recentShapePositions.rightThumbPosition.y,
-                      //       this.recentShapePositions.rightThumbPosition.x -
-                      //         this.recentShapePositions.rightIndexPosition.x,
-                      //       this.recentShapePositions.rightIndexPosition.y -
-                      //         this.recentShapePositions.rightThumbPosition.y
-                      //     );
-                      //   } else if (this.currentShape === ForeshadowingShapes.CIRCLE) {
-                      //     const circleRadius =
-                      //       (this.recentShapePositions.rightThumbPosition.y -
-                      //         this.recentShapePositions.rightIndexPosition.y) /
-                      //       2;
-                      //     this.context.beginPath();
-                      //     this.context.arc(
-                      //       this.recentShapePositions.rightIndexPosition.x,
-                      //       this.recentShapePositions.rightIndexPosition.y +
-                      //         circleRadius,
-                      //       circleRadius,
-                      //       0,
-                      //       2 * Math.PI,
-                      //       false
-                      //     );
-                      //     this.context.fill();
-                      //   }
-                    }
-                  }
+        this.timer = this.startTimeoutInstance({
+          onCompletion: () => {
+            if (this.initialShapePositions && this.recentShapePositions) {
+              const diffs = distanceBetweenPoints(
+                Object.values(this.initialShapePositions),
+                Object.values(this.recentShapePositions)
+              ).map((diff) => diff.euclideanDistance);
+
+              if (!containsValueLargerThanMax(diffs, 30)) {
+                if (this.currentShape) {
+                  this.drawVisualIndicator(this.currentShape);
                 }
-              },
-            },
-            timeout: 1000,
-          });
-        } else {
-          this.recentShapePositions = newShapePosition;
-        }
+              }
+            }
+            this.timer = undefined;
+          },
+          timeout: 1000,
+        });
+      } else {
+        this.recentShapePositions = newShapePosition;
       }
     }
   }
 
   // Implemented to only track one finger and one hand
-  handleNewData(fingerData: {
+  protected handleNewData(fingerData: {
     left?: ProcessedGestureListenerFingerData;
     right?: ProcessedGestureListenerFingerData;
   }): void {
@@ -456,6 +472,13 @@ export class ForeshadowingGestureListener extends GestureListener {
           this.handleShapeGesture(fingerData as Required<typeof fingerData>);
         }
       }
+    }
+  }
+
+  renderReferencePoints() {
+    if (this.context) {
+      this.clearCanvas();
+      this.renderBorder();
     }
   }
 }

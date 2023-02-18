@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import * as monaco from "monaco-editor";
 import { Chart, ChartTypeValue, type ChartType } from "@/utils";
 import _ from "lodash";
-import { ChartSettings } from "../settings-state";
+import { CanvasSettings, ChartSettings } from "../settings-state";
 
 const numPages = 2;
 const chartOptions = [
@@ -29,20 +29,35 @@ const buttonContainerClass = computed(() => {
 });
 
 function createChart() {
-  try {
-    const chart = Chart.CreateChart({
-      title: chartTitle.value,
-      type: newChartType.value,
-      data: chartData.value,
-      field: field.value,
-      key: key.value,
-      step: step.value,
-      xAccessor: xAccessor.value,
-      yAccessor: yAccessor.value,
-    });
-    ChartSettings.addChart(chart);
-  } catch (err) {
-    alert(err);
+  if (
+    chartTitle.value &&
+    newChartType.value &&
+    chartData.value &&
+    field.value &&
+    key.value &&
+    step.value &&
+    dataAccessor.value &&
+    xField.value &&
+    yField.value
+  ) {
+    ChartSettings.addChart(
+      new Chart({
+        title: chartTitle.value,
+        type: newChartType.value,
+        data: chartData.value,
+        field: field.value,
+        key: key.value,
+        step: step.value,
+        dataAccessor: dataAccessor.value,
+        xField: xField.value,
+        yField: yField.value,
+        position: ChartSettings.position,
+        dimensions: ChartSettings.dimensions,
+        canvasDimensions: CanvasSettings.dimensions,
+      })
+    );
+  } else {
+    alert("All required fields were not provided");
   }
 }
 
@@ -72,45 +87,29 @@ async function handleNext() {
     const hasRequiredFields =
       field.value !== undefined ||
       key.value !== undefined ||
-      xAccessor.value !== undefined ||
-      yAccessor.value !== undefined;
+      dataAccessor.value !== undefined ||
+      xField.value !== undefined ||
+      yField.value !== undefined;
 
     if (hasRequiredFields) {
       if (newChartType.value?.value === "line") {
-        const nestedXVals = xAccessor.value?.split(".");
-        const nestedYVals = yAccessor.value?.split(".");
-
-        if (
-          nestedXVals &&
-          nestedYVals &&
-          nestedXVals?.length > 1 &&
-          nestedYVals?.length > 1 &&
-          nestedXVals[0] === nestedYVals[0]
-        ) {
+        if (dataAccessor.value && xField.value && yField.value) {
           if (
-            chartData.value[0][nestedXVals[0]] &&
-            chartData.value[0][nestedXVals[0]][0][nestedXVals[1]] !==
+            chartData.value[0][dataAccessor.value] &&
+            chartData.value[0][dataAccessor.value][0][xField.value] !==
               undefined &&
-            chartData.value[0][nestedYVals[0]][0][nestedYVals[1]] !== undefined
+            chartData.value[0][dataAccessor.value][0][yField.value] !==
+              undefined
           ) {
             createChart();
           } else {
-            alert("ERROR - LINE");
+            alert(
+              "ERROR - Unable to access data using specified fields for dataAccessor and x/y fields"
+            );
           }
         } else {
           //set for error
-          alert("ERROR - LINE");
-        }
-      } else {
-        if (
-          xAccessor.value &&
-          yAccessor.value &&
-          chartData.value[0][xAccessor.value] &&
-          chartData.value[0][yAccessor.value]
-        ) {
-          createChart();
-        } else {
-          alert("ERROR - NON LINE");
+          alert("ERROR - LINE data accessor and x/y fields not set ");
         }
       }
     } else {
@@ -133,8 +132,9 @@ const dataInput = ref<HTMLElement>();
 let monacoEditor: monaco.editor.IStandaloneCodeEditor;
 const field = ref<string>();
 const key = ref<string>();
-const xAccessor = ref<string>();
-const yAccessor = ref<string>();
+const dataAccessor = ref<string>();
+const xField = ref<string>();
+const yField = ref<string>();
 const step = ref<number>(500);
 const columnOptions = ref<any>([]);
 watch([field, key], () => {
@@ -214,32 +214,27 @@ onMounted(() => {
               ></v-select>
             </v-col>
             <v-col lg="12">
-              <v-text-field
-                v-if="newChartType?.value === ChartTypeValue.LINE"
-                label="X Accessor"
-                v-model="xAccessor"
-              ></v-text-field>
               <v-select
-                v-else
-                label="X Accessor"
-                :hint="`${key}`"
+                v-if="newChartType?.value === ChartTypeValue.LINE"
+                label="Data Accessor"
+                :hint="`${dataAccessor}`"
                 :items="columnOptions"
-                v-model="xAccessor"
+                v-model="dataAccessor"
               ></v-select>
             </v-col>
             <v-col lg="12">
               <v-text-field
                 v-if="newChartType?.value === ChartTypeValue.LINE"
-                label="Y Accessor"
-                v-model="yAccessor"
+                label="X Field"
+                v-model="xField"
               ></v-text-field>
-              <v-select
-                v-else
-                label="Y Accessor"
-                :hint="`${key}`"
-                :items="columnOptions"
-                v-model="yAccessor"
-              ></v-select>
+            </v-col>
+            <v-col lg="12">
+              <v-text-field
+                v-if="newChartType?.value === ChartTypeValue.LINE"
+                label="Y Field"
+                v-model="yField"
+              ></v-text-field>
             </v-col>
             <v-col lg="12">
               <v-text-field label="Step" v-model="step"></v-text-field>

@@ -5,6 +5,12 @@ import {
   getLandmarksPerHand,
   type Coordinate3D,
   type Dimensions,
+  foreshadowingLeftC,
+  foreshadowingLeftL,
+  foreshadowingRightC,
+  foreshadowingRightL,
+  openHandGesture,
+  pointingGesture,
 } from "@/utils";
 import { Subject } from "rxjs";
 
@@ -22,14 +28,25 @@ export class GestureTracker {
 
   constructor({
     canvasDimensions,
-    gestures,
+    gestures = [
+      pointingGesture,
+      openHandGesture,
+      foreshadowingLeftL,
+      foreshadowingRightL,
+      foreshadowingLeftC,
+      foreshadowingRightC,
+    ],
   }: {
     canvasDimensions: Dimensions;
-    gestures: any;
+    gestures?: any;
   }) {
     this.canvasDimensions = canvasDimensions;
     this.gestureEstimatorInstance = new fp.GestureEstimator(gestures);
     this.gestureSubject = new Subject<any>();
+  }
+
+  changeCanvasDimensions(canvasDimensions: Dimensions) {
+    this.canvasDimensions = canvasDimensions;
   }
 
   async handleMediaPipeResults(results: Results) {

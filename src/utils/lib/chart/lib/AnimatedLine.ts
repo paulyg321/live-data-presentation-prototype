@@ -1,5 +1,6 @@
-import type { Coordinate2D, Dimensions } from "../../../types";
+import type { Coordinate2D, Dimensions } from "../types";
 import * as d3 from "d3";
+import { drawCircle } from "@/utils";
 
 /*
   TODO:
@@ -27,20 +28,38 @@ export enum AnimationType {
   DISCRETE = "discrete",
 }
 
+export enum LineEffect {
+  DEFAULT = "default",
+  FOCUSED = "focused",
+  BACKGROUND = "background",
+}
+
+export interface AnimatedLineConstructorArgs {
+  states: Coordinate2D[][];
+  xScale: any;
+  yScale: any;
+  chartDimensions: Dimensions;
+  canvasDimensions: Dimensions;
+  duration: number;
+  color?: string;
+  lineWidth?: number;
+  opacity?: number;
+}
+
 export class AnimatedLine {
   states: Coordinate2D[][];
   yScale: any;
   xScale: any;
   currentState: number;
-  canvasBounds: {
-    start: Coordinate2D;
-    end: Coordinate2D;
-  };
+  canvasDimensions: Dimensions;
   chartDimensions: Dimensions;
   duration = 2000;
+  mainColor = "steelblue";
   color = "steelblue";
   lineWidth = 2;
   opacity = 0.7;
+
+  context: CanvasRenderingContext2D | undefined;
 
   constructor({
     states,
@@ -52,27 +71,17 @@ export class AnimatedLine {
     color,
     lineWidth,
     opacity,
-  }: {
-    states: Coordinate2D[][];
-    xScale: any;
-    yScale: any;
-    chartDimensions: Dimensions;
-    canvasDimensions: Dimensions;
-    duration: number;
-    color?: string;
-    lineWidth?: number;
-    opacity?: number;
-  }) {
+  }: AnimatedLineConstructorArgs) {
     this.chartDimensions = chartDimensions;
     this.xScale = xScale;
     this.yScale = yScale;
     this.states = states;
     this.currentState = 0;
-    this.canvasBounds = {
-      start: { x: 0, y: 0 },
-      end: { x: canvasDimensions.width, y: canvasDimensions.height },
-    };
+    this.canvasDimensions = canvasDimensions;
     this.duration = duration;
+    if (color) {
+      this.mainColor = color;
+    }
     this.setLineAppearance({
       color,
       lineWidth,
@@ -80,29 +89,68 @@ export class AnimatedLine {
     });
   }
 
-  private configureLineContextSettings({
-    ctx,
-  }: {
-    ctx: CanvasRenderingContext2D;
-  }) {
-    ctx.lineWidth = this.lineWidth;
-    ctx.globalAlpha = this.opacity;
-    ctx.strokeStyle = this.color;
+  private configureLineContextSettings() {
+    if (this.context) {
+      this.context.lineWidth = this.lineWidth;
+      this.context.globalAlpha = this.opacity;
+      this.context.strokeStyle = this.color;
+    }
   }
 
   private configureLabelContextSettings({
-    ctx,
     variant,
   }: {
-    ctx: CanvasRenderingContext2D;
     variant: "arc" | "text";
   }) {
-    if (variant === "text") {
-      ctx.fillStyle = this.color;
-    } else {
-      ctx.fillStyle = "white";
+    if (this.context) {
+      if (variant === "text") {
+        this.context.fillStyle = this.color;
+        this.context.font = "12px Arial";
+      } else {
+        this.context.fillStyle = "white";
+      }
+      this.context.strokeStyle = this.color;
     }
-    ctx.strokeStyle = this.color;
+  }
+
+  setContext(ctx: CanvasRenderingContext2D) {
+    this.context = ctx;
+  }
+
+  updateState({
+    states,
+    xScale,
+    yScale,
+    chartDimensions,
+    canvasDimensions,
+    duration,
+    color,
+    lineWidth,
+    opacity,
+  }: Partial<AnimatedLineConstructorArgs>) {
+    if (states) {
+      this.states = states;
+    }
+    if (xScale) {
+      this.xScale = xScale;
+    }
+    if (yScale) {
+      this.yScale = yScale;
+    }
+    if (chartDimensions) {
+      this.chartDimensions = chartDimensions;
+    }
+    if (canvasDimensions) {
+      this.canvasDimensions = canvasDimensions;
+    }
+    if (duration) {
+      this.duration = duration;
+    }
+    this.setLineAppearance({
+      color,
+      lineWidth,
+      opacity,
+    });
   }
 
   setLineAppearance({
@@ -125,13 +173,43 @@ export class AnimatedLine {
     }
   }
 
-  clearCanvas({ ctx }: { ctx: CanvasRenderingContext2D }) {
-    ctx.clearRect(
-      this.canvasBounds.start.x,
-      this.canvasBounds.start.y,
-      this.canvasBounds.end.x,
-      this.canvasBounds.end.y
-    );
+  convertLineEffectForContext(lineEffect: LineEffect) {
+    if (lineEffect === LineEffect.FOCUSED) {
+      return {
+        lineWidth: 3,
+        opacity: 0.9,
+        color: this.mainColor,
+      };
+    }
+
+    if (lineEffect === LineEffect.BACKGROUND) {
+      return {
+        lineWidth: 1,
+        opacity: 0.5,
+        color: "grey",
+      };
+    }
+
+    return {
+      lineWidth: 2,
+      opacity: 0.7,
+      color: this.mainColor,
+    };
+  }
+
+  setLineAppearanceFromEffect(lineEffect: LineEffect) {
+    this.setLineAppearance(this.convertLineEffectForContext(lineEffect));
+  }
+
+  clearCanvas() {
+    if (this.context) {
+      this.context.clearRect(
+        0,
+        0,
+        this.canvasDimensions.width,
+        this.canvasDimensions.height
+      );
+    }
   }
 
   lineLength({ data, shape }: { data: [number, number][]; shape?: LineShape }) {
@@ -156,33 +234,29 @@ export class AnimatedLine {
     return totalLength;
   }
 
-  drawLabels(ctx: CanvasRenderingContext2D, points: Coordinate2D[]) {
+  drawLabels(points: Coordinate2D[]) {
     // draw points
     points.forEach((point) => {
-      this.configureLabelContextSettings({ ctx, variant: "text" });
-      ctx.font = "12px Arial";
-      ctx.fillText(
-        `$${Math.round(point.y)}`,
-        this.xScale(point.x) + 10,
-        this.yScale(point.y) + 10
-      );
-      this.configureLabelContextSettings({ ctx, variant: "arc" });
-      ctx.beginPath();
-      ctx.arc(
-        this.xScale(point.x),
-        this.yScale(point.y),
-        5,
-        0,
-        2 * Math.PI,
-        false
-      );
-      ctx.fill();
-      ctx.stroke();
+      if (this.context) {
+        this.configureLabelContextSettings({ variant: "text" });
+        this.context?.fillText(
+          `$${Math.round(point.y)}`,
+          this.xScale(point.x) + 10,
+          this.yScale(point.y) + 10
+        );
+        this.configureLabelContextSettings({ variant: "arc" });
+        drawCircle({
+          context: this.context,
+          coordinates: point,
+          radius: 5,
+          xScale: this.xScale,
+          yScale: this.yScale,
+        });
+      }
     });
   }
 
   draw(
-    ctx: CanvasRenderingContext2D,
     coordinates: Coordinate2D[],
     mode: DrawingMode,
     shape: LineShape,
@@ -190,87 +264,95 @@ export class AnimatedLine {
     endBound = 1,
     startBound = 0
   ) {
-    this.configureLineContextSettings({ ctx });
+    this.configureLineContextSettings();
 
     const data: [number, number][] = coordinates.map((coord) => [
       coord.x,
       coord.y,
     ]);
 
+    // draw line
+    const totalLength = this.lineLength({
+      data,
+      shape,
+    });
+
     let line = d3
       .line()
       .x((d) => this.xScale(d[0]))
       .y((d) => this.yScale(d[1]));
-
     if (shape === LineShape.CURVED) {
       // https://github.com/d3/d3-shape/blob/main/README.md#curves
       line = line.curve(d3.curveBumpX);
     }
 
-    const drawLine = line.context(ctx);
+    if (this.context) {
+      const drawLine = line.context(this.context);
 
-    if (mode === DrawingMode.SEQUENTIAL) {
-      const lineTimer = d3.timer((elapsed: number) => {
-        this.clearCanvas({ ctx });
+      if (mode === DrawingMode.SEQUENTIAL) {
+        const lineTimer = d3.timer((elapsed: number) => {
+          this.clearCanvas();
+          if (beforeClear) {
+            beforeClear();
+          }
+          let boundedTimeStep;
+
+          if (startBound < endBound) {
+            boundedTimeStep = Math.min(
+              elapsed / this.duration + startBound,
+              endBound
+            );
+          } else {
+            boundedTimeStep = Math.max(
+              startBound - elapsed / this.duration,
+              endBound
+            );
+          }
+
+          const maxIndex = Math.round(boundedTimeStep * data.length);
+
+          if (this.context) {
+            this.context.beginPath();
+            this.context.setLineDash([totalLength]);
+            this.context.lineDashOffset = d3.interpolate(
+              totalLength,
+              0
+            )(boundedTimeStep);
+            drawLine(data);
+            this.context.stroke();
+          }
+
+          // Draw points
+          this.drawLabels(coordinates.slice(0, maxIndex));
+
+          if (boundedTimeStep === endBound) {
+            lineTimer.stop();
+          }
+        });
+      } else if (mode === DrawingMode.CONCURRENT) {
+        this.clearCanvas();
         if (beforeClear) {
           beforeClear();
         }
-        let boundedTimeStep;
-
-        if (startBound < endBound) {
-          boundedTimeStep = Math.min(
-            elapsed / this.duration + startBound,
-            endBound
-          );
-        } else {
-          boundedTimeStep = Math.max(
-            startBound - elapsed / this.duration,
-            endBound
-          );
-        }
-
-        const maxIndex = Math.round(boundedTimeStep * data.length);
-
-        // draw line
-        const totalLength = this.lineLength({
-          data,
-          shape,
-        });
-        ctx.beginPath();
-        ctx.setLineDash([totalLength]);
-        ctx.lineDashOffset = d3.interpolate(totalLength, 0)(boundedTimeStep);
+        this.context.setLineDash([totalLength]);
+        this.context.lineDashOffset = d3.interpolate(totalLength, 0)(endBound);
+        this.context.beginPath();
         drawLine(data);
-        ctx.stroke();
-
-        // Draw points
-        this.drawLabels(ctx, coordinates.slice(0, maxIndex));
-
-        if (boundedTimeStep === endBound) {
-          lineTimer.stop();
-        }
-      });
-    } else if (mode === DrawingMode.CONCURRENT) {
-      this.clearCanvas({ ctx });
-      if (beforeClear) {
-        beforeClear();
+        this.context.stroke();
       }
-      ctx.beginPath();
-      drawLine(data);
-      ctx.stroke();
     }
   }
 
   drawCurrentState({
-    ctx,
     bounds,
+    drawingMode = DrawingMode.SEQUENTIAL,
   }: {
-    ctx: CanvasRenderingContext2D;
-    bounds?: { start: number; end: number };
+    bounds?: { start?: number; end: number };
+    drawingMode?: DrawingMode;
   }) {
     this.draw(
-      ctx,
       this.states[this.currentState],
-      DrawingMode.SEQUENTIAL,
+      drawingMode,
       LineShape.CURVED,
       () => void 0,
       bounds?.end,
@@ -280,13 +362,11 @@ export class AnimatedLine {
 
   drawTransitionBetweenStates({
     boundedTimeSteps,
-    ctx,
     transitionFunction,
     currentState,
     nextState,
   }: {
     boundedTimeSteps: number[];
-    ctx: CanvasRenderingContext2D;
     transitionFunction?: (time: number) => number;
     currentState: Coordinate2D[];
     nextState: Coordinate2D[];
@@ -322,13 +402,12 @@ export class AnimatedLine {
       );
 
       this.draw(
-        ctx,
         interPolatedState,
         DrawingMode.CONCURRENT,
         LineShape.CURVED,
         () => {
           if (transitionStep === 1) {
-            this.drawLabels(ctx, nextState);
+            this.drawLabels(nextState);
           }
         }
       );
@@ -362,13 +441,11 @@ export class AnimatedLine {
       );
 
       this.draw(
-        ctx,
         interPolatedState,
         DrawingMode.CONCURRENT,
         LineShape.CURVED,
         () =>
           this.drawLabels(
-            ctx,
             boundedTimeSteps
               .filter((step) => step === 1)
               .map((_, index) => nextState[index])
@@ -378,12 +455,10 @@ export class AnimatedLine {
   }
 
   animateToNextState({
-    ctx,
     playRemainingStates = false,
     transitionFunction,
     mode,
   }: {
-    ctx: CanvasRenderingContext2D;
     playRemainingStates: boolean;
     transitionFunction?: (time: number) => number;
     mode: DrawingMode;
@@ -398,7 +473,6 @@ export class AnimatedLine {
         const boundedTimeStep = Math.min(elapsed / this.duration, 1);
         this.drawTransitionBetweenStates({
           boundedTimeSteps: [boundedTimeStep],
-          ctx,
           transitionFunction,
           currentState: nextStateData.map((coord: Coordinate2D) => ({
             ...coord,
@@ -412,7 +486,6 @@ export class AnimatedLine {
           this.currentState++;
           if (playRemainingStates && moreStatesExist) {
             this.animateToNextState({
-              ctx,
               playRemainingStates,
               transitionFunction,
               mode,
@@ -436,7 +509,6 @@ export class AnimatedLine {
         const boundedTimeStep = Math.min(elapsed / this.duration, 1);
         this.drawTransitionBetweenStates({
           boundedTimeSteps: [boundedTimeStep],
-          ctx,
           transitionFunction,
           currentState: currentStateData,
           nextState: nextStateData,
@@ -447,7 +519,6 @@ export class AnimatedLine {
           this.currentState++;
           if (playRemainingStates && moreStatesExist) {
             this.animateToNextState({
-              ctx,
               playRemainingStates,
               transitionFunction,
               mode,
@@ -478,7 +549,6 @@ export class AnimatedLine {
         const [lastPointTimeStep] = boundedTimeSteps.slice(-1);
         this.drawTransitionBetweenStates({
           boundedTimeSteps,
-          ctx,
           transitionFunction,
           currentState: currentStateData,
           nextState: nextStateData,
@@ -489,7 +559,6 @@ export class AnimatedLine {
           this.currentState++;
           if (playRemainingStates && moreStatesExist) {
             this.animateToNextState({
-              ctx,
               playRemainingStates,
               transitionFunction,
               mode,
@@ -508,7 +577,7 @@ export class AnimatedLine {
       if (!nextStateData) return;
 
       const sequentialDelay = this.duration;
-      this.draw(ctx, nextStateData, DrawingMode.SEQUENTIAL, LineShape.CURVED);
+      this.draw(nextStateData, DrawingMode.SEQUENTIAL, LineShape.CURVED);
       this.currentState++;
 
       const seqTimer = d3.timer((elapsed: number) => {
@@ -518,7 +587,6 @@ export class AnimatedLine {
           const moreStatesExist = this.currentState < lastStateIndex;
           if (playRemainingStates && moreStatesExist) {
             this.animateToNextState({
-              ctx,
               playRemainingStates,
               transitionFunction,
               mode,
@@ -531,12 +599,10 @@ export class AnimatedLine {
   }
 
   animateToPreviousState({
-    ctx,
     playRemainingStates = false,
     transitionFunction,
     mode,
   }: {
-    ctx: CanvasRenderingContext2D;
     playRemainingStates: boolean;
     transitionFunction?: (time: number) => number;
     mode: DrawingMode;
@@ -552,7 +618,6 @@ export class AnimatedLine {
         const boundedTimeStep = Math.min(elapsed / this.duration, 1);
         this.drawTransitionBetweenStates({
           boundedTimeSteps: [boundedTimeStep],
-          ctx,
           transitionFunction,
           // TODO: Make the current state and next state differ by Y position
           currentState: prevStateData.map((coord: Coordinate2D) => ({
@@ -566,7 +631,6 @@ export class AnimatedLine {
           this.currentState--;
           if (playRemainingStates && moreStatesExist) {
             this.animateToPreviousState({
-              ctx,
               playRemainingStates,
               transitionFunction,
               mode,
@@ -592,7 +656,6 @@ export class AnimatedLine {
         const boundedTimeStep = Math.min(elapsed / this.duration, 1);
         this.drawTransitionBetweenStates({
           boundedTimeSteps: [boundedTimeStep],
-          ctx,
           transitionFunction,
           currentState,
           nextState: prevStateData,
@@ -602,7 +665,6 @@ export class AnimatedLine {
           this.currentState--;
           if (playRemainingStates && moreStatesExist) {
             this.animateToPreviousState({
-              ctx,
               playRemainingStates,
               transitionFunction,
               mode,
@@ -621,7 +683,7 @@ export class AnimatedLine {
       if (!prevStateData) return;
 
       const sequentialDelay = this.duration;
-      this.draw(ctx, prevStateData, DrawingMode.SEQUENTIAL, LineShape.CURVED);
+      this.draw(prevStateData, DrawingMode.SEQUENTIAL, LineShape.CURVED);
       this.currentState--;
       const seqTimer = d3.timer((elapsed: number) => {
         const boundedTimeStep = Math.min(elapsed / sequentialDelay, 1);
@@ -630,7 +692,6 @@ export class AnimatedLine {
           this.currentState--;
           if (playRemainingStates && moreStatesExist) {
             this.animateToPreviousState({
-              ctx,
               playRemainingStates,
               transitionFunction,
               mode,
@@ -663,7 +724,6 @@ export class AnimatedLine {
         const [lastPointTimeStep] = boundedTimeSteps.slice(-1);
         this.drawTransitionBetweenStates({
           boundedTimeSteps,
-          ctx,
           transitionFunction,
           currentState: currentState,
           nextState: prevStateData,
@@ -673,7 +733,6 @@ export class AnimatedLine {
           this.currentState--;
           if (playRemainingStates && moreStatesExist) {
             this.animateToNextState({
-              ctx,
               playRemainingStates,
               transitionFunction,
               mode,

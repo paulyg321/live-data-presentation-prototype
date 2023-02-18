@@ -5,10 +5,10 @@ export function drawXAxis(
   context: CanvasRenderingContext2D,
   xScale: any,
   Y: number,
-  xExtent: number[],
+  range: number[],
   fontSize: number,
 ) {
-  const [startX, endX] = xExtent;
+  const [startX, endX] = range;
   const tickSize = 6,
     xTicks = xScale.ticks(), // You may choose tick counts. ex: xScale.ticks(20)
     xTickFormat = xScale.tickFormat(); // you may choose the format. ex: xScale.tickFormat(tickCount, ".0s")
@@ -43,10 +43,10 @@ export function drawYAxis(
   context: CanvasRenderingContext2D,
   yScale: any,
   X: number,
-  yExtent: number[],
+  range: number[],
   fontSize: number,
 ) {
-  const [startY, endY] = yExtent;
+  const [startY, endY] = range;
   const tickPadding = 3,
     tickSize = 6,
     yTicks = yScale.ticks(10),

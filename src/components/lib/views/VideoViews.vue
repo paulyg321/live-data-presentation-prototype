@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from "vue";
+// import { onMounted } from "vue";
 import { CanvasSettings } from "../app-settings/settings-state";
 
 type VideoViewsProps = {
@@ -7,17 +7,14 @@ type VideoViewsProps = {
 };
 const props = defineProps<VideoViewsProps>();
 
-onMounted(() => {
-  CanvasSettings.initializeCanvas("video", true);
-});
 </script>
 
 <template>
   <canvas
-    :width="CanvasSettings.canvasWidth"
-    :height="CanvasSettings.canvasHeight"
+    :width="CanvasSettings.dimensions.width"
+    :height="CanvasSettings.dimensions.height"
     :class="className"
-    :ref="(el) => CanvasSettings.setCanvas(el as HTMLCanvasElement, 'video')"
+    :ref="(el) => CanvasSettings.setCanvas(el, 'video')"
   ></canvas>
 </template>
 

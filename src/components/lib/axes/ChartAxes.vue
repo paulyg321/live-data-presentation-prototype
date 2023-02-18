@@ -1,75 +1,51 @@
 <script setup lang="ts">
-import { drawXAxis, drawYAxis } from "@/utils";
-import { computed, onMounted, ref } from "vue";
-// --- TYPES ---
-type XAxisArgs = {
-  xScale: any;
-  Y: number;
-  xExtent: number[];
-};
-type YAxisArgs = {
-  yScale: any;
-  X: number;
-  yExtent: number[];
-};
+import { clearArea, drawXAxis, drawYAxis } from "@/utils";
+import { onMounted, ref, watchEffect } from "vue";
+import { CanvasSettings, ChartSettings } from "../app-settings/settings-state";
 
-// --- PROPS ---
-const props = defineProps<{
-  xAxis?: XAxisArgs;
-  yAxis?: YAxisArgs;
-  width: number;
-  height: number;
-  chartBounds: {
-    x: {
-      start: number;
-      end: number;
-    };
-    y: {
-      start: number;
-      end: number;
-    };
-  };
-  chartSize: number;
-}>();
+type VideoViewsProps = {
+  className?: string;
+};
+const props = defineProps<VideoViewsProps>();
 
-const canvas = ref<HTMLCanvasElement | null>();
-const canvasCtx = ref<CanvasRenderingContext2D | null>();
-const fontSize = computed(() => {
-  return Math.round(6 + 6 * props.chartSize);
+watchEffect(() => {
+  handleDrawAxes();
 });
 
 function handleDrawAxes() {
-  if (canvasCtx.value) {
-    canvasCtx.value.clearRect(0, 0, props.width, props.height);
-    drawXAxis(
-      canvasCtx.value,
-      props.xAxis?.xScale,
-      props.xAxis?.Y ?? 0,
-      props.xAxis?.xExtent ?? [0, 0],
-      fontSize.value
-    );
+  const fontSize = 11;
+  const currentChart = ChartSettings.currentChart;
+  const context = CanvasSettings.canvasCtx["axes"];
 
-    drawYAxis(
-      canvasCtx.value,
-      props.yAxis?.yScale,
-      props.yAxis?.X ?? 0,
-      props.yAxis?.yExtent ?? [0, 0],
-      fontSize.value
-    );
+  if (currentChart && context) {
+    const { xAxis: xAxisPosition, yAxis: yAxisPosition } =
+      currentChart.getAxesPositions();
+    const { xScale, yScale } = currentChart.getScales();
+    const { xRange, yRange } = currentChart.getRange();
+
+    clearArea({
+      context: context,
+      coordinates: { x: 0, y: 0 },
+      dimensions: CanvasSettings.dimensions,
+    });
+    drawXAxis(context, xScale, xAxisPosition, xRange, fontSize);
+
+    drawYAxis(context, yScale, yAxisPosition, yRange, fontSize);
   }
-  requestAnimationFrame(handleDrawAxes);
 }
 
 onMounted(() => {
-  if (canvas.value) {
-    canvasCtx.value = canvas.value.getContext("2d");
-  }
   handleDrawAxes();
 });
 </script>
 
 <template>
-  <canvas :width="width" :height="height" ref="canvas"></canvas>
+  <canvas
+    :width="CanvasSettings.dimensions.width"
+    :height="CanvasSettings.dimensions.height"
+    :class="className"
+    :ref="(el) => CanvasSettings.setCanvas(el, 'axes', false)"
+  ></canvas>
 </template>
 
 <style></style>

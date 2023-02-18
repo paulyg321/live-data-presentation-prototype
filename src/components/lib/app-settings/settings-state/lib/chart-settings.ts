@@ -1,39 +1,107 @@
 import * as d3 from "d3";
 import { reactive, computed, ref } from "vue";
-import { Chart, DrawingMode } from "@/utils";
+import {
+  Chart,
+  DrawingMode,
+  type Coordinate2D,
+  type Dimensions,
+  type PartialCoordinate2D,
+} from "@/utils";
 
 const initialChartWidth = 400;
 
 export const ChartSettings = reactive<{
-  chartWidth: number;
-  chartHeight: number;
-  changeChartWidth: (value: number) => void;
-  yPosition: number;
-  changeYPosition: (value: number) => void;
-  xPosition: number;
-  changeXPosition: (value: number) => void;
+  dimensions: Dimensions;
+  changeDimensions: (width: number) => void;
+  position: Coordinate2D;
+  changePosition: (coord: PartialCoordinate2D) => void;
   charts: Chart[];
   currentChart?: Chart;
   setCurrentChart: (index: number) => void;
   addChart: (newChart: any) => void;
-  margins: number;
   changeMargins: (margin: number) => void;
   drawingMode: DrawingMode;
   setDrawingMode: (mode: DrawingMode) => void;
+  canvasKeys: string[];
+  setCanvasKeys: () => void;
 }>({
-  chartWidth: initialChartWidth,
-  chartHeight: initialChartWidth * (3 / 4),
-  changeChartWidth(width: number) {
-    this.chartWidth = width;
-    this.chartHeight = width * (3 / 4);
+  canvasKeys: [],
+  setCanvasKeys() {
+    const animatedElements = this.currentChart?.getAnimatedElements();
+
+    if (animatedElements) {
+      this.canvasKeys = Object.keys(animatedElements).reduce(
+        (keys, key: string) => {
+          return [...keys, key, `${key}-legend`];
+        },
+        [] as string[]
+      );
+    }
   },
-  yPosition: 0,
-  changeYPosition(value: number) {
-    this.yPosition = value;
+  dimensions: {
+    width: initialChartWidth,
+    height: initialChartWidth * (3 / 4),
+    margin: {
+      left: 30,
+      right: 30,
+      top: 30,
+      bottom: 30,
+    },
   },
-  xPosition: 0,
-  changeXPosition(value: number) {
-    this.xPosition = value;
+  changeDimensions(width: number) {
+    const newDimensions = {
+      width,
+      height: width * (3 / 4),
+    };
+
+    this.dimensions = newDimensions;
+
+    if (this.currentChart) {
+      this.currentChart.updateState({
+        dimensions: newDimensions,
+      });
+      ChartSettings.currentChart?.draw();
+    }
+  },
+  changeMargins(margin: number) {
+    const newDimensions = {
+      ...this.dimensions,
+      margin: {
+        left: margin,
+        right: margin,
+        top: margin,
+        bottom: margin,
+      },
+    };
+
+    this.dimensions = newDimensions;
+
+    if (this.currentChart) {
+      this.currentChart.updateState({
+        dimensions: newDimensions,
+      });
+      ChartSettings.currentChart?.draw();
+    }
+  },
+  position: {
+    x: 0,
+    y: 0,
+  },
+  changePosition(coords: PartialCoordinate2D) {
+    const newPosition = {
+      ...this.position,
+      ...(coords.x ? { x: coords.x } : {}),
+      ...(coords.y ? { y: coords.y } : {}),
+    };
+
+    this.position = newPosition;
+
+    if (this.currentChart) {
+      this.currentChart.updateState({
+        position: newPosition,
+      });
+      ChartSettings.currentChart?.draw();
+    }
   },
   charts: localStorage.getItem("charts")
     ? JSON.parse(localStorage.getItem("charts") || "")
@@ -44,97 +112,19 @@ export const ChartSettings = reactive<{
     localStorage.setItem("charts", JSON.stringify(this.charts));
   },
   setCurrentChart(index: number) {
-    this.currentChart = new Chart({
+    const currentChart = new Chart({
       ...this.charts[index],
     });
+
+    this.currentChart = currentChart;
+
+    // Effects
+    this.setCanvasKeys();
   },
-  margins: 30,
-  changeMargins(margin: number) {
-    this.margins = margin;
-  },
-  drawingMode: DrawingMode.SEQUENTIAL,
+  drawingMode: DrawingMode.DROP,
   setDrawingMode(mode: DrawingMode) {
     this.drawingMode = mode;
   },
 });
 
 export const animationTrack = ref(1);
-
-export const CHART_DIMENSIONS = computed(() => {
-  return {
-    width: ChartSettings.chartWidth,
-    height: ChartSettings.chartHeight,
-    margin: {
-      left: 30,
-      right: 30,
-      top: 30,
-      bottom: 30,
-    },
-  };
-});
-
-export const CHART_POSITION = computed(() => {
-  return {
-    x: ChartSettings.xPosition,
-    y: ChartSettings.yPosition,
-  };
-});
-
-export const chartBounds = computed(() => {
-  return {
-    x: {
-      start: CHART_POSITION.value.x + CHART_DIMENSIONS.value.margin.left,
-      end:
-        CHART_POSITION.value.x +
-        (CHART_DIMENSIONS.value.width - CHART_DIMENSIONS.value.margin.right),
-    },
-    y: {
-      start:
-        CHART_POSITION.value.y +
-        (CHART_DIMENSIONS.value.height - CHART_DIMENSIONS.value.margin.bottom),
-      end: CHART_POSITION.value.y + CHART_DIMENSIONS.value.margin.top,
-    },
-  };
-});
-
-const xDomain = computed(() => {
-  return ChartSettings.currentChart?.xDomain ?? [0, 11];
-});
-export const xRange = computed(() => {
-  return [chartBounds.value.x.start, chartBounds.value.x.end];
-});
-export const xScale = computed(() => {
-  return d3.scaleLinear(xDomain.value, xRange.value);
-});
-export const xAxisVerticalPos = computed(
-  () =>
-    CHART_POSITION.value.y +
-    (CHART_DIMENSIONS.value.height - CHART_DIMENSIONS.value.margin.top)
-);
-
-export const xAxis = computed(() => ({
-  xScale: xScale.value,
-  Y: xAxisVerticalPos.value,
-  xExtent: xRange.value,
-}));
-
-// ---- Y SCALE FOR AXIS ----
-const yDomain = computed(() => {
-  return ChartSettings.currentChart?.yDomain ?? [0, 100];
-});
-export const yRange = computed(() => [
-  chartBounds.value.y.start,
-  chartBounds.value.y.end,
-]);
-export const yScale = computed(() =>
-  d3.scaleLinear(yDomain.value, yRange.value)
-);
-export const yAxisHorizontalPos = computed(
-  () => CHART_POSITION.value.x + CHART_DIMENSIONS.value.margin.left
-);
-
-export const yAxis = computed(() => ({
-  yScale: yScale.value,
-  X: yAxisHorizontalPos.value,
-  yExtent: yRange.value,
-}));

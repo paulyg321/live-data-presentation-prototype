@@ -9,17 +9,26 @@ import {
 } from "./GestureListener";
 import { SupportedGestures } from "./handGestures";
 
+export interface LinearListenerEmitRange {
+  start: Coordinate2D;
+  end: Coordinate2D;
+}
+
 export interface LinearPlaybackGestureListenerConstructorArgs
   extends GestureListenerConstructorArgs {
-  gestureTypes: {
-    rightHand: SupportedGestures;
-    leftHand: SupportedGestures;
-  }[];
+  emitRange?: LinearListenerEmitRange;
 }
 
 export class LinearPlaybackGestureListener extends GestureListener {
+  static trackingSubjectKey = "trackingSubject";
+  private emitRange:
+    | {
+        start: Coordinate2D;
+        end: Coordinate2D;
+      }
+    | undefined;
   subjects: GestureListenerSubjectMap = {
-    trackingSubject: new Subject(),
+    [LinearPlaybackGestureListener.trackingSubjectKey]: new Subject(),
   };
 
   constructor({
@@ -32,14 +41,20 @@ export class LinearPlaybackGestureListener extends GestureListener {
         leftHand: SupportedGestures.POINTING,
       },
     ],
+    gestureSubject,
+    canvasDimensions,
+    emitRange,
   }: LinearPlaybackGestureListenerConstructorArgs) {
     super({
       position,
       size,
       handsToTrack,
+      gestureTypes,
+      gestureSubject,
+      canvasDimensions,
     });
 
-    this.gestureTypes = gestureTypes;
+    this.emitRange = emitRange;
   }
 
   private ratioTravelledBetweenSpecifiedRange(
@@ -52,8 +67,25 @@ export class LinearPlaybackGestureListener extends GestureListener {
     return (value - range.min) / (range.max - range.min);
   }
 
+  private isWithinEmitRange(
+    value: number,
+    range: {
+      min: number | undefined;
+      max: number | undefined;
+    }
+  ) {
+    if (range.min && range.max) {
+      if (value >= range.min && value <= range.max) {
+        return true;
+      }
+      return false;
+    }
+
+    return true;
+  }
+
   // Implemented to only track one finger and one hand
-  handleNewData(fingerData: {
+  protected handleNewData(fingerData: {
     left?: ProcessedGestureListenerFingerData;
     right?: ProcessedGestureListenerFingerData;
   }): void {
@@ -75,7 +107,13 @@ export class LinearPlaybackGestureListener extends GestureListener {
         return;
       }
 
-      const canEmit = this.isWithinObjectBounds(fingerPosition);
+      const isInBounds = this.isWithinObjectBounds(fingerPosition);
+      const isInEmitRange = this.isWithinEmitRange(fingerPosition.x, {
+        min: this.emitRange?.start.x,
+        max: this.emitRange?.end.x,
+      });
+
+      const canEmit = isInBounds && isInEmitRange;
 
       // EMIT NEW TRACKING VALUE
       if (canEmit) {
@@ -88,6 +126,30 @@ export class LinearPlaybackGestureListener extends GestureListener {
         );
         this.subjects.trackingSubject.next(trackingValue);
       }
+    }
+  }
+
+  updateState({
+    position,
+    size,
+    handsToTrack,
+    emitRange,
+  }: Partial<LinearPlaybackGestureListenerConstructorArgs>): void {
+    super.updateState({
+      position,
+      size,
+      handsToTrack,
+    });
+
+    if (emitRange) {
+      this.emitRange = emitRange;
+    }
+  }
+
+  renderReferencePoints() {
+    if (this.context) {
+      this.clearCanvas();
+      this.renderBorder();
     }
   }
 }

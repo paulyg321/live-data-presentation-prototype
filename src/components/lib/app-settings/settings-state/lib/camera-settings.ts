@@ -55,7 +55,7 @@ watch(
       CanvasSettings.canvasCtx["video"]?.save();
       CanvasSettings.canvasCtx["video"]?.scale(-1, 1);
       CanvasSettings.canvasCtx["video"]?.translate(
-        -CanvasSettings.canvasWidth,
+        -CanvasSettings.dimensions.width,
         0
       );
     } else {
@@ -66,8 +66,8 @@ watch(
 
 export async function setVideoDimensions() {
   if (CameraSettings.video) {
-    CameraSettings.video.width = CanvasSettings.canvasWidth;
-    CameraSettings.video.height = CanvasSettings.canvasHeight; // (3 / 4);
+    CameraSettings.video.width = CanvasSettings.dimensions.width;
+    CameraSettings.video.height = CanvasSettings.dimensions.height; // (3 / 4);
     CameraSettings.video.play();
   }
 }

@@ -1,39 +1,34 @@
-import type { Coordinate2D } from "@/utils";
+import type { Coordinate2D, Dimensions, PartialCoordinate2D } from "@/utils";
 import { reactive } from "vue";
 import { initialCanvasWidth } from "./canvas-settings";
 
 const initialPlaybackComponentWidth = 250;
 
 export const PlaybackComponentSettings = reactive<{
-  xPosition: number;
-  yPosition: number;
-  centerPoint: Coordinate2D;
-  changeXPosition: (value: number) => void;
-  changeYPosition: (value: number) => void;
-  setCenterPoint: (position: Coordinate2D) => void;
-  width: number;
-  height: number;
-  setWidth: (value: number) => void;
+  dimensions: Dimensions;
+  changeDimensions: (width: number) => void;
+  position: Coordinate2D;
+  changePosition: (coord: PartialCoordinate2D) => void;
 }>({
-  xPosition: initialCanvasWidth - initialPlaybackComponentWidth,
-  yPosition: initialCanvasWidth * (3 / 4) - initialPlaybackComponentWidth,
-  centerPoint: {
-    x: initialCanvasWidth - initialPlaybackComponentWidth / 2,
-    y: initialCanvasWidth * (3 / 4) - initialPlaybackComponentWidth / 2,
+  dimensions: {
+    width: initialPlaybackComponentWidth,
+    height: initialPlaybackComponentWidth,
   },
-  changeXPosition(value: number) {
-    this.xPosition = value;
+  changeDimensions(width: number) {
+    this.dimensions = {
+      width: width,
+      height: width,
+    };
   },
-  changeYPosition(value: number) {
-    this.yPosition = value;
+  position: {
+    x: initialCanvasWidth - initialPlaybackComponentWidth,
+    y: initialCanvasWidth * (3 / 4) - initialPlaybackComponentWidth,
   },
-  setCenterPoint(position: Coordinate2D) {
-    this.centerPoint = position;
-  },
-  width: initialPlaybackComponentWidth,
-  height: initialPlaybackComponentWidth,
-  setWidth(value: number) {
-    this.width = value;
-    this.height = value;
+  changePosition(coords: PartialCoordinate2D) {
+    this.position = {
+      ...this.position,
+      ...(coords.x ? { x: coords.x } : {}),
+      ...(coords.y ? { x: coords.y } : {}),
+    };
   },
 });
