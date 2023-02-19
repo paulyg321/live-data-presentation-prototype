@@ -8,8 +8,8 @@ import {
   SupportedGestures,
   type FingerPositionsData,
   type GestureTrackerValues,
-  type TimeoutInstanceArgs,
   type TimerInstanceArgs,
+  type TimeoutInstanceArgs,
 } from "@/utils";
 import type { Timer } from "d3";
 import type { Subject, Subscription } from "rxjs";
@@ -17,7 +17,7 @@ import type { Coordinate2D, Dimensions } from "../../chart";
 
 export interface GestureListenerConstructorArgs {
   position: Coordinate2D;
-  size: Dimensions;
+  dimensions: Dimensions;
   canvasDimensions: Dimensions;
   gestureSubject: Subject<any>;
   handsToTrack?: [HANDS] | [HANDS, HANDS];
@@ -37,7 +37,7 @@ export interface ProcessedGestureListenerFingerData {
 
 export abstract class GestureListener {
   position: Coordinate2D;
-  size: Dimensions;
+  dimensions: Dimensions;
   subjects: GestureListenerSubjectMap | undefined;
   timer: Timer | undefined;
   context: CanvasRenderingContext2D | undefined;
@@ -54,14 +54,14 @@ export abstract class GestureListener {
 
   constructor({
     position,
-    size,
+    dimensions,
     handsToTrack,
     gestureTypes,
     gestureSubject,
     canvasDimensions,
   }: GestureListenerConstructorArgs) {
     this.position = position;
-    this.size = size;
+    this.dimensions = dimensions;
     this.handsToTrack = handsToTrack;
     this.gestureTypes = gestureTypes ?? [];
     // Set up listener for gesture subject
@@ -141,9 +141,13 @@ export abstract class GestureListener {
     }
   }
 
-  protected startTimerInstance({ execute, timeout }: TimerInstanceArgs) {
+  protected startTimerInstance({
+    onCompletion,
+    onTick,
+    timeout,
+  }: TimerInstanceArgs) {
     this.resetTimer();
-    return startTimerInstance({ execute, timeout });
+    return startTimerInstance({ onCompletion, onTick, timeout });
   }
 
   protected startTimeoutInstance({
@@ -159,7 +163,7 @@ export abstract class GestureListener {
       drawRect({
         context: this.context,
         coordinates: this.position,
-        dimensions: this.size,
+        dimensions: this.dimensions,
         stroke: true,
         strokeStyle: "skyblue",
       });
@@ -172,6 +176,16 @@ export abstract class GestureListener {
         context: this.context,
         coordinates: { x: 0, y: 0 },
         dimensions: this.canvasDimensions,
+      });
+    }
+  }
+
+  protected clearListenerArea() {
+    if (this.context) {
+      clearArea({
+        context: this.context,
+        coordinates: this.position,
+        dimensions: this.dimensions,
       });
     }
   }
@@ -198,14 +212,14 @@ export abstract class GestureListener {
 
   updateState({
     position,
-    size,
+    dimensions,
     handsToTrack,
   }: Partial<GestureListenerConstructorArgs>) {
     if (position) {
       this.position = position;
     }
-    if (size) {
-      this.size = size;
+    if (dimensions) {
+      this.dimensions = dimensions;
     }
     if (handsToTrack) {
       this.handsToTrack = handsToTrack;
@@ -227,8 +241,8 @@ export abstract class GestureListener {
   isWithinObjectBounds(position: Coordinate2D) {
     const { x: minX, y: minY } = this.position;
     const { maxX, maxY } = {
-      maxX: this.position.x + this.size.width,
-      maxY: this.position.y + this.size.height,
+      maxX: this.position.x + this.dimensions.width,
+      maxY: this.position.y + this.dimensions.height,
     };
 
     if (

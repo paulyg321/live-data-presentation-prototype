@@ -11,12 +11,14 @@ import {
   type Dimensions,
   drawText,
   drawRect,
+  clearArea,
 } from "@/utils";
 import type { Subject } from "rxjs";
 
 export interface LegendConstructorArgs {
   label: string;
   position: Coordinate2D;
+  canvasDimensions: Dimensions;
   dimensions: Dimensions;
   color: string;
   gestureTracker: GestureTracker;
@@ -30,6 +32,7 @@ export class LegendItem {
   label: string;
   private color: string;
   private position: Coordinate2D;
+  private canvasDimensions: Dimensions;
   private dimensions: Dimensions;
   gestureTracker: GestureTracker;
   legendSubject: Subject<any>;
@@ -47,6 +50,7 @@ export class LegendItem {
     // passing the subject so all legends can share the same subject and push their keys when they're in range
     legendSubject,
     index,
+    canvasDimensions
   }: LegendConstructorArgs) {
     this.dimensions = dimensions;
     this.label = label;
@@ -60,6 +64,7 @@ export class LegendItem {
         this.gestureListener(gestureData);
       },
     });
+    this.canvasDimensions = canvasDimensions;
   }
 
   getPositionFromIndex(position: Coordinate2D) {
@@ -159,6 +164,11 @@ export class LegendItem {
 
   drawLegend() {
     if (this.context) {
+      clearArea({
+        context: this.context,
+        coordinates: { x: 0, y: 0 },
+        dimensions: this.canvasDimensions,
+      });
       drawRect({
         context: this.context,
         coordinates: this.position,
@@ -173,7 +183,7 @@ export class LegendItem {
         context: this.context,
         coordinates: { x: this.position.x + 40, y: this.position.y + 17 },
         text: this.label,
-        font: "20px Arial",
+        fontSize: 20,
         fillStyle: this.color,
       });
     }

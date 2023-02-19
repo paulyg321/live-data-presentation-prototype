@@ -33,7 +33,7 @@ export class LinearPlaybackGestureListener extends GestureListener {
 
   constructor({
     position,
-    size,
+    dimensions,
     handsToTrack = [HANDS.RIGHT],
     gestureTypes = [
       {
@@ -47,7 +47,7 @@ export class LinearPlaybackGestureListener extends GestureListener {
   }: LinearPlaybackGestureListenerConstructorArgs) {
     super({
       position,
-      size,
+      dimensions,
       handsToTrack,
       gestureTypes,
       gestureSubject,
@@ -121,7 +121,7 @@ export class LinearPlaybackGestureListener extends GestureListener {
           fingerPosition.x,
           {
             min: this.position.x,
-            max: this.position.x + this.size.width,
+            max: this.position.x + this.dimensions.width,
           }
         );
         this.subjects.trackingSubject.next(trackingValue);
@@ -131,13 +131,13 @@ export class LinearPlaybackGestureListener extends GestureListener {
 
   updateState({
     position,
-    size,
+    dimensions,
     handsToTrack,
     emitRange,
   }: Partial<LinearPlaybackGestureListenerConstructorArgs>): void {
     super.updateState({
       position,
-      size,
+      dimensions,
       handsToTrack,
     });
 

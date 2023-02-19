@@ -105,6 +105,7 @@ export const LegendSettings = reactive<{
       gestureTracker,
       legendSubject: this.legendSubject,
       index,
+      canvasDimensions: CanvasSettings.dimensions,
     });
     if (context) {
       newLegendItem.setContext(context);

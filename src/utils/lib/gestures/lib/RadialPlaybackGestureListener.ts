@@ -1,6 +1,7 @@
+import _ from "lodash";
 import { Subject } from "rxjs";
 import type { Coordinate2D } from "../../chart";
-import { clearArea, drawCircle } from "../../drawing";
+import { clearArea, drawCircle, drawLine, drawText } from "../../drawing";
 import { HANDS } from "./gesture-utils";
 import {
   GestureListener,
@@ -15,7 +16,8 @@ export enum RadialTrackerMode {
   TRACKING = "tracking",
 }
 
-export interface RadialPlaybackGestureListenerConstructorArgs extends GestureListenerConstructorArgs {
+export interface RadialPlaybackGestureListenerConstructorArgs
+  extends GestureListenerConstructorArgs {
   mode: RadialTrackerMode;
 }
 
@@ -33,7 +35,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
 
   constructor({
     position,
-    size,
+    dimensions,
     handsToTrack = [HANDS.RIGHT],
     gestureTypes = [
       {
@@ -47,7 +49,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
   }: RadialPlaybackGestureListenerConstructorArgs) {
     super({
       position,
-      size,
+      dimensions,
       handsToTrack,
       gestureTypes,
       gestureSubject,
@@ -59,8 +61,8 @@ export class RadialPlaybackGestureListener extends GestureListener {
 
   private getCenterPoint(): Coordinate2D {
     return {
-      x: this.position.x + this.size.width / 2,
-      y: this.position.y + this.size.height / 2,
+      x: this.position.x + this.dimensions.width / 2,
+      y: this.position.y + this.dimensions.height / 2,
     };
   }
 
@@ -79,18 +81,49 @@ export class RadialPlaybackGestureListener extends GestureListener {
   // ----------------- INTERACTIONS WITH CANVAS ----------------------
   private renderState() {
     // TODO: Use this to render visual indicators
-    // this.context.
   }
 
   private renderCenterPoint() {
     const centerPoint = this.getCenterPoint();
+    const fontSize = 60;
     if (this.context) {
+      drawText({
+        context: this.context,
+        coordinates: centerPoint,
+        text: this.rotations.toString(),
+        fillStyle: "skyblue",
+        fontSize,
+        xScale: (value: number) => {
+          return value - fontSize / 4;
+        },
+        yScale: (value: number) => {
+          return value + fontSize / 4;
+        },
+      });
+    }
+  }
+
+  private renderReferenceLine(fingerPosition: Coordinate2D, angle: number) {
+    const centerPoint = this.getCenterPoint();
+    const endAngle = this.angleStack.length > 0 ? angle * (Math.PI / 180) : 0;
+    if (this.context) {
+      this.renderReferencePoints();
+      drawLine({
+        context: this.context,
+        startCoordinates: centerPoint,
+        endCoordinates: fingerPosition,
+        strokeStyle: "skyblue",
+      });
       drawCircle({
         context: this.context,
         coordinates: centerPoint,
-        radius: 5,
-        fillStyle: "skyblue",
-        strokeStyle: "skyblue",
+        radius: this.dimensions.width / 2,
+        startAngle: 0,
+        endAngle,
+        fill: true,
+        fillStyle: "#90EE90",
+        drawLineToCenter: true,
+        opacity: 0.3,
       });
     }
   }
@@ -109,27 +142,34 @@ export class RadialPlaybackGestureListener extends GestureListener {
       this.subjects[
         RadialPlaybackGestureListener.discreteTrackingSubjectKey
       ].next(theta / 360);
-    } else if (theta <= 90 && this.angleStack.length === 0) {
-      this.angleStack.push(theta);
+    } else if (theta <= 90) {
+      if (this.angleStack.length === 4) {
+        this.rotations++;
+        this.angleStack = [];
+      }
 
-      // start timer to empty stack if no rotations are completed
-      const isFirstRotation = this.rotations === 0;
+      if (this.angleStack.length === 0) {
+        this.angleStack.push(theta);
 
-      const executeAfterTimerEnds = () => {
-        if (this.rotations >= 1 && this.mode === RadialTrackerMode.NORMAL) {
-          this.subjects[
-            RadialPlaybackGestureListener.continuousTrackingSubjectKey
-          ].next(true);
-          this.resetAngleState();
+        // start timer to empty stack if no rotations are completed
+        const isFirstRotation = this.rotations === 0;
+
+        const executeAfterTimerEnds = () => {
+          if (this.rotations >= 1 && this.mode === RadialTrackerMode.NORMAL) {
+            this.subjects[
+              RadialPlaybackGestureListener.continuousTrackingSubjectKey
+            ].next(true);
+            this.resetAngleState();
+          }
+          this.timer = undefined;
+        };
+
+        if (isFirstRotation) {
+          this.timer = this.startTimeoutInstance({
+            onCompletion: executeAfterTimerEnds,
+            timeout: 3000,
+          });
         }
-        this.timer = undefined;
-      };
-
-      if (isFirstRotation) {
-        this.timer = this.startTimeoutInstance({
-          onCompletion: executeAfterTimerEnds,
-          timeout: 3000,
-        });
       }
     } else if (theta <= 180 && theta > 90 && this.angleStack.length === 1) {
       this.angleStack.push(theta);
@@ -137,8 +177,6 @@ export class RadialPlaybackGestureListener extends GestureListener {
       this.angleStack.push(theta);
     } else if (theta <= 360 && theta > 270 && this.angleStack.length === 3) {
       this.angleStack.push(theta);
-      this.rotations++;
-      this.angleStack = [];
     }
   }
 
@@ -170,6 +208,10 @@ export class RadialPlaybackGestureListener extends GestureListener {
       if (canEmit) {
         const angle = this.calculateAngleFromCenter(fingerPosition);
         this.handleNewAngle(angle);
+        this.renderReferenceLine(fingerPosition, angle);
+      } else {
+        this.resetAngleState();
+        this.renderReferencePoints();
       }
     }
   }
@@ -180,16 +222,18 @@ export class RadialPlaybackGestureListener extends GestureListener {
       drawCircle({
         context: this.context,
         coordinates: centerPoint,
-        radius: this.size.width / 2,
-        fillStyle: "skyblue",
+        radius: this.dimensions.width / 2,
         strokeStyle: "skyblue",
+        stroke: true,
       });
     }
   }
 
-  renderReferencePoints() {
+  renderReferencePoints(clear = true) {
     if (this.context) {
-      this.clearCanvas();
+      if (clear) {
+        this.clearCanvas();
+      }
       this.renderCenterPoint();
       this.renderBorder();
     }

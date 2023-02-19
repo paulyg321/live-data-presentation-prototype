@@ -26,7 +26,7 @@ export class EmphasisGestureListener extends GestureListener {
 
   constructor({
     position,
-    size,
+    dimensions,
     handsToTrack = [HANDS.RIGHT, HANDS.LEFT],
     gestureTypes = [
       {
@@ -39,7 +39,7 @@ export class EmphasisGestureListener extends GestureListener {
   }: EmphasisGestureListenerConstructorArgs) {
     super({
       position,
-      size,
+      dimensions,
       handsToTrack,
       gestureSubject,
       canvasDimensions,
@@ -77,20 +77,18 @@ export class EmphasisGestureListener extends GestureListener {
       if (canEmit) {
         if (this.timer === undefined) {
           this.timer = this.startTimerInstance({
-            execute: {
-              onTick: () => {
-                if (this.emphasisLevel === 0) {
-                  this.resetTimer();
-                } else {
-                  this.emphasisLevel -= 1;
-                  this.emphasisMeter?.valueHandler(this.emphasisLevel);
-                }
-              },
-              onCompletion: () => {
-                this.emphasisLevel = 0;
-                this.emphasisMeter?.valueHandler(this.emphasisLevel);
+            onTick: () => {
+              if (this.emphasisLevel === 0) {
                 this.resetTimer();
-              },
+              } else {
+                this.emphasisLevel -= 1;
+                this.emphasisMeter?.valueHandler(this.emphasisLevel);
+              }
+            },
+            onCompletion: () => {
+              this.emphasisLevel = 0;
+              this.emphasisMeter?.valueHandler(this.emphasisLevel);
+              this.resetTimer();
             },
             timeout: 20000,
           });

@@ -27,6 +27,12 @@ export const ChartSettings = reactive<{
 }>({
   canvasKeys: [],
   setCanvasKeys() {
+    /**
+     * Get keys of all the lines/chart items to be plotted and create a legend key for them
+     * This gets used to render the canvases needed for the items and their legend items
+     *
+     * the keys are used to access the canvas Contexts using CanvasSettings.canvasCtx[<key>]
+     */
     const animatedElements = this.currentChart?.getAnimatedElements();
 
     if (animatedElements) {

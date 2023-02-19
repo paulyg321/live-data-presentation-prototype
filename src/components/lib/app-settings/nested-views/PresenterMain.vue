@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { DrawingMode, LineEffect, type AnimatedLine } from "@/utils";
+import {
+  DrawingMode,
+  LineEffect,
+  type AnimatedLine,
+  type Coordinate2D,
+  type Dimensions,
+} from "@/utils";
 import { onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import CanvasWrapper from "../../CanvasWrapper.vue";
@@ -16,26 +22,14 @@ import {
   foreshadowingTracker,
   foreshadowingTrackerSubject,
   LegendSettings,
+  gestureCanvasKeys,
+  foreshadowingAreaSubject,
 } from "../settings-state";
 import * as d3 from "d3";
 import VideoViews from "../../views/VideoViews.vue";
 
 const route = useRoute();
 ChartSettings.setCurrentChart(parseInt(route.params.id as string));
-
-/**
- * Get keys of all the lines/chart items to be plotted and create a legend key for them
- * This gets used to render the canvases needed for the items and their legend items
- *
- * the keys are used to access the canvas Contexts using CanvasSettings.canvasCtx[<key>]
- */
-const canvasKeys = Object.keys(
-  ChartSettings.currentChart?.getAnimatedElements() ?? {}
-).reduce((keys, key: string) => {
-  return [...keys, key, `${key}-legend`];
-}, [] as string[]);
-
-const gestureCanvasKeys = ["dialing", "emphasis", "foreshadowing"];
 
 const checkedLines = ref<string[]>([]);
 
@@ -69,6 +63,26 @@ foreshadowingTrackerSubject.value?.subscribe({
   },
 });
 
+foreshadowingAreaSubject.value?.subscribe({
+  next(foreshadowingArea: { position: Coordinate2D; dimensions: Dimensions }) {
+    Object.entries(
+      ChartSettings.currentChart?.getAnimatedElements() ?? {}
+    ).forEach(([key, value]: [string, AnimatedLine]) => {
+      if (checkedLines.value.length > 0 && checkedLines.value.includes(key)) {
+        value.setForeshadowingArea(foreshadowingArea);
+        if (CanvasSettings.canvasCtx[key]) {
+          value.drawCurrentState({
+            bounds: {
+              end: animationTrack.value,
+            },
+            drawingMode: DrawingMode.CONCURRENT,
+          });
+        }
+      }
+    });
+  },
+});
+
 radialContinuousTrackerSubject.value?.subscribe({
   next(value: any) {
     if (value === true) {
@@ -80,7 +94,7 @@ radialContinuousTrackerSubject.value?.subscribe({
 watch(checkedLines, () => {
   Object.entries(
     ChartSettings.currentChart?.getAnimatedElements() ?? {}
-  ).forEach(([key, value]: any) => {
+  ).forEach(([key, value]: [string, AnimatedLine]) => {
     let lineEffect = LineEffect.DEFAULT;
     if (checkedLines.value.length > 0) {
       if (checkedLines.value.includes(key)) {
@@ -92,7 +106,6 @@ watch(checkedLines, () => {
 
     value.setLineAppearanceFromEffect(lineEffect);
     value.drawCurrentState({
-      ctx: CanvasSettings.canvasCtx[key],
       bounds: {
         end: animationTrack.value,
       },
@@ -251,7 +264,7 @@ onMounted(() => {
         <VideoViews :className="className" />
         <ChartAxes :className="className" />
         <canvas
-          v-for="key in [...canvasKeys, ...gestureCanvasKeys]"
+          v-for="key in [...ChartSettings.canvasKeys, ...gestureCanvasKeys]"
           v-bind:key="key"
           :width="CanvasSettings.dimensions.width"
           :height="CanvasSettings.dimensions.height"

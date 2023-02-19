@@ -1,26 +1,27 @@
 import * as d3 from "d3";
 
 export interface TimerInstanceArgs {
-  execute: {
-    onTick?: () => void;
-    onCompletion?: () => void;
-  };
+  onTick?: () => void;
+  onCompletion?: () => void;
   timeout: number;
 }
 
-export interface TimeoutInstanceArgs {
-  onCompletion: () => void;
-  timeout: number;
-}
+export type TimeoutInstanceArgs = Required<
+  Pick<TimerInstanceArgs, "onCompletion" | "timeout">
+>;
 
-export function startTimerInstance({ execute, timeout }: TimerInstanceArgs) {
+export function startTimerInstance({
+  onCompletion,
+  onTick,
+  timeout,
+}: TimerInstanceArgs) {
   function handler(elapsed: number) {
     const boundedTimeStep = Math.min(elapsed / timeout, 1);
 
-    if (execute.onTick) execute.onTick();
+    if (onTick) onTick();
 
     if (boundedTimeStep === 1) {
-      if (execute.onCompletion) execute.onCompletion();
+      if (onCompletion) onCompletion();
     }
   }
 

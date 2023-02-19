@@ -1,3 +1,4 @@
+import { drawCircle, drawLine, drawRect } from "@/utils";
 import { Subject } from "rxjs";
 import {
   calculateDistance,
@@ -42,9 +43,11 @@ export interface ForeshadowingShapePosition {
 
 export class ForeshadowingGestureListener extends GestureListener {
   static trackingSubjectKey = "trackingSubject";
+  static foreshadowingAreaSubjectKey = "foreshadowingAreaSubject";
 
   subjects: GestureListenerSubjectMap = {
     [ForeshadowingGestureListener.trackingSubjectKey]: new Subject(),
+    [ForeshadowingGestureListener.foreshadowingAreaSubjectKey]: new Subject(),
   };
 
   private initialShapePositions: ForeshadowingShapePosition | undefined;
@@ -56,7 +59,7 @@ export class ForeshadowingGestureListener extends GestureListener {
 
   constructor({
     position,
-    size,
+    dimensions,
     handsToTrack = [HANDS.RIGHT, HANDS.LEFT],
     gestureTypes = [
       {
@@ -77,7 +80,7 @@ export class ForeshadowingGestureListener extends GestureListener {
   }: ForeshadowingGestureListenerConstructorArgs) {
     super({
       position,
-      size,
+      dimensions,
       handsToTrack,
       gestureSubject,
       canvasDimensions,
@@ -127,8 +130,8 @@ export class ForeshadowingGestureListener extends GestureListener {
               this.recentRangePositions.rightFingerPosition.y
             ),
           },
-          size: {
-            width: this.size.width,
+          dimensions: {
+            width: this.dimensions.width,
             height: 50,
           },
           emitRange: {
@@ -145,8 +148,8 @@ export class ForeshadowingGestureListener extends GestureListener {
               this.recentRangePositions.rightFingerPosition.y
             ),
           },
-          size: {
-            width: this.size.width,
+          dimensions: {
+            width: this.dimensions.width,
             height: 50,
           },
           gestureSubject: this.gestureSubject,
@@ -309,57 +312,82 @@ export class ForeshadowingGestureListener extends GestureListener {
 
   private drawVisualIndicator(shape: ForeshadowingShapes) {
     if (this.context) {
-      this.context.fillStyle = "#EE4B2B";
-      this.context.globalAlpha = 0.5;
-      this.context.clearRect(
-        this.position.x,
-        this.position.y,
-        this.size.width,
-        this.size.height
-      );
+      const fillStyle = "#EE4B2B";
+      const opacity = 0.5;
+
+      this.clearCanvas();
 
       if (
         shape === ForeshadowingShapes.RECTANGLE &&
         this.recentShapePositions
       ) {
-        this.context?.fillRect(
-          this.recentShapePositions.rightIndex.x,
-          this.recentShapePositions.rightThumb.y,
-          this.recentShapePositions.rightThumb.x -
+        const rectDimensions = {
+          width:
+            this.recentShapePositions.rightThumb.x -
             this.recentShapePositions.rightIndex.x,
-          this.recentShapePositions.rightIndex.y -
-            this.recentShapePositions.rightThumb.y
-        );
+          height:
+            this.recentShapePositions.rightIndex.y -
+            this.recentShapePositions.rightThumb.y,
+        };
+        const rectCoordinates = {
+          x: this.recentShapePositions.rightIndex.x,
+          y: this.recentShapePositions.rightThumb.y,
+        };
+
+        drawRect({
+          context: this.context,
+          coordinates: rectCoordinates,
+          dimensions: rectDimensions,
+          stroke: true,
+          strokeStyle: fillStyle,
+          opacity,
+        });
+
+        this.subjects[
+          ForeshadowingGestureListener.foreshadowingAreaSubjectKey
+        ].next({
+          position: rectCoordinates,
+          dimensions: rectDimensions,
+        });
       }
       if (shape === ForeshadowingShapes.CIRCLE && this.recentShapePositions) {
         const circleRadius =
           (this.recentShapePositions.rightThumb.y -
             this.recentShapePositions.rightIndex.y) /
           2;
-        this.context?.beginPath();
-        this.context?.arc(
-          this.recentShapePositions.rightIndex.x,
-          this.recentShapePositions.rightIndex.y + circleRadius,
-          circleRadius,
-          0,
-          2 * Math.PI,
-          false
-        );
-        this.context?.fill();
+        const circlePosition = {
+          x: this.recentShapePositions.rightIndex.x,
+          y: this.recentShapePositions.rightIndex.y + circleRadius,
+        };
+        drawCircle({
+          context: this.context,
+          radius: circleRadius,
+          coordinates: circlePosition,
+          fill: true,
+          fillStyle,
+          opacity,
+        });
       }
 
       if (shape === ForeshadowingShapes.RANGE && this.recentRangePositions) {
-        this.context.lineWidth = 15;
-        this.context?.beginPath();
-        this.context?.moveTo(
-          this.recentRangePositions.leftFingerPosition.x,
-          this.recentRangePositions.leftFingerPosition.y
-        );
-        this.context?.lineTo(
-          this.recentRangePositions.rightFingerPosition.x,
-          this.recentRangePositions.rightFingerPosition.y
-        );
-        this.context?.stroke();
+        const lineWidth = 15;
+        const startCoordinates = {
+          x: this.recentRangePositions.leftFingerPosition.x,
+          y: this.recentRangePositions.leftFingerPosition.y,
+        };
+
+        const endCoordinates = {
+          x: this.recentRangePositions.rightFingerPosition.x,
+          y: this.recentRangePositions.rightFingerPosition.y,
+        };
+
+        drawLine({
+          context: this.context,
+          startCoordinates,
+          endCoordinates,
+          lineWidth,
+          strokeStyle: fillStyle,
+        });
       }
     }
   }

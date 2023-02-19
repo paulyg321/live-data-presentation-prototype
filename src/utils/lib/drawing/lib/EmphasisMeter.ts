@@ -70,7 +70,6 @@ export class EmphasisMeter {
         },
         fillStyle,
         fill: true,
-        stroke: false,
       });
     }
   }

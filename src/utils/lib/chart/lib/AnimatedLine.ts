@@ -1,6 +1,13 @@
 import type { Coordinate2D, Dimensions } from "../types";
 import * as d3 from "d3";
-import { drawCircle } from "@/utils";
+import {
+  clearArea,
+  drawCircle,
+  drawLine,
+  drawRect,
+  drawText,
+  modifyContextStyleAndDraw,
+} from "@/utils";
 
 /*
   TODO:
@@ -60,6 +67,9 @@ export class AnimatedLine {
   opacity = 0.7;
 
   context: CanvasRenderingContext2D | undefined;
+  foreshadowingArea:
+    | { position: Coordinate2D; dimensions: Dimensions }
+    | undefined;
 
   constructor({
     states,
@@ -115,6 +125,17 @@ export class AnimatedLine {
 
   setContext(ctx: CanvasRenderingContext2D) {
     this.context = ctx;
+  }
+
+  setForeshadowingArea(
+    foreshadowingArea:
+      | {
+          position: Coordinate2D;
+          dimensions: Dimensions;
+        }
+      | undefined
+  ) {
+    this.foreshadowingArea = foreshadowingArea;
   }
 
   updateState({
@@ -212,17 +233,26 @@ export class AnimatedLine {
     }
   }
 
-  lineLength({ data, shape }: { data: [number, number][]; shape?: LineShape }) {
+  lineLength({
+    coordinates,
+    shape,
+  }: {
+    coordinates: Coordinate2D[];
+    shape?: LineShape;
+  }) {
     function dist(x1: number, y1: number, x2: number, y2: number) {
       return Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2));
     }
 
     let totalLength = 0;
-    for (let i = 0; i < data.length - 1; i++) {
-      const [x1, y1] = [this.xScale(data[i][0]), this.yScale(data[i][1])];
+    for (let i = 0; i < coordinates.length - 1; i++) {
+      const [x1, y1] = [
+        this.xScale(coordinates[i].x),
+        this.yScale(coordinates[i].y),
+      ];
       const [x2, y2] = [
-        this.xScale(data[i + 1][0]),
-        this.yScale(data[i + 1][1]),
+        this.xScale(coordinates[i + 1].x),
+        this.yScale(coordinates[i + 1].y),
       ];
       if (shape === LineShape.CURVED) {
         totalLength += dist(x1, y1, x2, y2) * 1.2;
@@ -239,11 +269,14 @@ export class AnimatedLine {
     points.forEach((point) => {
       if (this.context) {
         this.configureLabelContextSettings({ variant: "text" });
-        this.context?.fillText(
-          `$${Math.round(point.y)}`,
-          this.xScale(point.x) + 10,
-          this.yScale(point.y) + 10
-        );
+        drawText({
+          context: this.context,
+          coordinates: {
+            x: this.xScale(point.x) + 10,
+            y: this.yScale(point.y) + 10,
+          },
+          text: `$${Math.round(point.y)}`,
+        });
         this.configureLabelContextSettings({ variant: "arc" });
         drawCircle({
           context: this.context,
@@ -251,9 +284,34 @@ export class AnimatedLine {
           radius: 5,
           xScale: this.xScale,
           yScale: this.yScale,
+          stroke: true,
+          fill: true,
         });
       }
     });
+  }
+
+  drawForeshadow(drawFn: () => void) {
+    if (this.context && this.foreshadowingArea) {
+      const settings = {
+        context: this.context,
+        lineWidth: 5,
+      };
+      this.context.save();
+      clearArea({
+        context: this.context,
+        dimensions: this.foreshadowingArea?.dimensions,
+        coordinates: this.foreshadowingArea?.position,
+      });
+      drawRect({
+        context: this.context,
+        coordinates: this.foreshadowingArea?.position,
+        dimensions: this.foreshadowingArea?.dimensions,
+        clip: true,
+      });
+      modifyContextStyleAndDraw(settings, drawFn);
+      this.context.restore();
+    }
   }
 
   draw(
@@ -265,22 +323,17 @@ export class AnimatedLine {
     startBound = 0
   ) {
     this.configureLineContextSettings();
-
-    const data: [number, number][] = coordinates.map((coord) => [
-      coord.x,
-      coord.y,
-    ]);
-
     // draw line
     const totalLength = this.lineLength({
-      data,
+      coordinates,
       shape,
     });
 
     let line = d3
-      .line()
-      .x((d) => this.xScale(d[0]))
-      .y((d) => this.yScale(d[1]));
+      .line<Coordinate2D>()
+      .x((d: Coordinate2D) => this.xScale(d.x))
+      .y((d: Coordinate2D) => this.yScale(d.y));
+
     if (shape === LineShape.CURVED) {
       // https://github.com/d3/d3-shape/blob/main/README.md#curves
       line = line.curve(d3.curveBumpX);
@@ -288,6 +341,11 @@ export class AnimatedLine {
 
     if (this.context) {
       const drawLine = line.context(this.context);
+      const drawFn = () => {
+        this.context?.beginPath();
+        drawLine(coordinates);
+        this.context?.stroke();
+      };
 
       if (mode === DrawingMode.SEQUENTIAL) {
         const lineTimer = d3.timer((elapsed: number) => {
@@ -309,36 +367,41 @@ export class AnimatedLine {
             );
           }
 
-          const maxIndex = Math.round(boundedTimeStep * data.length);
+          const maxIndex = Math.round(boundedTimeStep * coordinates.length);
 
           if (this.context) {
-            this.context.beginPath();
             this.context.setLineDash([totalLength]);
             this.context.lineDashOffset = d3.interpolate(
               totalLength,
               0
             )(boundedTimeStep);
-            drawLine(data);
-            this.context.stroke();
+            drawFn();
+            // Draw points
+            this.drawLabels(coordinates.slice(0, maxIndex));
+            this.drawForeshadow(() => {
+              drawFn();
+              this.drawLabels(coordinates.slice(0, maxIndex));
+            });
           }
-
-          // Draw points
-          this.drawLabels(coordinates.slice(0, maxIndex));
 
           if (boundedTimeStep === endBound) {
             lineTimer.stop();
           }
         });
       } else if (mode === DrawingMode.CONCURRENT) {
+        const maxIndex = Math.round(endBound * coordinates.length);
         this.clearCanvas();
         if (beforeClear) {
           beforeClear();
         }
         this.context.setLineDash([totalLength]);
         this.context.lineDashOffset = d3.interpolate(totalLength, 0)(endBound);
-        this.context.beginPath();
-        drawLine(data);
-        this.context.stroke();
+        drawFn();
+        this.drawLabels(coordinates.slice(0, maxIndex));
+        this.drawForeshadow(() => {
+          drawFn();
+          this.drawLabels(coordinates.slice(0, maxIndex));
+        });
       }
     }
   }

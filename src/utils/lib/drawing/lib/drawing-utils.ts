@@ -2,43 +2,50 @@ import type { Coordinate2D, Dimensions } from "../../chart";
 
 const defaultScale = (value: any) => value;
 
-export interface DrawCircleArgs {
+interface DrawingArgs {
   context: CanvasRenderingContext2D;
   coordinates: Coordinate2D;
+  xScale?: (value: any) => number;
+  yScale?: (value: any) => number;
+  fill?: boolean;
+  stroke?: boolean;
+  strokeStyle?: string;
+  fillStyle?: string;
+  opacity?: number;
+  clip?: boolean;
+}
+
+export interface ModifyContextStyleArgs {
+  context: CanvasRenderingContext2D;
+  strokeStyle?: string;
+  fillStyle?: string;
+  fontSize?: number;
+  opacity?: number;
+  lineWidth?: number;
+}
+
+export interface DrawCircleArgs extends DrawingArgs {
   radius: number;
   startAngle?: number;
   endAngle?: number;
-  xScale?: (value: any) => number;
-  yScale?: (value: any) => number;
-  fill?: boolean;
-  stroke?: boolean;
-  strokeStyle?: string;
-  fillStyle?: string;
+  drawLineToCenter?: boolean;
 }
 
-export interface DrawRectArgs {
-  context: CanvasRenderingContext2D;
-  coordinates: Coordinate2D;
+export interface DrawRectArgs extends DrawingArgs {
   dimensions: Dimensions;
-  xScale?: (value: any) => number;
-  yScale?: (value: any) => number;
-  fill?: boolean;
-  stroke?: boolean;
-  strokeStyle?: string;
-  fillStyle?: string;
 }
 
-export interface DrawTextArgs {
-  context: CanvasRenderingContext2D;
-  coordinates: Coordinate2D;
+export interface DrawTextArgs extends DrawingArgs {
   text: string;
-  xScale?: (value: any) => number;
-  yScale?: (value: any) => number;
-  font?: string;
-  fill?: boolean;
-  stroke?: boolean;
+  fontSize?: number;
+}
+
+export interface DrawLineArgs {
+  context: CanvasRenderingContext2D;
+  startCoordinates: Coordinate2D;
+  endCoordinates: Coordinate2D;
   strokeStyle?: string;
-  fillStyle?: string;
+  lineWidth?: number;
 }
 
 export function drawText({
@@ -47,29 +54,32 @@ export function drawText({
   text,
   xScale = defaultScale,
   yScale = defaultScale,
-  font,
+  fontSize,
   fill = true,
   stroke = false,
   strokeStyle,
   fillStyle,
+  opacity,
 }: DrawTextArgs) {
-  context.save();
-
-  modifyContextStyle({
+  const settings = {
     context,
     fillStyle,
     strokeStyle,
-    font,
-  });
+    fontSize,
+    opacity,
+  };
 
-  if (fill) {
-    context.fillText(text, xScale(coordinates.x), yScale(coordinates.y));
+  function drawFn() {
+    if (fill) {
+      context.fillText(text, xScale(coordinates.x), yScale(coordinates.y));
+    }
+
+    if (stroke) {
+      context.strokeText(text, xScale(coordinates.x), yScale(coordinates.y));
+    }
   }
 
-  if (stroke) {
-    context.strokeText(text, xScale(coordinates.x), yScale(coordinates.y));
-  }
-  context.restore();
+  modifyContextStyleAndDraw(settings, drawFn);
 }
 
 export function drawCircle({
@@ -81,37 +91,72 @@ export function drawCircle({
   xScale = defaultScale,
   yScale = defaultScale,
   fill = false,
-  stroke = true,
+  stroke = false,
+  clip = false,
   strokeStyle,
   fillStyle,
+  drawLineToCenter = false,
+  opacity,
 }: DrawCircleArgs) {
-  context.save();
-
-  modifyContextStyle({
+  const settings = {
     context,
     fillStyle,
     strokeStyle,
-  });
+    opacity,
+  };
 
-  context.beginPath();
-  context.arc(
-    xScale(coordinates.x),
-    yScale(coordinates.y),
-    radius,
-    startAngle,
-    endAngle,
-    false
-  );
+  function drawFn() {
+    context.beginPath();
+    context.arc(
+      xScale(coordinates.x),
+      yScale(coordinates.y),
+      radius,
+      startAngle,
+      endAngle,
+      false
+    );
 
-  if (fill) {
-    context.fill();
-  }
+    if (drawLineToCenter) {
+      context.lineTo(xScale(coordinates.x), yScale(coordinates.y));
+    }
 
-  if (stroke) {
+    if (clip) {
+      context.clip();
+    }
+
+    if (fill) {
+      context.fill();
+    }
+
+    if (stroke) {
+      context.stroke();
+    }
+  };
+
+  modifyContextStyleAndDraw(settings, drawFn);
+}
+
+export function drawLine({
+  context,
+  startCoordinates,
+  endCoordinates,
+  strokeStyle,
+  lineWidth,
+}: DrawLineArgs) {
+  const settings = {
+    context,
+    strokeStyle,
+    lineWidth,
+  };
+
+  function drawFn() {
+    context.beginPath();
+    context.moveTo(startCoordinates.x, startCoordinates.y);
+    context.lineTo(endCoordinates.x, endCoordinates.y);
     context.stroke();
-  }
+  };
 
-  context.restore();
+  modifyContextStyleAndDraw(settings, drawFn);
 }
 
 export function drawRect({
@@ -121,36 +166,51 @@ export function drawRect({
   xScale = defaultScale,
   yScale = defaultScale,
   fill = false,
-  stroke = true,
+  stroke = false,
+  clip = false,
   strokeStyle,
   fillStyle,
+  opacity,
 }: DrawRectArgs) {
-  context.save();
 
-  modifyContextStyle({
+  if (clip) {
+    context.beginPath();
+    context.rect(
+      xScale(coordinates.x),
+      yScale(coordinates.y),
+      dimensions.width,
+      dimensions.height
+    );
+    context.clip();
+    return;
+  }
+
+  const settings = {
     context,
     fillStyle,
     strokeStyle,
-  });
+    opacity,
+  };
 
-  if (fill) {
-    context.fillRect(
-      xScale(coordinates.x),
-      yScale(coordinates.y),
-      dimensions.width,
-      dimensions.height
-    );
-  }
+  function drawFn() {
+    if (fill) {
+      context.fillRect(
+        xScale(coordinates.x),
+        yScale(coordinates.y),
+        dimensions.width,
+        dimensions.height
+      );
+    } else if (stroke) {
+      context.strokeRect(
+        xScale(coordinates.x),
+        yScale(coordinates.y),
+        dimensions.width,
+        dimensions.height
+      );
+    }
+  };
 
-  if (stroke) {
-    context.strokeRect(
-      xScale(coordinates.x),
-      yScale(coordinates.y),
-      dimensions.width,
-      dimensions.height
-    );
-  }
-  context.restore();
+  modifyContextStyleAndDraw(settings, drawFn);
 }
 
 export function clearArea({
@@ -174,17 +234,15 @@ export function clearArea({
   );
 }
 
-export function modifyContextStyle({
-  context,
-  fillStyle,
-  strokeStyle,
-  font,
-}: {
-  context: CanvasRenderingContext2D;
-  strokeStyle?: string;
-  fillStyle?: string;
-  font?: string;
-}) {
+export function modifyContextStyleAndDraw(
+  settings: ModifyContextStyleArgs,
+  drawFn: () => void
+) {
+  const { context, fillStyle, strokeStyle, fontSize, opacity, lineWidth } =
+    settings;
+
+  context.save();
+
   if (fillStyle) {
     context.fillStyle = fillStyle;
   }
@@ -193,7 +251,19 @@ export function modifyContextStyle({
     context.strokeStyle = strokeStyle;
   }
 
-  if (font) {
-    context.font = font;
+  if (fontSize) {
+    context.font = `${fontSize}px Arial`;
   }
+
+  if (opacity) {
+    context.globalAlpha = opacity;
+  }
+
+  if (lineWidth) {
+    context.lineWidth = lineWidth;
+  }
+
+  drawFn();
+
+  context.restore();
 }
