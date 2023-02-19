@@ -68,16 +68,23 @@ foreshadowingAreaSubject.value?.subscribe({
     Object.entries(
       ChartSettings.currentChart?.getAnimatedElements() ?? {}
     ).forEach(([key, value]: [string, AnimatedLine]) => {
-      if (checkedLines.value.length > 0 && checkedLines.value.includes(key)) {
+      // Sets foreshdowing area for the chart item
+      const triggerForeshadow = () => {
         value.setForeshadowingArea(foreshadowingArea);
-        if (CanvasSettings.canvasCtx[key]) {
-          value.drawCurrentState({
-            bounds: {
-              end: animationTrack.value,
-            },
-            drawingMode: DrawingMode.CONCURRENT,
-          });
+        value.drawCurrentState({
+          bounds: {
+            end: animationTrack.value,
+          },
+          drawingMode: DrawingMode.CONCURRENT,
+        });
+      };
+
+      if (checkedLines.value.length > 0) {
+        if (checkedLines.value.includes(key)) {
+          triggerForeshadow();
         }
+      } else {
+        triggerForeshadow();
       }
     });
   },

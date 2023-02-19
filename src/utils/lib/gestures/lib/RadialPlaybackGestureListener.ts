@@ -1,13 +1,13 @@
 import _ from "lodash";
 import { Subject } from "rxjs";
 import type { Coordinate2D } from "../../chart";
-import { clearArea, drawCircle, drawLine, drawText } from "../../drawing";
+import { drawCircle, drawLine, drawText } from "../../drawing";
 import { HANDS } from "./gesture-utils";
 import {
   GestureListener,
   type GestureListenerConstructorArgs,
   type GestureListenerSubjectMap,
-  type ProcessedGestureListenerFingerData,
+  type ListenerProcessedFingerData,
 } from "./GestureListener";
 import { SupportedGestures } from "./handGestures";
 
@@ -36,7 +36,10 @@ export class RadialPlaybackGestureListener extends GestureListener {
   constructor({
     position,
     dimensions,
-    handsToTrack = [HANDS.RIGHT],
+    handsToTrack = {
+      dominant: HANDS.RIGHT,
+      nonDominant: HANDS.LEFT,
+    },
     gestureTypes = [
       {
         rightHand: SupportedGestures.POINTING,
@@ -137,6 +140,29 @@ export class RadialPlaybackGestureListener extends GestureListener {
     this.angleStack = [];
   }
 
+  renderBorder() {
+    const centerPoint = this.getCenterPoint();
+    if (this.context) {
+      drawCircle({
+        context: this.context,
+        coordinates: centerPoint,
+        radius: this.dimensions.width / 2,
+        strokeStyle: "skyblue",
+        stroke: true,
+      });
+    }
+  }
+
+  renderReferencePoints(clear = true) {
+    if (this.context) {
+      if (clear) {
+        this.clearCanvas();
+      }
+      this.renderCenterPoint();
+      this.renderBorder();
+    }
+  }
+
   private handleNewAngle(theta: number) {
     if (this.rotations >= 1 && this.mode === RadialTrackerMode.TRACKING) {
       this.subjects[
@@ -181,61 +207,33 @@ export class RadialPlaybackGestureListener extends GestureListener {
   }
 
   // Implemented to only track one finger and one hand
-  protected handleNewData(fingerData: {
-    left?: ProcessedGestureListenerFingerData;
-    right?: ProcessedGestureListenerFingerData;
-  }): void {
-    let dominantHand;
+  protected handleNewData(fingerData: ListenerProcessedFingerData): void {
+    const dominantHand = fingerData[this.handsToTrack.dominant];
+    const nonDominantHand = fingerData[this.handsToTrack.nonDominant];
 
-    if (fingerData.left) {
-      dominantHand = fingerData.left;
-    } else if (fingerData.right) {
-      dominantHand = fingerData.right;
+    // Don't want non dominant hand in the frame
+    if (!dominantHand || nonDominantHand) {
+      return;
     }
 
-    if (dominantHand) {
-      const [fingerToTrack] = dominantHand.fingersToTrack;
-      const fingerPosition = dominantHand.fingerPositions[
-        fingerToTrack
-      ] as Coordinate2D;
+    const [fingerToTrack] = dominantHand.fingersToTrack;
+    const fingerPosition = dominantHand.fingerPositions[
+      fingerToTrack
+    ] as Coordinate2D;
 
-      if (fingerPosition.x === undefined || fingerPosition.y === undefined) {
-        return;
-      }
-
-      const canEmit = this.isWithinObjectBounds(fingerPosition);
-
-      if (canEmit) {
-        const angle = this.calculateAngleFromCenter(fingerPosition);
-        this.handleNewAngle(angle);
-        this.renderReferenceLine(fingerPosition, angle);
-      } else {
-        this.resetAngleState();
-        this.renderReferencePoints();
-      }
+    if (fingerPosition.x === undefined || fingerPosition.y === undefined) {
+      return;
     }
-  }
 
-  renderBorder() {
-    const centerPoint = this.getCenterPoint();
-    if (this.context) {
-      drawCircle({
-        context: this.context,
-        coordinates: centerPoint,
-        radius: this.dimensions.width / 2,
-        strokeStyle: "skyblue",
-        stroke: true,
-      });
-    }
-  }
+    const canEmit = this.isWithinObjectBounds(fingerPosition);
 
-  renderReferencePoints(clear = true) {
-    if (this.context) {
-      if (clear) {
-        this.clearCanvas();
-      }
-      this.renderCenterPoint();
-      this.renderBorder();
+    if (canEmit) {
+      const angle = this.calculateAngleFromCenter(fingerPosition);
+      this.handleNewAngle(angle);
+      this.renderReferenceLine(fingerPosition, angle);
+    } else {
+      this.resetAngleState();
+      this.renderReferencePoints();
     }
   }
 }

@@ -15,12 +15,21 @@ import type { Timer } from "d3";
 import type { Subject, Subscription } from "rxjs";
 import type { Coordinate2D, Dimensions } from "../../chart";
 
+export type ListenerProcessedFingerData = Record<
+  HANDS,
+  ProcessedGestureListenerFingerData | undefined
+>;
+
 export interface GestureListenerConstructorArgs {
   position: Coordinate2D;
   dimensions: Dimensions;
   canvasDimensions: Dimensions;
   gestureSubject: Subject<any>;
-  handsToTrack?: [HANDS] | [HANDS, HANDS];
+  // Ordered from most dominant to least dominant
+  handsToTrack?: {
+    dominant: HANDS;
+    nonDominant: HANDS;
+  };
   gestureTypes?: {
     rightHand: SupportedGestures;
     leftHand: SupportedGestures;
@@ -43,7 +52,14 @@ export abstract class GestureListener {
   context: CanvasRenderingContext2D | undefined;
   canvasDimensions: Dimensions;
   chartDimensions: Dimensions | undefined;
-  handsToTrack: undefined | [HANDS] | [HANDS, HANDS];
+  // Ordered from most dominant to least dominant
+  handsToTrack: {
+    dominant: HANDS;
+    nonDominant: HANDS;
+  } = {
+    dominant: HANDS.RIGHT,
+    nonDominant: HANDS.LEFT,
+  };
   gestureTypes:
     | {
         rightHand: SupportedGestures;
@@ -62,7 +78,9 @@ export abstract class GestureListener {
   }: GestureListenerConstructorArgs) {
     this.position = position;
     this.dimensions = dimensions;
-    this.handsToTrack = handsToTrack;
+    if (handsToTrack) {
+      this.handsToTrack = handsToTrack;
+    }
     this.gestureTypes = gestureTypes ?? [];
     // Set up listener for gesture subject
     this.gestureSubject = gestureSubject;
@@ -72,10 +90,9 @@ export abstract class GestureListener {
     this.canvasDimensions = canvasDimensions;
   }
 
-  protected abstract handleNewData(fingerData: {
-    left?: ProcessedGestureListenerFingerData;
-    right?: ProcessedGestureListenerFingerData;
-  }): void;
+  protected abstract handleNewData(
+    fingerData: ListenerProcessedFingerData
+  ): void;
 
   abstract renderReferencePoints(): void;
 
@@ -234,7 +251,7 @@ export abstract class GestureListener {
     this.canvasDimensions = dimensions;
   }
 
-  setHandsToTrack(hands: [HANDS, HANDS]) {
+  setHandsToTrack(hands: { dominant: HANDS; nonDominant: HANDS }) {
     this.handsToTrack = hands;
   }
 
@@ -276,30 +293,22 @@ export abstract class GestureListener {
         rightHand: SupportedGestures;
         leftHand: SupportedGestures;
       }) => {
-        if (this.handsToTrack?.includes(HANDS.RIGHT)) {
-          rightHandData = GestureListener.convertGestureAndLandmarksToPositions(
-            {
-              landmarkData: rightHandLandmarks,
-              gestureData: rightHandGestures,
-              gestureType: gestureType.rightHand,
-            }
-          );
-        }
+        rightHandData = GestureListener.convertGestureAndLandmarksToPositions({
+          landmarkData: rightHandLandmarks,
+          gestureData: rightHandGestures,
+          gestureType: gestureType.rightHand,
+        });
 
-        if (this.handsToTrack?.includes(HANDS.LEFT)) {
-          leftHandData = GestureListener.convertGestureAndLandmarksToPositions({
-            landmarkData: leftHandLandmarks,
-            gestureData: leftHandGestures,
-            gestureType: gestureType.leftHand,
-          });
-        }
+        leftHandData = GestureListener.convertGestureAndLandmarksToPositions({
+          landmarkData: leftHandLandmarks,
+          gestureData: leftHandGestures,
+          gestureType: gestureType.leftHand,
+        });
 
-        if (rightHandData || leftHandData) {
-          this.handleNewData({
-            right: rightHandData,
-            left: leftHandData,
-          });
-        }
+        this.handleNewData({
+          [HANDS.RIGHT]: rightHandData,
+          [HANDS.LEFT]: leftHandData,
+        });
       }
     );
   }

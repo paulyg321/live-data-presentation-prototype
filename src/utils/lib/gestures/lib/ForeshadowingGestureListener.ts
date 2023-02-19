@@ -10,7 +10,7 @@ import {
   GestureListener,
   type GestureListenerConstructorArgs,
   type GestureListenerSubjectMap,
-  type ProcessedGestureListenerFingerData,
+  type ListenerProcessedFingerData,
 } from "./GestureListener";
 import { SupportedGestures } from "./handGestures";
 import { LinearPlaybackGestureListener } from "./LinearPlaybackGestureListener";
@@ -60,7 +60,10 @@ export class ForeshadowingGestureListener extends GestureListener {
   constructor({
     position,
     dimensions,
-    handsToTrack = [HANDS.RIGHT, HANDS.LEFT],
+    handsToTrack = {
+      dominant: HANDS.RIGHT,
+      nonDominant: HANDS.LEFT,
+    },
     gestureTypes = [
       {
         rightHand: SupportedGestures.FORESHADOWING_RIGHT_L,
@@ -239,77 +242,6 @@ export class ForeshadowingGestureListener extends GestureListener {
     return false;
   }
 
-  private handleRangeGesture(fingerData: {
-    left: ProcessedGestureListenerFingerData;
-    right: ProcessedGestureListenerFingerData;
-  }) {
-    const [leftFingerToTrack] = fingerData.left.fingersToTrack;
-    const leftFingerPosition = fingerData.left.fingerPositions[
-      leftFingerToTrack
-    ] as Coordinate2D;
-
-    const [rightFingerToTrack] = fingerData.right.fingersToTrack;
-    const rightFingerPosition = fingerData.right.fingerPositions[
-      rightFingerToTrack
-    ] as Coordinate2D;
-
-    if (
-      leftFingerPosition.x === undefined ||
-      leftFingerPosition.y === undefined ||
-      rightFingerPosition.x === undefined ||
-      rightFingerPosition.y === undefined
-    ) {
-      throw new Error(
-        "handleRangeGesture - one of the finger positions is undefined"
-      );
-    }
-
-    const newRangePosition = {
-      leftFingerPosition,
-      rightFingerPosition,
-    } as ForeshadowingRangePosition;
-
-    const leftFingerInRange = this.isWithinObjectBounds(leftFingerPosition);
-    const rightFingerInRange = this.isWithinObjectBounds(rightFingerPosition);
-
-    const canEmit = leftFingerInRange && rightFingerInRange;
-
-    // EMIT NEW TRACKING VALUE
-    if (canEmit) {
-      if (!this.timer) {
-        this.initialRangePositions = newRangePosition;
-        this.currentShape = ForeshadowingShapes.RANGE;
-        this.timer = this.startTimeoutInstance({
-          onCompletion: () => {
-            if (this.initialRangePositions && this.recentRangePositions) {
-              const diffs = distanceBetweenPoints(
-                Object.values(this.initialRangePositions),
-                Object.values(this.recentRangePositions)
-              ).map((diff: any) => diff.euclideanDistance);
-
-              if (!containsValueLargerThanMax(diffs, 30)) {
-                if (this.context) {
-                  if (this.currentShape === ForeshadowingShapes.RANGE) {
-                    if (this.currentShape) {
-                      this.drawVisualIndicator(this.currentShape);
-                      this.placeListenerInPosition();
-                    }
-                  }
-
-                  this.resetRangeGestureState();
-                }
-              }
-            }
-            this.timer = undefined;
-          },
-          timeout: 1000,
-        });
-      } else {
-        this.recentRangePositions = newRangePosition;
-      }
-    }
-  }
-
   private drawVisualIndicator(shape: ForeshadowingShapes) {
     if (this.context) {
       const fillStyle = "#EE4B2B";
@@ -392,25 +324,111 @@ export class ForeshadowingGestureListener extends GestureListener {
     }
   }
 
-  private handleShapeGesture(fingerData: {
-    left: ProcessedGestureListenerFingerData;
-    right: ProcessedGestureListenerFingerData;
-  }) {
+  renderReferencePoints() {
+    if (this.context) {
+      this.clearCanvas();
+      this.renderBorder();
+    }
+  }
+
+  private handleRangeGesture(fingerData: ListenerProcessedFingerData) {
+    const leftHandData = fingerData[HANDS.LEFT];
+    const rightHandData = fingerData[HANDS.RIGHT];
+
+    if (!leftHandData || !rightHandData) {
+      return;
+    }
+
+    const [leftFingerToTrack] = leftHandData.fingersToTrack;
+    const leftFingerPosition = leftHandData.fingerPositions[
+      leftFingerToTrack
+    ] as Coordinate2D;
+
+    const [rightFingerToTrack] = rightHandData.fingersToTrack;
+    const rightFingerPosition = rightHandData.fingerPositions[
+      rightFingerToTrack
+    ] as Coordinate2D;
+
+    if (
+      leftFingerPosition.x === undefined ||
+      leftFingerPosition.y === undefined ||
+      rightFingerPosition.x === undefined ||
+      rightFingerPosition.y === undefined
+    ) {
+      throw new Error(
+        "handleRangeGesture - one of the finger positions is undefined"
+      );
+    }
+
+    const newRangePosition = {
+      leftFingerPosition,
+      rightFingerPosition,
+    } as ForeshadowingRangePosition;
+
+    const leftFingerInRange = this.isWithinObjectBounds(leftFingerPosition);
+    const rightFingerInRange = this.isWithinObjectBounds(rightFingerPosition);
+
+    const canEmit = leftFingerInRange && rightFingerInRange;
+
+    // EMIT NEW TRACKING VALUE
+    if (canEmit) {
+      if (!this.timer) {
+        this.initialRangePositions = newRangePosition;
+        this.currentShape = ForeshadowingShapes.RANGE;
+        this.timer = this.startTimeoutInstance({
+          onCompletion: () => {
+            if (this.initialRangePositions && this.recentRangePositions) {
+              const diffs = distanceBetweenPoints(
+                Object.values(this.initialRangePositions),
+                Object.values(this.recentRangePositions)
+              ).map((diff: any) => diff.euclideanDistance);
+
+              if (!containsValueLargerThanMax(diffs, 30)) {
+                if (this.context) {
+                  if (this.currentShape === ForeshadowingShapes.RANGE) {
+                    if (this.currentShape) {
+                      this.drawVisualIndicator(this.currentShape);
+                      this.placeListenerInPosition();
+                    }
+                  }
+
+                  this.resetRangeGestureState();
+                }
+              }
+            }
+            this.timer = undefined;
+          },
+          timeout: 1000,
+        });
+      } else {
+        this.recentRangePositions = newRangePosition;
+      }
+    }
+  }
+
+  private handleShapeGesture(fingerData: ListenerProcessedFingerData) {
+    const leftHandData = fingerData[HANDS.LEFT];
+    const rightHandData = fingerData[HANDS.RIGHT];
+
+    if (!leftHandData || !rightHandData) {
+      return;
+    }
+
     const [leftIndexLandmarkId, leftThumbLandmarkId] =
-      fingerData.left.fingersToTrack;
-    const leftIndex = fingerData.left.fingerPositions[
+      leftHandData.fingersToTrack;
+    const leftIndex = leftHandData.fingerPositions[
       leftIndexLandmarkId
     ] as Coordinate2D;
-    const leftThumb = fingerData.left.fingerPositions[
+    const leftThumb = leftHandData.fingerPositions[
       leftThumbLandmarkId
     ] as Coordinate2D;
 
     const [rightIndexLandmarkId, rightThumbLandmarkId] =
-      fingerData.right.fingersToTrack;
-    const rightIndex = fingerData.right.fingerPositions[
+      rightHandData.fingersToTrack;
+    const rightIndex = rightHandData.fingerPositions[
       rightIndexLandmarkId
     ] as Coordinate2D;
-    const rightThumb = fingerData.right.fingerPositions[
+    const rightThumb = rightHandData.fingerPositions[
       rightThumbLandmarkId
     ] as Coordinate2D;
 
@@ -482,31 +500,29 @@ export class ForeshadowingGestureListener extends GestureListener {
     }
   }
 
-  // Implemented to only track one finger and one hand
-  protected handleNewData(fingerData: {
-    left?: ProcessedGestureListenerFingerData;
-    right?: ProcessedGestureListenerFingerData;
-  }): void {
-    if (fingerData.left && fingerData.right) {
-      const { match, type } = this.verifyGesturesMatch({
-        left: fingerData.left?.detectedGesture,
-        right: fingerData.right?.detectedGesture,
-      });
+  protected handleNewData(fingerData: ListenerProcessedFingerData): void {
+    /**
+     * NOTE: Don't use this.handsToTrack for emphasis as each hands needs to perform
+     * the exact gesture we want so dominant and non dominant hand concept doesn't apply here
+     */
+    const rightHand = fingerData[HANDS.RIGHT];
+    const leftHand = fingerData[HANDS.LEFT];
 
-      if (match) {
-        if (type === ForeshadowingType.RANGE) {
-          this.handleRangeGesture(fingerData as Required<typeof fingerData>);
-        } else if (type === ForeshadowingType.SHAPE) {
-          this.handleShapeGesture(fingerData as Required<typeof fingerData>);
-        }
-      }
+    if (!rightHand || !leftHand) {
+      return;
     }
-  }
 
-  renderReferencePoints() {
-    if (this.context) {
-      this.clearCanvas();
-      this.renderBorder();
+    const { match, type } = this.verifyGesturesMatch({
+      left: leftHand.detectedGesture,
+      right: rightHand.detectedGesture,
+    });
+
+    if (match) {
+      if (type === ForeshadowingType.RANGE) {
+        this.handleRangeGesture(fingerData);
+      } else if (type === ForeshadowingType.SHAPE) {
+        this.handleShapeGesture(fingerData);
+      }
     }
   }
 }

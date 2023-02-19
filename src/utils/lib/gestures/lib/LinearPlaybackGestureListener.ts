@@ -5,7 +5,7 @@ import {
   GestureListener,
   type GestureListenerConstructorArgs,
   type GestureListenerSubjectMap,
-  type ProcessedGestureListenerFingerData,
+  type ListenerProcessedFingerData,
 } from "./GestureListener";
 import { SupportedGestures } from "./handGestures";
 
@@ -34,7 +34,10 @@ export class LinearPlaybackGestureListener extends GestureListener {
   constructor({
     position,
     dimensions,
-    handsToTrack = [HANDS.RIGHT],
+    handsToTrack = {
+      dominant: HANDS.RIGHT,
+      nonDominant: HANDS.LEFT,
+    },
     gestureTypes = [
       {
         rightHand: SupportedGestures.POINTING,
@@ -84,51 +87,6 @@ export class LinearPlaybackGestureListener extends GestureListener {
     return true;
   }
 
-  // Implemented to only track one finger and one hand
-  protected handleNewData(fingerData: {
-    left?: ProcessedGestureListenerFingerData;
-    right?: ProcessedGestureListenerFingerData;
-  }): void {
-    let dominantHand;
-
-    if (fingerData.left) {
-      dominantHand = fingerData.left;
-    } else if (fingerData.right) {
-      dominantHand = fingerData.right;
-    }
-
-    if (dominantHand) {
-      const [fingerToTrack] = dominantHand.fingersToTrack;
-      const fingerPosition = dominantHand.fingerPositions[
-        fingerToTrack
-      ] as Coordinate2D;
-
-      if (fingerPosition.x === undefined || fingerPosition.y === undefined) {
-        return;
-      }
-
-      const isInBounds = this.isWithinObjectBounds(fingerPosition);
-      const isInEmitRange = this.isWithinEmitRange(fingerPosition.x, {
-        min: this.emitRange?.start.x,
-        max: this.emitRange?.end.x,
-      });
-
-      const canEmit = isInBounds && isInEmitRange;
-
-      // EMIT NEW TRACKING VALUE
-      if (canEmit) {
-        const trackingValue = this.ratioTravelledBetweenSpecifiedRange(
-          fingerPosition.x,
-          {
-            min: this.position.x,
-            max: this.position.x + this.dimensions.width,
-          }
-        );
-        this.subjects.trackingSubject.next(trackingValue);
-      }
-    }
-  }
-
   updateState({
     position,
     dimensions,
@@ -151,5 +109,45 @@ export class LinearPlaybackGestureListener extends GestureListener {
       this.clearCanvas();
       this.renderBorder();
     }
+  }
+
+  protected handleNewData(fingerData: ListenerProcessedFingerData): void {
+    const dominantHand = fingerData[this.handsToTrack.dominant];
+    const nonDominantHand = fingerData[this.handsToTrack.nonDominant];
+
+    // Don't want non dominant hand in the frame
+    if (!dominantHand || nonDominantHand) {
+      return;
+    }
+
+    const [fingerToTrack] = dominantHand.fingersToTrack;
+    const fingerPosition = dominantHand.fingerPositions[
+      fingerToTrack
+    ] as Coordinate2D;
+
+    if (fingerPosition.x === undefined || fingerPosition.y === undefined) {
+      return;
+    }
+
+    const isInBounds = this.isWithinObjectBounds(fingerPosition);
+    const isInEmitRange = this.isWithinEmitRange(fingerPosition.x, {
+      min: this.emitRange?.start.x,
+      max: this.emitRange?.end.x,
+    });
+
+    const canEmit = isInBounds && isInEmitRange;
+
+    if (!canEmit) {
+      return;
+    }
+
+    const trackingValue = this.ratioTravelledBetweenSpecifiedRange(
+      fingerPosition.x,
+      {
+        min: this.position.x,
+        max: this.position.x + this.dimensions.width,
+      }
+    );
+    this.subjects.trackingSubject.next(trackingValue);
   }
 }
