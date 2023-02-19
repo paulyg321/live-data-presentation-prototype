@@ -1,12 +1,14 @@
+import type { Handedness } from "@mediapipe/hands";
 import {
   calculateAngleBetweenPoints,
   calculateDistance,
 } from "../../calculations";
-import { CLASSES, type PredictionObject } from "../../teachable-machine";
+import type { Dimensions } from "../../chart";
+import { POSES, type PredictionObject } from "../../teachable-machine";
 import type {
   MultiHandednessObject,
   ParsedLandmarksObject,
-} from "../types/media-pipe.d";
+} from "../types/lib/media-pipe";
 import { HAND_LANDMARK_IDS } from "./constants";
 
 export function mirrorLandmarkHorizontally(
@@ -16,12 +18,11 @@ export function mirrorLandmarkHorizontally(
   return width - horizontalPosition;
 }
 
-export function getLeftVsRightIndex(multiHandedness: MultiHandednessObject[]) {
+export function getLeftVsRightIndex(multiHandedness: Handedness[]) {
   return {
     right: multiHandedness.reduce(
       (rightHandIndex: number | undefined, handedness, index) => {
-        // In mediapipe 0 is for the left hand but it's inverted so left is right
-        if (handedness.index === 0) {
+        if (handedness.label === "Left") {
           return index;
         }
         return rightHandIndex;
@@ -30,8 +31,7 @@ export function getLeftVsRightIndex(multiHandedness: MultiHandednessObject[]) {
     ),
     left: multiHandedness.reduce(
       (leftHandIndex: number | undefined, handedness, index) => {
-        // In mediapipe 1 is for the left hand but it's inverted so right is left
-        if (handedness.index === 1) {
+        if (handedness.label === "Right") {
           return index;
         }
         return leftHandIndex;
@@ -45,7 +45,7 @@ export function validateCurrentPose(
   canvasCtx: CanvasRenderingContext2D,
   predictions: PredictionObject[],
   multiHandLandmarks: any,
-  chartDimensions: { width: number; height: number },
+  canvasDimensions: Dimensions,
   multiHandedness: MultiHandednessObject[]
 ) {
   const handIndices = getLeftVsRightIndex(multiHandedness);
@@ -56,78 +56,121 @@ export function validateCurrentPose(
       }
       return maxPrediction;
     },
-    { className: CLASSES.NONE, probability: -Infinity } as PredictionObject
+    { className: POSES.NONE, probability: -Infinity } as PredictionObject
   );
 
+  const { leftHandLandmarks, rightHandLandmarks, numHands } =
+    getLandmarksPerHand(canvasDimensions, multiHandLandmarks, handIndices);
+
   let validatedPose;
-  switch (currentPose.className) {
-    case CLASSES.PLAYBACK:
-      validatedPose = validatePlayback(
-        canvasCtx,
-        multiHandLandmarks,
-        chartDimensions,
-        handIndices
-      );
-      break;
-    case CLASSES.EMPHASIS:
-      validatedPose = validateEmphasis(
-        canvasCtx,
-        multiHandLandmarks,
-        chartDimensions,
-        handIndices,
-        CLASSES.EMPHASIS
-      );
-      break;
-    case CLASSES.NONE:
-    default:
-      validatedPose = CLASSES.NONE;
-      break;
+
+  if (numHands === 1) {
+    validatedPose = validatePointing(leftHandLandmarks, rightHandLandmarks);
+  } else if (numHands === 2) {
+    switch (currentPose.className) {
+      case POSES.PLAYBACK:
+        validatedPose = validatePlayback(leftHandLandmarks, rightHandLandmarks);
+        break;
+      case POSES.EMPHASIS:
+        validatedPose = validateEmphasis(
+          POSES.EMPHASIS,
+          leftHandLandmarks,
+          rightHandLandmarks
+        );
+        break;
+      case POSES.NONE:
+      default:
+        validatedPose = {
+          class: POSES.NONE,
+          left: leftHandLandmarks,
+          right: rightHandLandmarks,
+        };
+        break;
+    }
+  } else {
+    validatedPose = {
+      class: POSES.NONE,
+      left: leftHandLandmarks,
+      right: rightHandLandmarks,
+    };
   }
   return validatedPose;
 }
 
-function validatePlayback(
-  canvasCtx: CanvasRenderingContext2D,
-  multiHandLandmarks: any,
-  chartDimensions: { width: number; height: number },
-  handIndices: any
-) {
-  // 8, 5, 0 indicate landmarks on the index finger tip (8), MCP joint of the index finger (5), wrist (0)
-  const LANDMARKS_TO_VALIDATE = [
-    HAND_LANDMARK_IDS.index_finger_tip,
-    HAND_LANDMARK_IDS.index_finger_mcp,
-    HAND_LANDMARK_IDS.wrist,
-  ];
+function validatePointing(leftHandLandmarks: any, rightHandLandmarks: any) {
+  // const LANDMARKS_TO_VALIDATE = [
+  //   HAND_LANDMARK_IDS.index_finger_tip,
+  //   HAND_LANDMARK_IDS.index_finger_mcp,
+  //   HAND_LANDMARK_IDS.middle_finger_tip,
+  //   HAND_LANDMARK_IDS.middle_finger_mcp,
+  // ];
 
-  // Verify left hand is pointing
-  if (handIndices.left !== undefined && handIndices.right !== undefined) {
-    const leftHandLandmarks = multiHandLandmarks[handIndices.left];
-
-    const parsedLandmarks: ParsedLandmarksObject = LANDMARKS_TO_VALIDATE.reduce(
-      (parsedLandmarks, landmark) => {
-        const x = chartDimensions.width * leftHandLandmarks[landmark].x;
-        const y = chartDimensions.height * leftHandLandmarks[landmark].y;
-        canvasCtx.beginPath();
-        canvasCtx.arc(x, y, 5, 0, 2 * Math.PI, false);
-        // canvasCtx.arc(rightX, rightY, 5, 0, 2 * Math.PI, false);
-        canvasCtx.fillStyle = "red";
-        canvasCtx.fill();
-        parsedLandmarks[landmark] = {
-          x: mirrorLandmarkHorizontally(chartDimensions.width, x),
-          y,
-        };
-
-        return parsedLandmarks;
-      },
-      {} as ParsedLandmarksObject
-    );
-
-    if (isCorrectPlaybackSelectionHandLandmark(parsedLandmarks)) {
-      return CLASSES.PLAYBACK;
+  if (leftHandLandmarks) {
+    if (isCorrectPointingLandmark(leftHandLandmarks)) {
+      return {
+        class: POSES.POINTING,
+        left: leftHandLandmarks,
+        right: rightHandLandmarks,
+      };
     }
-  } else {
-    return CLASSES.NONE;
+
+    return {
+      class: POSES.NONE,
+      left: leftHandLandmarks,
+      right: rightHandLandmarks,
+    };
   }
+
+  if (rightHandLandmarks) {
+    if (isCorrectPointingLandmark(rightHandLandmarks)) {
+      return {
+        class: POSES.POINTING,
+        left: leftHandLandmarks,
+        right: rightHandLandmarks,
+      };
+    }
+  }
+
+  return {
+    class: POSES.NONE,
+    left: leftHandLandmarks,
+    right: rightHandLandmarks,
+  };
+}
+
+function isCorrectPointingLandmark(parsedLandmarks: ParsedLandmarksObject) {
+  if (
+    parsedLandmarks[HAND_LANDMARK_IDS.index_finger_tip].y <
+      parsedLandmarks[HAND_LANDMARK_IDS.index_finger_mcp].y &&
+    parsedLandmarks[HAND_LANDMARK_IDS.middle_finger_tip].y >
+      parsedLandmarks[HAND_LANDMARK_IDS.middle_finger_mcp].y
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function validatePlayback(leftHandLandmarks: any, rightHandLandmarks: any) {
+  // const LANDMARKS_TO_VALIDATE = [
+  //   HAND_LANDMARK_IDS.index_finger_tip,
+  //   HAND_LANDMARK_IDS.index_finger_mcp,
+  //   HAND_LANDMARK_IDS.wrist,
+  // ];
+
+  if (isCorrectPlaybackSelectionHandLandmark(leftHandLandmarks)) {
+    return {
+      class: POSES.PLAYBACK,
+      left: leftHandLandmarks,
+      right: rightHandLandmarks,
+    };
+  }
+
+  return {
+    class: POSES.NONE,
+    left: leftHandLandmarks,
+    right: rightHandLandmarks,
+  };
 }
 
 function isCorrectPlaybackSelectionHandLandmark(
@@ -153,67 +196,33 @@ function isCorrectPlaybackSelectionHandLandmark(
 }
 
 function validateEmphasis(
-  canvasCtx: CanvasRenderingContext2D,
-  multiHandLandmarks: any,
-  chartDimensions: { width: number; height: number },
-  handIndices: any,
-  type: string
+  type: string,
+  leftHandLandmarks: any,
+  rightHandLandmarks: any
 ) {
-  const LANDMARKS_TO_VALIDATE = [
-    HAND_LANDMARK_IDS.middle_finger_tip,
-    HAND_LANDMARK_IDS.wrist,
-  ];
-
-  if (handIndices.left === undefined || handIndices.right === undefined) {
-    return CLASSES.NONE;
-  }
-
-  const leftHandLandmarks = multiHandLandmarks[handIndices.left];
-  const rightHandLandmarks = multiHandLandmarks[handIndices.right];
-
-  const parsedLandmarks: {
-    left: ParsedLandmarksObject;
-    right: ParsedLandmarksObject;
-  } = LANDMARKS_TO_VALIDATE.reduce(
-    (parsedLandmarks, landmark) => {
-      const leftX = chartDimensions.width * leftHandLandmarks[landmark].x;
-      const leftY = chartDimensions.height * leftHandLandmarks[landmark].y;
-      const rightX = chartDimensions.width * rightHandLandmarks[landmark].x;
-      const rightY = chartDimensions.height * rightHandLandmarks[landmark].y;
-
-      canvasCtx.beginPath();
-      canvasCtx.arc(leftX, leftY, 5, 0, 2 * Math.PI, false);
-      // canvasCtx.arc(rightX, rightY, 5, 0, 2 * Math.PI, false);
-      canvasCtx.fillStyle = "red";
-      canvasCtx.fill();
-
-      parsedLandmarks.left[landmark] = {
-        x: mirrorLandmarkHorizontally(chartDimensions.width, leftX),
-        y: leftY,
-      };
-      parsedLandmarks.right[landmark] = {
-        x: chartDimensions.width - rightX,
-        y: rightY,
-      };
-
-      return parsedLandmarks;
-    },
-    { left: {}, right: {} } as {
-      left: ParsedLandmarksObject;
-      right: ParsedLandmarksObject;
-    }
-  );
+  // const LANDMARKS_TO_VALIDATE = [
+  //   HAND_LANDMARK_IDS.middle_finger_tip,
+  //   HAND_LANDMARK_IDS.wrist,
+  // ];
 
   if (
     isCorrectInitiateEmphasisHandLandmark({
-      leftHand: parsedLandmarks.left,
-      rightHand: parsedLandmarks.right,
+      leftHand: leftHandLandmarks,
+      rightHand: rightHandLandmarks,
     })
   ) {
-    return type;
+    return {
+      class: type,
+      left: leftHandLandmarks,
+      right: rightHandLandmarks,
+    };
   }
 
-  return CLASSES.NONE;
+  return {
+    class: POSES.NONE,
+    left: leftHandLandmarks,
+    right: rightHandLandmarks,
+  };
 }
 
 // Ensure right landmarks to validate is setup
@@ -250,8 +259,8 @@ function isCorrectInitiateEmphasisHandLandmark({
     );
 
     if (
-      handDistance.horizontalDistance < 400 &&
-      handDistance.verticalDistance < 300
+      handDistance.horizontalDistance.value < 400 &&
+      handDistance.verticalDistance.value < 300
     ) {
       return true;
     }
@@ -259,4 +268,93 @@ function isCorrectInitiateEmphasisHandLandmark({
   }
 
   return false;
+}
+
+export function scaleLandmarksToCanvas({
+  landmarks,
+  canvasDimensions,
+  indices,
+  mirror = true,
+}: {
+  landmarks: any;
+  canvasDimensions: Dimensions;
+  indices?: number[];
+  mirror?: boolean;
+}) {
+  if (indices && indices.length > 0) {
+    const processedLandmarks = [...landmarks];
+
+    indices.forEach((index: number) => {
+      processedLandmarks[index] = {
+        // mirror because the video the prediction is being detected on is flipped
+        x: mirror
+          ? mirrorLandmarkHorizontally(
+              canvasDimensions.width,
+              canvasDimensions.width * processedLandmarks[index].x
+            )
+          : processedLandmarks[index].x,
+        y: canvasDimensions.height * processedLandmarks[index].y,
+        z: processedLandmarks[index].z,
+      };
+    });
+
+    return processedLandmarks;
+  }
+
+  return landmarks.map((landmark: any) => {
+    return {
+      x: mirror
+        ? mirrorLandmarkHorizontally(
+            canvasDimensions.width,
+            canvasDimensions.width * landmark.x
+          )
+        : landmark.x,
+      y: canvasDimensions.height * landmark.y,
+      z: landmark.z,
+    };
+  });
+}
+
+export function getLandmarksPerHand(
+  canvasDimensions: any,
+  multiHandLandmarks: any,
+  handIndices: {
+    left?: number;
+    right?: number;
+  },
+  mirror = true
+) {
+  const leftHandLandmarks =
+    handIndices.left !== undefined
+      ? scaleLandmarksToCanvas({
+          landmarks: multiHandLandmarks[handIndices.left],
+          canvasDimensions,
+          mirror,
+        })
+      : undefined;
+  const rightHandLandmarks =
+    handIndices.right !== undefined
+      ? scaleLandmarksToCanvas({
+          landmarks: multiHandLandmarks[handIndices.right],
+          canvasDimensions,
+          mirror,
+        })
+      : undefined;
+
+  const numHands = [leftHandLandmarks, rightHandLandmarks].reduce(
+    (count, currentLandmark) => {
+      if (currentLandmark !== undefined) {
+        return count + 1;
+      }
+
+      return count;
+    },
+    0
+  );
+
+  return {
+    leftHandLandmarks,
+    rightHandLandmarks,
+    numHands,
+  };
 }

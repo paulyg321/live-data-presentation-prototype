@@ -1,6 +1,13 @@
-export const HANDS = {
-  LEFT: "Left",
-  RIGHT: "Right",
+import { POSES } from "../../teachable-machine";
+
+export const VERTICAL_ORDER = {
+  ABOVE: 1,
+  BELOW: -1,
+};
+
+export const HORIZONTAL_ORDER = {
+  LEFT: 1,
+  RIGHT: -1,
 };
 
 export const HAND_LANDMARK_IDS = {
@@ -26,3 +33,9 @@ export const HAND_LANDMARK_IDS = {
   pinky_dip: 19,
   pinky_tip: 20,
 };
+
+export const NONE_OBJECT = {
+  class: POSES.NONE,
+  left: undefined,
+  right: undefined,
+}
