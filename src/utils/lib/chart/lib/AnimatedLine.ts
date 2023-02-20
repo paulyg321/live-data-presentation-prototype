@@ -3,36 +3,21 @@ import * as d3 from "d3";
 import {
   clearArea,
   drawCircle,
-  drawLine,
   drawRect,
   drawText,
   modifyContextStyleAndDraw,
 } from "@/utils";
 
-/*
-  TODO:
-  - Use different canvas for axes & line
-  - Add modal for configuring chart
-  - Work on sequential animations
-    - Add Bezier curves for sequential animations
-    - auto animate through all states for sequential animations
-*/
-
 export enum DrawingMode {
-  SEQUENTIAL = "sequential",
-  CONCURRENT = "concurrent",
-  SEQUENTIAL_TRANSITION = "sequential_transition",
-  DROP = "drop",
+  DRAW_ALL = "Draw All",
+  UNDULATE_ANIMATION = "Tenderness - Undulate", // level 1
+  BASELINE_ANIMATION = "Joy - Baseline", // level 2
+  DROP_ANIMATION = "Excitement - Drop", // level 3
 }
 
 export enum LineShape {
   CURVED = "curved",
   SHARP = "sharp",
-}
-
-export enum AnimationType {
-  CONTINUOUS = "continuous",
-  DISCRETE = "discrete",
 }
 
 export enum LineEffect {
@@ -347,7 +332,7 @@ export class AnimatedLine {
         this.context?.stroke();
       };
 
-      if (mode === DrawingMode.SEQUENTIAL) {
+      if (mode === DrawingMode.BASELINE_ANIMATION) {
         const lineTimer = d3.timer((elapsed: number) => {
           this.clearCanvas();
           if (beforeClear) {
@@ -388,7 +373,7 @@ export class AnimatedLine {
             lineTimer.stop();
           }
         });
-      } else if (mode === DrawingMode.CONCURRENT) {
+      } else if (mode === DrawingMode.DRAW_ALL) {
         const maxIndex = Math.round(endBound * coordinates.length);
         this.clearCanvas();
         if (beforeClear) {
@@ -408,7 +393,7 @@ export class AnimatedLine {
 
   drawCurrentState({
     bounds,
-    drawingMode = DrawingMode.SEQUENTIAL,
+    drawingMode = DrawingMode.DRAW_ALL,
   }: {
     bounds?: { start?: number; end: number };
     drawingMode?: DrawingMode;
@@ -466,7 +451,7 @@ export class AnimatedLine {
 
       this.draw(
         interPolatedState,
-        DrawingMode.CONCURRENT,
+        DrawingMode.DRAW_ALL,
         LineShape.CURVED,
         () => {
           if (transitionStep === 1) {
@@ -503,16 +488,12 @@ export class AnimatedLine {
         }
       );
 
-      this.draw(
-        interPolatedState,
-        DrawingMode.CONCURRENT,
-        LineShape.CURVED,
-        () =>
-          this.drawLabels(
-            boundedTimeSteps
-              .filter((step) => step === 1)
-              .map((_, index) => nextState[index])
-          )
+      this.draw(interPolatedState, DrawingMode.DRAW_ALL, LineShape.CURVED, () =>
+        this.drawLabels(
+          boundedTimeSteps
+            .filter((step) => step === 1)
+            .map((_, index) => nextState[index])
+        )
       );
     }
   }
@@ -526,7 +507,7 @@ export class AnimatedLine {
     transitionFunction?: (time: number) => number;
     mode: DrawingMode;
   }) {
-    if (mode === DrawingMode.DROP) {
+    if (mode === DrawingMode.DROP_ANIMATION) {
       const nextIndex = this.currentState + 1;
 
       const nextStateData = this.states[nextIndex];
@@ -559,7 +540,7 @@ export class AnimatedLine {
       });
     }
 
-    if (mode === DrawingMode.CONCURRENT) {
+    if (mode === DrawingMode.DRAW_ALL) {
       const currentIndex = this.currentState;
       const nextIndex = this.currentState + 1;
 
@@ -592,7 +573,7 @@ export class AnimatedLine {
       });
     }
 
-    if (mode === DrawingMode.SEQUENTIAL_TRANSITION) {
+    if (mode === DrawingMode.UNDULATE_ANIMATION) {
       const currentIndex = this.currentState;
       const nextIndex = this.currentState + 1;
 
@@ -632,19 +613,22 @@ export class AnimatedLine {
       });
     }
 
-    if (mode === DrawingMode.SEQUENTIAL) {
+    if (mode === DrawingMode.BASELINE_ANIMATION) {
       const nextIndex = this.currentState + 1;
 
       const nextStateData = this.states[nextIndex];
 
       if (!nextStateData) return;
 
-      const sequentialDelay = this.duration;
-      this.draw(nextStateData, DrawingMode.SEQUENTIAL, LineShape.CURVED);
+      this.draw(
+        nextStateData,
+        DrawingMode.BASELINE_ANIMATION,
+        LineShape.CURVED
+      );
       this.currentState++;
 
       const seqTimer = d3.timer((elapsed: number) => {
-        const boundedTimeStep = Math.min(elapsed / sequentialDelay, 1);
+        const boundedTimeStep = Math.min(elapsed / this.duration, 1);
         if (boundedTimeStep === 1) {
           const lastStateIndex = this.states.length - 1;
           const moreStatesExist = this.currentState < lastStateIndex;
@@ -670,7 +654,7 @@ export class AnimatedLine {
     transitionFunction?: (time: number) => number;
     mode: DrawingMode;
   }) {
-    if (mode === DrawingMode.DROP) {
+    if (mode === DrawingMode.DROP_ANIMATION) {
       const prevIndex = this.currentState - 1;
 
       const prevStateData = this.states[prevIndex];
@@ -704,7 +688,7 @@ export class AnimatedLine {
       });
     }
 
-    if (mode === DrawingMode.CONCURRENT) {
+    if (mode === DrawingMode.DRAW_ALL) {
       const currentIndex = this.currentState;
       const prevIndex = this.currentState - 1;
 
@@ -738,7 +722,7 @@ export class AnimatedLine {
       });
     }
 
-    if (mode === DrawingMode.SEQUENTIAL) {
+    if (mode === DrawingMode.BASELINE_ANIMATION) {
       const prevIndex = this.currentState - 1;
 
       const prevStateData = this.states[prevIndex];
@@ -746,7 +730,11 @@ export class AnimatedLine {
       if (!prevStateData) return;
 
       const sequentialDelay = this.duration;
-      this.draw(prevStateData, DrawingMode.SEQUENTIAL, LineShape.CURVED);
+      this.draw(
+        prevStateData,
+        DrawingMode.BASELINE_ANIMATION,
+        LineShape.CURVED
+      );
       this.currentState--;
       const seqTimer = d3.timer((elapsed: number) => {
         const boundedTimeStep = Math.min(elapsed / sequentialDelay, 1);
@@ -765,7 +753,7 @@ export class AnimatedLine {
       });
     }
 
-    if (mode === DrawingMode.SEQUENTIAL_TRANSITION) {
+    if (mode === DrawingMode.UNDULATE_ANIMATION) {
       const currentIndex = this.currentState;
       const prevIndex = this.currentState - 1;
 

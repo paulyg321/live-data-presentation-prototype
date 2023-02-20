@@ -1,5 +1,5 @@
-import { EmphasisMeter } from "@/utils";
-import { Subject } from "rxjs";
+import { EmphasisMeter, startIntervalInstance } from "@/utils";
+import _ from "lodash";
 import { DrawingMode, type Coordinate2D } from "../../chart";
 import { HANDS } from "./gesture-utils";
 import {
@@ -10,19 +10,79 @@ import {
 } from "./GestureListener";
 import { SupportedGestures } from "./handGestures";
 
-export type EmphasisGestureListenerConstructorArgs =
-  GestureListenerConstructorArgs;
+export interface EmphasisGestureListenerConstructorArgs
+  extends GestureListenerConstructorArgs {
+  subjects?: GestureListenerSubjectMap;
+}
+
+export type EmphasisListenerAnimationRangeConfig = [
+  // Start value
+  number,
+  // end value
+  number,
+  DrawingMode,
+  // colors
+  string
+];
 
 export class EmphasisGestureListener extends GestureListener {
-  static emphasisLevelSubjectKey = "emphasisLevelSubject";
+  static currentAnimationSubjectKey = "currentAnimationSubject";
+  // These can be changed if we want to support configuration of the behaviour of our emphasis
+  static MAX_EMPHASIS = 150;
+  static INCREMENT_BY_VALUE = 50;
+  static DECREMENT_BY_VALUE = 1;
+  static DECREMENT_EVERY = 100;
+
+  // CONFIGURE THESE TO CONFIGURE THE ANIMATIONS AND RANGES FOR EMPHASIS VALUES
+  static ANIMATION_RANGES: EmphasisListenerAnimationRangeConfig[] = [
+    [0, 51, DrawingMode.UNDULATE_ANIMATION, "#00cf07"],
+    [51, 101, DrawingMode.BASELINE_ANIMATION, "#d1b902"],
+    [101, 151, DrawingMode.DROP_ANIMATION, "#c40e0e"],
+  ];
+
+  // watch for the values around the boundaries of our configured ranges
+  static rangeValuesToEmit = EmphasisGestureListener.ANIMATION_RANGES.reduce(
+    (
+      watchForArray: number[],
+      [_, rangeEnd, __]: EmphasisListenerAnimationRangeConfig
+    ) => {
+      return [...watchForArray, rangeEnd - 1, rangeEnd, rangeEnd + 1];
+    },
+    [] as number[]
+  );
+
+  static getConfigValuesBasedOnRange(value: number): {
+    mode: DrawingMode;
+    color: string;
+  } {
+    return EmphasisGestureListener.ANIMATION_RANGES.reduce(
+      (
+        config: { mode: DrawingMode; color: string },
+        [
+          rangeStart,
+          rangeEnd,
+          currentMode,
+          currentColor,
+        ]: EmphasisListenerAnimationRangeConfig
+      ) => {
+        if (_.inRange(value, rangeStart, rangeEnd)) {
+          return {
+            mode: currentMode,
+            color: currentColor,
+          };
+        }
+        return config;
+      },
+      {
+        mode: DrawingMode.BASELINE_ANIMATION,
+        color: "#00cf07",
+      }
+    );
+  }
 
   private emphasisLevel = 0;
   private emphasisMeter: EmphasisMeter | undefined;
-
   private isPreviousPositionInRange = false;
-  subjects: GestureListenerSubjectMap = {
-    [EmphasisGestureListener.emphasisLevelSubjectKey]: new Subject(),
-  };
 
   constructor({
     position,
@@ -39,6 +99,8 @@ export class EmphasisGestureListener extends GestureListener {
     ],
     gestureSubject,
     canvasDimensions,
+    subjects,
+    resetKeys,
   }: EmphasisGestureListenerConstructorArgs) {
     super({
       position,
@@ -46,9 +108,85 @@ export class EmphasisGestureListener extends GestureListener {
       handsToTrack,
       gestureSubject,
       canvasDimensions,
+      resetKeys,
     });
 
+    this.subjects = subjects;
     this.gestureTypes = gestureTypes;
+  }
+
+  private resetStateValues() {
+    this.resetTimer();
+    this.emphasisLevel = 0;
+    this.isPreviousPositionInRange = false;
+    this.emphasisMeter?.resetState();
+  }
+
+  private clearAllVisualIndicators() {
+    this.renderReferencePoints(true);
+    const currentDrawingMode =
+      EmphasisGestureListener.getConfigValuesBasedOnRange(
+        this.emphasisLevel
+      ).mode;
+    this.publishToSubjectIfExists(
+      EmphasisGestureListener.currentAnimationSubjectKey,
+      currentDrawingMode
+    );
+  }
+
+  private onLevelIncrement() {
+    this.renderVisualIndicators();
+    const currentDrawingMode = this.getAnimationBasedOnEmphasisLevel();
+    this.publishToSubjectIfExists(
+      EmphasisGestureListener.currentAnimationSubjectKey,
+      currentDrawingMode
+    );
+  }
+
+  private onLevelDecrement() {
+    this.renderVisualIndicators();
+
+    if (
+      EmphasisGestureListener.rangeValuesToEmit.includes(this.emphasisLevel)
+    ) {
+      const currentDrawingMode = this.getAnimationBasedOnEmphasisLevel();
+      this.publishToSubjectIfExists(
+        EmphasisGestureListener.currentAnimationSubjectKey,
+        currentDrawingMode
+      );
+    }
+  }
+
+  getAnimationBasedOnEmphasisLevel() {
+    return EmphasisGestureListener.getConfigValuesBasedOnRange(
+      this.emphasisLevel
+    ).mode;
+  }
+
+  resetHandler(): void {
+    this.resetStateValues();
+    this.clearAllVisualIndicators();
+  }
+
+  startDecrementTimer() {
+    if (this.timer === undefined) {
+      this.timer = startIntervalInstance({
+        onTick: () => {
+          if (this.emphasisLevel === 0) {
+            this.resetStateValues();
+          } else {
+            this.emphasisLevel -= EmphasisGestureListener.DECREMENT_BY_VALUE;
+            this.onLevelDecrement();
+          }
+        },
+        onCompletion: () => {
+          this.onLevelDecrement();
+          this.resetStateValues();
+        },
+        timeout: 20000,
+        interval: EmphasisGestureListener.DECREMENT_EVERY,
+      });
+    }
   }
 
   setContext(ctx: CanvasRenderingContext2D): void {
@@ -61,21 +199,22 @@ export class EmphasisGestureListener extends GestureListener {
     }
   }
 
-  getAnimationBasedOnEmphasisLevel() {
-    if (this.emphasisLevel <= 50) {
-      return DrawingMode.SEQUENTIAL_TRANSITION;
-    } else if (this.emphasisLevel > 50 && this.emphasisLevel <= 100) {
-      return DrawingMode.CONCURRENT;
-    } else if (this.emphasisLevel > 100 && this.emphasisLevel <= 150) {
-      return DrawingMode.DROP;
-    }
+  renderVisualIndicators() {
+    this.clearCanvas();
+    this.emphasisMeter?.valueHandler(this.emphasisLevel);
+    this.renderReferencePoints(false);
   }
 
-  renderReferencePoints() {
-    if (this.context) {
-      this.clearCanvas();
-      this.renderBorder();
+  renderReferencePoints(clear = true) {
+    if (!this.context) {
+      return;
     }
+
+    if (clear) {
+      this.clearCanvas();
+    }
+
+    this.renderBorder();
   }
 
   protected handleNewData(fingerData: ListenerProcessedFingerData): void {
@@ -99,33 +238,18 @@ export class EmphasisGestureListener extends GestureListener {
     const canEmit = this.isWithinObjectBounds(fingerPosition);
 
     if (canEmit) {
-      if (this.timer === undefined) {
-        this.timer = this.startTimerInstance({
-          onTick: () => {
-            if (this.emphasisLevel === 0) {
-              this.resetTimer();
-            } else {
-              this.emphasisLevel -= 1;
-              this.emphasisMeter?.valueHandler(this.emphasisLevel);
-            }
-          },
-          onCompletion: () => {
-            this.emphasisLevel = 0;
-            this.emphasisMeter?.valueHandler(this.emphasisLevel);
-            this.resetTimer();
-          },
-          timeout: 20000,
-        });
-      }
+      this.startDecrementTimer();
+
+      const lastValueToIncrementAt = EmphasisGestureListener.MAX_EMPHASIS -
+        EmphasisGestureListener.INCREMENT_BY_VALUE;
 
       if (
         this.isPreviousPositionInRange === false &&
-        this.emphasisLevel < 150
+        this.emphasisLevel <= lastValueToIncrementAt
       ) {
-        this.emphasisLevel += 25;
-        this.emphasisMeter?.valueHandler(this.emphasisLevel);
+        this.emphasisLevel += EmphasisGestureListener.INCREMENT_BY_VALUE;
+        this.onLevelIncrement();
       }
-
       this.isPreviousPositionInRange = true;
     } else {
       this.isPreviousPositionInRange = false;

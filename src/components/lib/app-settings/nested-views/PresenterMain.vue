@@ -24,14 +24,21 @@ import {
   LegendSettings,
   gestureCanvasKeys,
   foreshadowingAreaSubject,
+  currentAnimationSubject,
 } from "../settings-state";
-import * as d3 from "d3";
 import VideoViews from "../../views/VideoViews.vue";
 
 const route = useRoute();
 ChartSettings.setCurrentChart(parseInt(route.params.id as string));
 
 const checkedLines = ref<string[]>([]);
+
+// EMPHASIS CONTROLS ANIMATION
+currentAnimationSubject.subscribe({
+  next(animation: any) {
+    ChartSettings.setAnimationMode(animation);
+  },
+});
 
 LegendSettings.legendSubject.subscribe({
   next(value: any) {
@@ -75,7 +82,6 @@ foreshadowingAreaSubject.value?.subscribe({
           bounds: {
             end: animationTrack.value,
           },
-          drawingMode: DrawingMode.CONCURRENT,
         });
       };
 
@@ -116,7 +122,6 @@ watch(checkedLines, () => {
       bounds: {
         end: animationTrack.value,
       },
-      drawingMode: DrawingMode.CONCURRENT,
     });
   });
 });
@@ -155,24 +160,20 @@ function handlePlayState(type: string) {
     if (type === "prev") {
       line.animateToPreviousState({
         playRemainingStates: false,
-        // Call like this so we don't lose the this context in ThreePointBezier
-        transitionFunction: d3.easeElasticOut.amplitude(1).period(0.163),
-        mode: ChartSettings.drawingMode,
+        transitionFunction: ChartSettings.transitionFunction,
+        mode: ChartSettings.animationMode,
       });
     } else if (type === "next") {
       line.animateToNextState({
         playRemainingStates: false,
-        // Call like this so we don't lose the this context in ThreePointBezier
-        transitionFunction: (time: number) =>
-          d3.easeExpIn(Math.min(1, time + 0.5)),
-        mode: ChartSettings.drawingMode,
+        transitionFunction: ChartSettings.transitionFunction,
+        mode: ChartSettings.animationMode,
       });
     } else if (type === "all") {
       line.animateToNextState({
         playRemainingStates: true,
-        // Call like this so we don't lose the this context in ThreePointBezier
-        transitionFunction: d3.easeElasticOut,
-        mode: ChartSettings.drawingMode,
+        transitionFunction: ChartSettings.transitionFunction,
+        mode: ChartSettings.animationMode,
       });
     }
   }
@@ -204,7 +205,7 @@ onMounted(() => {
 
   // Do whatever you need to do with canvasCtx after this
   ChartSettings.currentChart?.setContext(CanvasSettings.canvasCtx);
-  ChartSettings.currentChart?.draw();
+  ChartSettings.currentChart?.drawAll();
 
   LegendSettings.initializeLegendItems();
   LegendSettings.drawLegendItems();
@@ -240,7 +241,7 @@ onMounted(() => {
       ></v-slider>
     </v-col>
   </v-row>
-  <v-row class="justify-center">
+  <!-- <v-row class="justify-center">
     <v-col lg="3">
       <v-btn
         icon="mdi-skip-backward"
@@ -260,8 +261,18 @@ onMounted(() => {
         @click="() => handlePlayState('next')"
       ></v-btn>
     </v-col>
+  </v-row> -->
+  <v-row align="center">
+    <v-col lg="12">
+      <div class="text-h6">
+        Current Animation:
+        <span class="font-italic font-weight-thin">{{
+          ChartSettings.animationMode
+        }}</span>
+      </div>
+    </v-col>
   </v-row>
-  <v-row>
+  <v-row class="mt-10">
     <v-col lg="12">
       <CanvasWrapper
         :width="CanvasSettings.dimensions.width"

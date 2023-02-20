@@ -9,12 +9,26 @@ import {
   RadialPlaybackGestureListener,
   RadialTrackerMode,
 } from "@/utils";
+import { Subject } from "rxjs";
 import { shallowRef, watchEffect } from "vue";
 import { CanvasSettings } from "./canvas-settings";
 import { ChartSettings } from "./chart-settings";
 import { PlaybackComponentSettings } from "./playback-component-settings";
 
 export const gestureCanvasKeys = ["dialing", "emphasis", "foreshadowing"];
+export const RESET_ALL_KEY = "Space";
+export function getGestureListenerResetKeys(
+  keys: string | string[]
+): Set<string> {
+  if (Array.isArray(keys)) {
+    return new Set([RESET_ALL_KEY, ...keys]);
+  }
+
+  return new Set([RESET_ALL_KEY, ...keys]);
+}
+
+// -------------------------- Subjects --------------------------
+export const currentAnimationSubject = new Subject();
 
 // -------------------------- GENERAL GESTURE TRACKING --------------------------
 
@@ -52,6 +66,11 @@ export const emphasisTracker = shallowRef(
     },
     gestureSubject: gestureTracker.value.gestureSubject,
     canvasDimensions: CanvasSettings.dimensions,
+    subjects: {
+      [EmphasisGestureListener.currentAnimationSubjectKey]:
+        currentAnimationSubject,
+    },
+    resetKeys: getGestureListenerResetKeys("KeyE"),
   })
 );
 

@@ -3,13 +3,9 @@ import {
   drawRect,
   HANDS,
   HAND_LANDMARK_IDS,
-  startTimeoutInstance,
-  startTimerInstance,
   SupportedGestures,
   type FingerPositionsData,
   type GestureTrackerValues,
-  type TimerInstanceArgs,
-  type TimeoutInstanceArgs,
 } from "@/utils";
 import type { Timer } from "d3";
 import type { Subject, Subscription } from "rxjs";
@@ -34,6 +30,7 @@ export interface GestureListenerConstructorArgs {
     rightHand: SupportedGestures;
     leftHand: SupportedGestures;
   }[];
+  resetKeys?: Set<string>;
 }
 
 export type GestureListenerSubjectMap = { [key: string]: Subject<any> };
@@ -66,6 +63,8 @@ export abstract class GestureListener {
         leftHand: SupportedGestures;
       }[] = [];
   gestureSubject: Subject<any>;
+  resetKeys: Set<string> | undefined;
+
   private gestureSubscription: Subscription | undefined;
 
   constructor({
@@ -75,6 +74,8 @@ export abstract class GestureListener {
     gestureTypes,
     gestureSubject,
     canvasDimensions,
+    // ACCEPTED VALUES - https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_code_values
+    resetKeys,
   }: GestureListenerConstructorArgs) {
     this.position = position;
     this.dimensions = dimensions;
@@ -88,13 +89,21 @@ export abstract class GestureListener {
       next: (data: any) => this.handler(data),
     });
     this.canvasDimensions = canvasDimensions;
+    if (resetKeys && resetKeys.size > 0) {
+      this.resetKeys = resetKeys;
+      this.setResetHandler();
+    }
   }
 
-  protected abstract handleNewData(
-    fingerData: ListenerProcessedFingerData
-  ): void;
-
-  abstract renderReferencePoints(): void;
+  private setResetHandler() {
+    this.resetKeys?.forEach((resetKey: string) => {
+      document.addEventListener("keypress", (event) => {
+        if (event.code == resetKey) {
+          this.resetHandler();
+        }
+      });
+    });
+  }
 
   static convertGestureAndLandmarksToPositions({
     landmarkData,
@@ -151,28 +160,24 @@ export abstract class GestureListener {
     return undefined;
   }
 
+  abstract renderReferencePoints(clearCanvas?: boolean): void;
+  abstract resetHandler(): void;
+
+  protected abstract handleNewData(
+    fingerData: ListenerProcessedFingerData
+  ): void;
+
+  protected publishToSubjectIfExists(subjectKey: string, value: any) {
+    if (this.subjects && this.subjects[subjectKey]) {
+      this.subjects[subjectKey].next(value);
+    }
+  }
+
   protected resetTimer() {
     if (this.timer) {
       this.timer.stop();
       this.timer = undefined;
     }
-  }
-
-  protected startTimerInstance({
-    onCompletion,
-    onTick,
-    timeout,
-  }: TimerInstanceArgs) {
-    this.resetTimer();
-    return startTimerInstance({ onCompletion, onTick, timeout });
-  }
-
-  protected startTimeoutInstance({
-    onCompletion,
-    timeout,
-  }: TimeoutInstanceArgs) {
-    this.resetTimer();
-    return startTimeoutInstance({ onCompletion, timeout });
   }
 
   protected renderBorder() {

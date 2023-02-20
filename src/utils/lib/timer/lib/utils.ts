@@ -3,6 +3,14 @@ import * as d3 from "d3";
 export interface TimerInstanceArgs {
   onTick?: () => void;
   onCompletion?: () => void;
+  delay?: number;
+  timeout: number;
+}
+
+export interface IntervalInstanceArgs {
+  onTick?: () => void;
+  onCompletion?: () => void;
+  interval?: number;
   timeout: number;
 }
 
@@ -14,6 +22,7 @@ export function startTimerInstance({
   onCompletion,
   onTick,
   timeout,
+  delay,
 }: TimerInstanceArgs) {
   function handler(elapsed: number) {
     const boundedTimeStep = Math.min(elapsed / timeout, 1);
@@ -25,7 +34,28 @@ export function startTimerInstance({
     }
   }
 
-  const timer = d3.timer(handler);
+  const timer = d3.timer(handler, delay);
+
+  return timer;
+}
+
+export function startIntervalInstance({
+  onCompletion,
+  onTick,
+  timeout,
+  interval,
+}: IntervalInstanceArgs) {
+  function handler(elapsed: number) {
+    const boundedTimeStep = Math.min(elapsed / timeout, 1);
+
+    if (onTick) onTick();
+
+    if (boundedTimeStep === 1) {
+      if (onCompletion) onCompletion();
+    }
+  }
+
+  const timer = d3.interval(handler, interval);
 
   return timer;
 }

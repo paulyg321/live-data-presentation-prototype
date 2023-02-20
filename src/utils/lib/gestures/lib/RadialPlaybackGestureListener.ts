@@ -1,3 +1,4 @@
+import { startTimeoutInstance } from "@/utils";
 import _ from "lodash";
 import { Subject } from "rxjs";
 import type { Coordinate2D } from "../../chart";
@@ -49,6 +50,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
     gestureSubject,
     canvasDimensions,
     mode,
+    resetKeys,
   }: RadialPlaybackGestureListenerConstructorArgs) {
     super({
       position,
@@ -57,6 +59,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
       gestureTypes,
       gestureSubject,
       canvasDimensions,
+      resetKeys,
     });
 
     this.mode = mode;
@@ -81,11 +84,6 @@ export class RadialPlaybackGestureListener extends GestureListener {
     return theta;
   }
 
-  // ----------------- INTERACTIONS WITH CANVAS ----------------------
-  private renderState() {
-    // TODO: Use this to render visual indicators
-  }
-
   private renderCenterPoint() {
     const centerPoint = this.getCenterPoint();
     const fontSize = 60;
@@ -106,7 +104,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
     }
   }
 
-  private renderReferenceLine(fingerPosition: Coordinate2D, angle: number) {
+  private renderCurrentState(fingerPosition: Coordinate2D, angle: number) {
     const centerPoint = this.getCenterPoint();
     const endAngle = this.angleStack.length > 0 ? angle * (Math.PI / 180) : 0;
     if (this.context) {
@@ -128,38 +126,6 @@ export class RadialPlaybackGestureListener extends GestureListener {
         drawLineToCenter: true,
         opacity: 0.3,
       });
-    }
-  }
-
-  setTrackingMode(mode: RadialTrackerMode) {
-    this.mode = mode;
-  }
-
-  resetAngleState() {
-    this.rotations = 0;
-    this.angleStack = [];
-  }
-
-  renderBorder() {
-    const centerPoint = this.getCenterPoint();
-    if (this.context) {
-      drawCircle({
-        context: this.context,
-        coordinates: centerPoint,
-        radius: this.dimensions.width / 2,
-        strokeStyle: "skyblue",
-        stroke: true,
-      });
-    }
-  }
-
-  renderReferencePoints(clear = true) {
-    if (this.context) {
-      if (clear) {
-        this.clearCanvas();
-      }
-      this.renderCenterPoint();
-      this.renderBorder();
     }
   }
 
@@ -191,7 +157,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
         };
 
         if (isFirstRotation) {
-          this.timer = this.startTimeoutInstance({
+          this.timer = startTimeoutInstance({
             onCompletion: executeAfterTimerEnds,
             timeout: 3000,
           });
@@ -204,6 +170,42 @@ export class RadialPlaybackGestureListener extends GestureListener {
     } else if (theta <= 360 && theta > 270 && this.angleStack.length === 3) {
       this.angleStack.push(theta);
     }
+  }
+
+  private resetAngleState() {
+    this.rotations = 0;
+    this.angleStack = [];
+  }
+
+  setTrackingMode(mode: RadialTrackerMode) {
+    this.mode = mode;
+  }
+
+  renderBorder() {
+    const centerPoint = this.getCenterPoint();
+    if (this.context) {
+      drawCircle({
+        context: this.context,
+        coordinates: centerPoint,
+        radius: this.dimensions.width / 2,
+        strokeStyle: "skyblue",
+        stroke: true,
+      });
+    }
+  }
+
+  renderReferencePoints(clear = true) {
+    if (this.context) {
+      if (clear) {
+        this.clearCanvas();
+      }
+      this.renderCenterPoint();
+      this.renderBorder();
+    }
+  }
+
+  resetHandler(): void {
+    console.log("RESET RADIAL LISTENER");
   }
 
   // Implemented to only track one finger and one hand
@@ -230,7 +232,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
     if (canEmit) {
       const angle = this.calculateAngleFromCenter(fingerPosition);
       this.handleNewAngle(angle);
-      this.renderReferenceLine(fingerPosition, angle);
+      this.renderCurrentState(fingerPosition, angle);
     } else {
       this.resetAngleState();
       this.renderReferencePoints();

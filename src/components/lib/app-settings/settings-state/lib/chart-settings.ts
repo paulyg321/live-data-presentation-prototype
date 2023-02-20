@@ -1,5 +1,5 @@
 import * as d3 from "d3";
-import { reactive, computed, ref } from "vue";
+import { reactive, ref } from "vue";
 import {
   Chart,
   DrawingMode,
@@ -20,10 +20,12 @@ export const ChartSettings = reactive<{
   setCurrentChart: (index: number) => void;
   addChart: (newChart: any) => void;
   changeMargins: (margin: number) => void;
-  drawingMode: DrawingMode;
-  setDrawingMode: (mode: DrawingMode) => void;
   canvasKeys: string[];
   setCanvasKeys: () => void;
+  animationMode: DrawingMode;
+  setAnimationMode: (mode: DrawingMode) => void;
+  transitionFunction: (time: number) => number;
+  setTransitionFunction: (transitionFunc: (time: number) => number) => void;
 }>({
   canvasKeys: [],
   setCanvasKeys() {
@@ -66,7 +68,7 @@ export const ChartSettings = reactive<{
       this.currentChart.updateState({
         dimensions: newDimensions,
       });
-      ChartSettings.currentChart?.draw();
+      this.currentChart?.drawAll();
     }
   },
   changeMargins(margin: number) {
@@ -86,7 +88,7 @@ export const ChartSettings = reactive<{
       this.currentChart.updateState({
         dimensions: newDimensions,
       });
-      ChartSettings.currentChart?.draw();
+      this.currentChart?.drawAll();
     }
   },
   position: {
@@ -106,7 +108,7 @@ export const ChartSettings = reactive<{
       this.currentChart.updateState({
         position: newPosition,
       });
-      ChartSettings.currentChart?.draw();
+      this.currentChart?.drawAll();
     }
   },
   charts: localStorage.getItem("charts")
@@ -127,9 +129,15 @@ export const ChartSettings = reactive<{
     // Effects
     this.setCanvasKeys();
   },
-  drawingMode: DrawingMode.DROP,
-  setDrawingMode(mode: DrawingMode) {
-    this.drawingMode = mode;
+
+  // States for drawing
+  animationMode: DrawingMode.UNDULATE_ANIMATION,
+  setAnimationMode(mode: DrawingMode) {
+    this.animationMode = mode;
+  },
+  transitionFunction: (time: number) => d3.easeExpIn(Math.min(1, time + 0.5)),
+  setTransitionFunction(transitionFunc: (time: number) => number) {
+    this.transitionFunction = transitionFunc;
   },
 });
 

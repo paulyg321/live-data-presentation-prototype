@@ -1,4 +1,9 @@
-import { clearArea, drawRect, type Dimensions } from "@/utils";
+import {
+  clearArea,
+  drawRect,
+  EmphasisGestureListener,
+  type Dimensions,
+} from "@/utils";
 
 interface EmphasisMeterConstructor {
   context: CanvasRenderingContext2D | null | undefined;
@@ -37,6 +42,16 @@ export class EmphasisMeter {
     }
   }
 
+  protected clearCanvas() {
+    if (this.context) {
+      clearArea({
+        context: this.context,
+        coordinates: { x: 0, y: 0 },
+        dimensions: this.canvasDimensions,
+      });
+    }
+  }
+
   private draw() {
     if (this.context) {
       clearArea({
@@ -48,17 +63,13 @@ export class EmphasisMeter {
         },
       });
 
-      let fillStyle = "#c40e0e";
-      if (this.dimensions.height <= 50) {
-        fillStyle = "#00cf07";
-      } else if (this.dimensions.height > 50 && this.dimensions.height <= 100) {
-        fillStyle = "#d1b902";
-      }
-
+      const fillStyle = EmphasisGestureListener.getConfigValuesBasedOnRange(
+        this.dimensions.height
+      ).color;
       const padding = this.dimensions.margin?.left ?? 10;
       const coordinates = {
         x: this.canvasDimensions.width - this.dimensions.width - padding,
-        y: 150 + padding,
+        y: EmphasisGestureListener.MAX_EMPHASIS + padding,
       };
 
       drawRect({
@@ -74,10 +85,21 @@ export class EmphasisMeter {
     }
   }
 
-  valueHandler(value: any) {
+  resetState() {
+    this.setDimensions({
+      height: 0,
+    });
+    this.clearCanvas();
+  }
+
+  valueHandler(value: number) {
     this.setDimensions({
       height: value,
     });
-    this.draw();
+    if (value === 0) {
+      this.clearCanvas();
+    } else {
+      this.draw();
+    }
   }
 }

@@ -1,4 +1,4 @@
-import { drawCircle, drawLine, drawRect } from "@/utils";
+import { drawCircle, drawLine, drawRect, startTimeoutInstance } from "@/utils";
 import { Subject } from "rxjs";
 import {
   calculateDistance,
@@ -80,6 +80,7 @@ export class ForeshadowingGestureListener extends GestureListener {
     ],
     gestureSubject,
     canvasDimensions,
+    resetKeys,
   }: ForeshadowingGestureListenerConstructorArgs) {
     super({
       position,
@@ -87,6 +88,7 @@ export class ForeshadowingGestureListener extends GestureListener {
       handsToTrack,
       gestureSubject,
       canvasDimensions,
+      resetKeys,
     });
 
     this.gestureTypes = gestureTypes;
@@ -324,13 +326,6 @@ export class ForeshadowingGestureListener extends GestureListener {
     }
   }
 
-  renderReferencePoints() {
-    if (this.context) {
-      this.clearCanvas();
-      this.renderBorder();
-    }
-  }
-
   private handleRangeGesture(fingerData: ListenerProcessedFingerData) {
     const leftHandData = fingerData[HANDS.LEFT];
     const rightHandData = fingerData[HANDS.RIGHT];
@@ -375,7 +370,7 @@ export class ForeshadowingGestureListener extends GestureListener {
       if (!this.timer) {
         this.initialRangePositions = newRangePosition;
         this.currentShape = ForeshadowingShapes.RANGE;
-        this.timer = this.startTimeoutInstance({
+        this.timer = startTimeoutInstance({
           onCompletion: () => {
             if (this.initialRangePositions && this.recentRangePositions) {
               const diffs = distanceBetweenPoints(
@@ -476,7 +471,7 @@ export class ForeshadowingGestureListener extends GestureListener {
           ? ForeshadowingShapes.RECTANGLE
           : undefined;
 
-        this.timer = this.startTimeoutInstance({
+        this.timer = startTimeoutInstance({
           onCompletion: () => {
             if (this.initialShapePositions && this.recentShapePositions) {
               const diffs = distanceBetweenPoints(
@@ -498,6 +493,17 @@ export class ForeshadowingGestureListener extends GestureListener {
         this.recentShapePositions = newShapePosition;
       }
     }
+  }
+
+  renderReferencePoints() {
+    if (this.context) {
+      this.clearCanvas();
+      this.renderBorder();
+    }
+  }
+
+  resetHandler(): void {
+    console.log("RESET FORESHADOWING LISTENER");
   }
 
   protected handleNewData(fingerData: ListenerProcessedFingerData): void {

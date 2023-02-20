@@ -1,5 +1,5 @@
 import * as d3 from "d3";
-import { AnimatedLine, type Coordinate2D, type Dimensions } from "@/utils";
+import { AnimatedLine, DrawingMode, type Coordinate2D, type Dimensions } from "@/utils";
 
 export interface ChartType {
   title: "Line Chart" | "Bar Chart" | "Scatter Plot";
@@ -338,7 +338,7 @@ export class Chart {
     }
   }
 
-  draw() {
+  drawAll() {
     if (this.lines) {
       Object.entries(this.lines).forEach(
         ([_, value]: [string, AnimatedLine]) => {
