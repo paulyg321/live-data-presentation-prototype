@@ -57,12 +57,7 @@ foreshadowingAreaSubject.subscribe({
     ChartSettings.iterateOverChartItems((key: string, value: AnimatedLine) => {
       // Sets foreshdowing area for the chart item
       const triggerForeshadow = () => {
-        if (type === ForeshadowingAreaSubjectType.SET) {
-          value.setForeshadowingArea(foreshadowingArea);
-        }
-        if (type === ForeshadowingAreaSubjectType.CLEAR) {
-          value.setForeshadowingArea(undefined);
-        }
+        value.setForeshadowingArea(type, foreshadowingArea);
         value.drawCurrentState({
           bounds: {
             end: ChartSettings.playbackExtent,
@@ -104,7 +99,10 @@ watch(
         lineEffect = LineEffect.FOCUSED;
       } else {
         lineEffect = LineEffect.BACKGROUND;
-        value.setForeshadowingArea(undefined);
+        value.setForeshadowingArea(
+          ForeshadowingAreaSubjectType.CLEAR,
+          undefined
+        );
       }
 
       value.setLineAppearanceFromEffect(lineEffect);

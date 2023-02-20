@@ -6,7 +6,8 @@ export enum PlaybackSubjectType {
 }
 
 export enum ForeshadowingAreaSubjectType {
-  SET = "set",
+  RECTANGLE = "rect",
+  CIRCLE = "circle",
   CLEAR = "clear",
 }
 

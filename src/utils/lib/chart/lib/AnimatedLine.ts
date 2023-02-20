@@ -5,7 +5,9 @@ import {
   drawCircle,
   drawRect,
   drawText,
+  ForeshadowingAreaSubjectType,
   modifyContextStyleAndDraw,
+  type ForeshadowingAreaData,
 } from "@/utils";
 
 export enum DrawingMode {
@@ -52,9 +54,7 @@ export class AnimatedLine {
   opacity = 0.7;
 
   context: CanvasRenderingContext2D | undefined;
-  foreshadowingArea:
-    | { position: Coordinate2D; dimensions: Dimensions }
-    | undefined;
+  foreshadowingArea: ForeshadowingAreaData | undefined;
 
   constructor({
     states,
@@ -92,35 +92,22 @@ export class AnimatedLine {
     }
   }
 
-  private configureLabelContextSettings({
-    variant,
-  }: {
-    variant: "arc" | "text";
-  }) {
-    if (this.context) {
-      if (variant === "text") {
-        this.context.fillStyle = this.color;
-        this.context.font = "12px Arial";
-      } else {
-        this.context.fillStyle = "white";
-      }
-      this.context.strokeStyle = this.color;
-    }
-  }
-
   setContext(ctx: CanvasRenderingContext2D) {
     this.context = ctx;
   }
 
   setForeshadowingArea(
-    foreshadowingArea:
-      | {
-          position: Coordinate2D;
-          dimensions: Dimensions;
-        }
-      | undefined
+    type: ForeshadowingAreaSubjectType,
+    foreshadowingArea: ForeshadowingAreaData | undefined
   ) {
-    this.foreshadowingArea = foreshadowingArea;
+    if (type === ForeshadowingAreaSubjectType.CLEAR) {
+      this.foreshadowingArea = undefined;
+    } else if (
+      type === ForeshadowingAreaSubjectType.CIRCLE ||
+      type === ForeshadowingAreaSubjectType.RECTANGLE
+    ) {
+      this.foreshadowingArea = foreshadowingArea;
+    }
   }
 
   updateState({
@@ -249,28 +236,39 @@ export class AnimatedLine {
     return totalLength;
   }
 
-  drawLabels(points: Coordinate2D[]) {
+  drawLabels(points: Coordinate2D[], isSelected = false) {
+    const LARGE_FONT = 20;
+    const DEFAULT_FONT = 12;
+
+    const DEFAULT_RADIUS = 5;
+    const LARGE_RADIUS = 10;
     // draw points
     points.forEach((point) => {
       if (this.context) {
-        this.configureLabelContextSettings({ variant: "text" });
-        drawText({
-          context: this.context,
-          coordinates: {
-            x: this.xScale(point.x) + 10,
-            y: this.yScale(point.y) + 10,
-          },
-          text: `$${Math.round(point.y)}`,
-        });
-        this.configureLabelContextSettings({ variant: "arc" });
+        if (isSelected) {
+          drawText({
+            context: this.context,
+            coordinates: {
+              x: this.xScale(point.x) + 15,
+              y: this.yScale(point.y) + 10,
+            },
+            text: `$${Math.round(point.y)}`,
+            fillStyle: "black",
+            strokeStyle: this.color,
+            fontSize: isSelected ? LARGE_FONT : DEFAULT_FONT,
+            opacity: 1,
+          });
+        }
         drawCircle({
           context: this.context,
           coordinates: point,
-          radius: 5,
+          radius: isSelected ? LARGE_RADIUS : DEFAULT_RADIUS,
           xScale: this.xScale,
           yScale: this.yScale,
-          stroke: true,
+          stroke: isSelected,
           fill: true,
+          strokeStyle: this.color,
+          fillStyle: "white",
         });
       }
     });
@@ -283,19 +281,57 @@ export class AnimatedLine {
         lineWidth: 5,
       };
       this.context.save();
-      clearArea({
-        context: this.context,
-        dimensions: this.foreshadowingArea?.dimensions,
-        coordinates: this.foreshadowingArea?.position,
-      });
-      drawRect({
-        context: this.context,
-        coordinates: this.foreshadowingArea?.position,
-        dimensions: this.foreshadowingArea?.dimensions,
-        clip: true,
-      });
+      if (this.foreshadowingArea.dimensions) {
+        this.clearAndClipRect({
+          dimensions: this.foreshadowingArea.dimensions,
+          coordinates: this.foreshadowingArea.position,
+        });
+      } else if (this.foreshadowingArea.radius) {
+        this.clearAndClipCircle({
+          radius: this.foreshadowingArea.radius,
+          coordinates: this.foreshadowingArea.position,
+        });
+      }
+
       modifyContextStyleAndDraw(settings, drawFn);
       this.context.restore();
+    }
+  }
+
+  // MOVE TO DRAWING UTIL
+  private clearAndClipRect({
+    dimensions,
+    coordinates,
+  }: {
+    dimensions: Dimensions;
+    coordinates: Coordinate2D;
+  }) {
+    if (this.context) {
+      drawRect({
+        context: this.context,
+        coordinates,
+        dimensions,
+        clip: true,
+      });
+      this.clearCanvas();
+    }
+  }
+
+  private clearAndClipCircle({
+    radius,
+    coordinates,
+  }: {
+    radius: number;
+    coordinates: Coordinate2D;
+  }) {
+    if (this.context) {
+      drawCircle({
+        context: this.context,
+        coordinates,
+        radius,
+        clip: true,
+      });
+      this.clearCanvas();
     }
   }
 
@@ -365,7 +401,7 @@ export class AnimatedLine {
             this.drawLabels(coordinates.slice(0, maxIndex));
             this.drawForeshadow(() => {
               drawFn();
-              this.drawLabels(coordinates.slice(0, maxIndex));
+              this.drawLabels(coordinates.slice(0, maxIndex), true);
             });
           }
 
@@ -385,7 +421,7 @@ export class AnimatedLine {
         this.drawLabels(coordinates.slice(0, maxIndex));
         this.drawForeshadow(() => {
           drawFn();
-          this.drawLabels(coordinates.slice(0, maxIndex));
+          this.drawLabels(coordinates.slice(0, maxIndex), true);
         });
       }
     }

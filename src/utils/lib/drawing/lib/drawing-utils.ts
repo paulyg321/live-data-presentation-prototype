@@ -98,6 +98,20 @@ export function drawCircle({
   drawLineToCenter = false,
   opacity,
 }: DrawCircleArgs) {
+  if (clip) {
+    context.beginPath();
+    context.arc(
+      xScale(coordinates.x),
+      yScale(coordinates.y),
+      radius,
+      startAngle,
+      endAngle,
+      false
+    );
+    context.clip();
+    return;
+  }
+
   const settings = {
     context,
     fillStyle,
@@ -120,10 +134,6 @@ export function drawCircle({
       context.lineTo(xScale(coordinates.x), yScale(coordinates.y));
     }
 
-    if (clip) {
-      context.clip();
-    }
-
     if (fill) {
       context.fill();
     }
@@ -131,7 +141,7 @@ export function drawCircle({
     if (stroke) {
       context.stroke();
     }
-  };
+  }
 
   modifyContextStyleAndDraw(settings, drawFn);
 }
@@ -172,7 +182,6 @@ export function drawRect({
   fillStyle,
   opacity,
 }: DrawRectArgs) {
-
   if (clip) {
     context.beginPath();
     context.rect(

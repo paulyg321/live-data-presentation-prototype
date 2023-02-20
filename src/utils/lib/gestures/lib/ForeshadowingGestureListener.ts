@@ -1,9 +1,19 @@
-import { drawCircle, drawLine, drawRect, ForeshadowingAreaSubjectType, startTimeoutInstance } from "@/utils";
+import {
+  drawCircle,
+  drawLine,
+  drawRect,
+  ForeshadowingAreaSubjectType,
+  startTimeoutInstance,
+} from "@/utils";
 import {
   calculateDistance,
   containsValueLargerThanMax,
 } from "../../calculations";
-import { distanceBetweenPoints, type Coordinate2D } from "../../chart";
+import {
+  distanceBetweenPoints,
+  type Coordinate2D,
+  type Dimensions,
+} from "../../chart";
 import { HANDS } from "./gesture-utils";
 import {
   GestureListener,
@@ -15,6 +25,18 @@ import { LinearPlaybackGestureListener } from "./LinearPlaybackGestureListener";
 
 export type ForeshadowingGestureListenerConstructorArgs =
   GestureListenerConstructorArgs;
+
+export type ForeshadowingAreaData =
+  | {
+      position: Coordinate2D;
+      dimensions: Dimensions;
+      radius?: number;
+    }
+  | {
+      position: Coordinate2D;
+      radius: number;
+      dimensions?: Dimensions;
+    };
 
 export enum ForeshadowingType {
   SHAPE = "shape",
@@ -287,7 +309,7 @@ export class ForeshadowingGestureListener extends GestureListener {
         this.publishToSubjectIfExists(
           ForeshadowingGestureListener.foreshadowingAreaSubjectKey,
           {
-            type: ForeshadowingAreaSubjectType.SET,
+            type: ForeshadowingAreaSubjectType.RECTANGLE,
             value: foreshadowingArea,
           }
         );
@@ -309,6 +331,17 @@ export class ForeshadowingGestureListener extends GestureListener {
           fillStyle,
           opacity,
         });
+        const foreshadowingArea = {
+          position: circlePosition,
+          radius: circleRadius,
+        };
+        this.publishToSubjectIfExists(
+          ForeshadowingGestureListener.foreshadowingAreaSubjectKey,
+          {
+            type: ForeshadowingAreaSubjectType.CIRCLE,
+            value: foreshadowingArea,
+          }
+        );
       }
 
       if (shape === ForeshadowingShapes.RANGE && this.recentRangePositions) {
