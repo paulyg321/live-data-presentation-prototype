@@ -3,23 +3,19 @@ import {
   currentAnimationSubject,
   playbackSubject,
   PlaybackSubjectType,
+  ForeshadowingAreaSubjectType,
   foreshadowingAreaSubject,
   LineEffect,
   type AnimatedLine,
-  type Coordinate2D,
-  type Dimensions,
-ForeshadowingAreaSubjectType,
+  legendSubject,
 } from "@/utils";
-import { onMounted, ref, watch } from "vue";
+import { onMounted, watch } from "vue";
 import { useRoute } from "vue-router";
 import CanvasWrapper from "../../CanvasWrapper.vue";
 import ChartAxes from "../../axes/ChartAxes.vue";
 import {
   ChartSettings,
   CanvasSettings,
-  animationTrack,
-  radialDiscreteTrackerSubject,
-  radialContinuousTrackerSubject,
   radialPlaybackTracker,
   emphasisTracker,
   foreshadowingTracker,
@@ -30,8 +26,6 @@ import VideoViews from "../../views/VideoViews.vue";
 
 const route = useRoute();
 ChartSettings.setCurrentChart(parseInt(route.params.id as string));
-
-const checkedLines = ref<string[]>([]);
 
 // EMPHASIS CONTROLS ANIMATION
 currentAnimationSubject.subscribe({
@@ -46,11 +40,11 @@ playbackSubject.subscribe({
     const { type, value } = playbackValue;
 
     if (type === PlaybackSubjectType.DISCRETE) {
-      animationTrack.value = value;
+      ChartSettings.setPlaybackExtent(value);
     }
 
     if (type === PlaybackSubjectType.CONTINUOUS) {
-      handlePlayState("next");
+      ChartSettings.handlePlay("next");
     }
   },
 });
@@ -60,9 +54,7 @@ foreshadowingAreaSubject.subscribe({
   next(foreshadowingAreaValue: any) {
     const { type, value: foreshadowingArea } = foreshadowingAreaValue;
 
-    Object.entries(
-      ChartSettings.currentChart?.getAnimatedElements() ?? {}
-    ).forEach(([key, value]: [string, AnimatedLine]) => {
+    ChartSettings.iterateOverChartItems((key: string, value: AnimatedLine) => {
       // Sets foreshdowing area for the chart item
       const triggerForeshadow = () => {
         if (type === ForeshadowingAreaSubjectType.SET) {
@@ -73,13 +65,13 @@ foreshadowingAreaSubject.subscribe({
         }
         value.drawCurrentState({
           bounds: {
-            end: animationTrack.value,
+            end: ChartSettings.playbackExtent,
           },
         });
       };
 
-      if (checkedLines.value.length > 0) {
-        if (checkedLines.value.includes(key)) {
+      if (ChartSettings.selectedChartItems.length > 0) {
+        if (ChartSettings.isItemSelected(key)) {
           triggerForeshadow();
         }
       } else {
@@ -89,132 +81,66 @@ foreshadowingAreaSubject.subscribe({
   },
 });
 
-LegendSettings.legendSubject.subscribe({
+legendSubject.subscribe({
   next(value: any) {
-    if (checkedLines.value.includes(value)) {
-      checkedLines.value = checkedLines.value.filter((line: any) => {
-        return line !== value;
-      });
+    if (ChartSettings.isItemSelected(value)) {
+      ChartSettings.removeSelectedChartItem(value);
     } else {
-      checkedLines.value = [...checkedLines.value, value];
+      ChartSettings.addSelectedChartItem(value);
     }
   },
 });
 
-radialDiscreteTrackerSubject.value?.subscribe({
-  next(value: any) {
-    animationTrack.value = value;
-  },
-});
+watch(
+  () => ChartSettings.selectedChartItems,
+  (selectedItems: string[]) => {
+    ChartSettings.iterateOverChartItems((key: string, value: AnimatedLine) => {
+      let lineEffect;
 
-radialContinuousTrackerSubject.value?.subscribe({
-  next(value: any) {
-    if (value === true) {
-      handlePlayState("next");
-    }
-  },
-});
-
-watch(checkedLines, () => {
-  Object.entries(
-    ChartSettings.currentChart?.getAnimatedElements() ?? {}
-  ).forEach(([key, value]: [string, AnimatedLine]) => {
-    let lineEffect = LineEffect.DEFAULT;
-    if (checkedLines.value.length > 0) {
-      if (checkedLines.value.includes(key)) {
+      // No selected items then all lines should have default values
+      if (selectedItems.length === 0) {
+        lineEffect = LineEffect.DEFAULT;
+      } else if (ChartSettings.isItemSelected(key)) {
         lineEffect = LineEffect.FOCUSED;
       } else {
         lineEffect = LineEffect.BACKGROUND;
         value.setForeshadowingArea(undefined);
       }
-    }
 
-    value.setLineAppearanceFromEffect(lineEffect);
-    value.drawCurrentState({
-      bounds: {
-        end: animationTrack.value,
-      },
+      value.setLineAppearanceFromEffect(lineEffect);
+      value.drawCurrentState({
+        bounds: {
+          end: ChartSettings.playbackExtent,
+        },
+      });
     });
-  });
-});
+  }
+);
 
 watch(
-  () => animationTrack.value,
+  () => ChartSettings.playbackExtent,
   (newValue, oldValue) => {
-    Object.entries(
-      ChartSettings.currentChart?.getAnimatedElements() ?? {}
-    ).forEach(([key, value]: any) => {
-      if (checkedLines.value.length === 0) {
+    ChartSettings.iterateOverChartItems((key: string, value: AnimatedLine) => {
+      if (ChartSettings.selectedChartItems.length === 0) {
         value.drawCurrentState({
-          ctx: CanvasSettings.canvasCtx[key],
           bounds: {
             start: oldValue,
             end: newValue,
           },
         });
-        return;
-      } else if (checkedLines.value.includes(key)) {
+      } else if (ChartSettings.isItemSelected(key)) {
         value.drawCurrentState({
-          ctx: CanvasSettings.canvasCtx[key],
           bounds: {
             start: oldValue,
             end: newValue,
           },
         });
-        return;
       }
     });
   }
 );
 
-function handlePlayState(type: string) {
-  function play({ line }: { line: AnimatedLine }) {
-    if (type === "prev") {
-      line.animateToPreviousState({
-        playRemainingStates: false,
-        transitionFunction: ChartSettings.transitionFunction,
-        mode: ChartSettings.animationMode,
-      });
-    } else if (type === "next") {
-      line.animateToNextState({
-        playRemainingStates: false,
-        transitionFunction: ChartSettings.transitionFunction,
-        mode: ChartSettings.animationMode,
-      });
-    } else if (type === "all") {
-      line.animateToNextState({
-        playRemainingStates: true,
-        transitionFunction: ChartSettings.transitionFunction,
-        mode: ChartSettings.animationMode,
-      });
-    }
-  }
-
-  Object.entries(
-    ChartSettings.currentChart?.getAnimatedElements() ?? {}
-  ).forEach(([key, value]: any) => {
-    if (checkedLines.value.length === 0) {
-      play({
-        line: value,
-      });
-      return;
-    } else if (checkedLines.value.includes(key)) {
-      play({
-        line: value,
-      });
-      return;
-    }
-  });
-}
-
 onMounted(() => {
-  /**
-   * Get keys of all the lines/chart items to be plotted and create a legend key for them
-   * This gets used to render the canvases needed for the items and their legend items
-   *
-   * the keys are used to access the canvas Contexts using CanvasSettings.canvasCtx[<key>]
-   */
-
   // Do whatever you need to do with canvasCtx after this
   ChartSettings.currentChart?.setContext(CanvasSettings.canvasCtx);
   ChartSettings.currentChart?.drawAll();
@@ -246,35 +172,14 @@ onMounted(() => {
   <v-row class="justify-center">
     <v-col lg="12">
       <v-slider
-        v-model="animationTrack"
+        v-model="ChartSettings.playbackExtent"
         :min="0"
         :max="1"
         thumb-label
       ></v-slider>
     </v-col>
   </v-row>
-  <!-- <v-row class="justify-center">
-    <v-col lg="3">
-      <v-btn
-        icon="mdi-skip-backward"
-        @click="() => handlePlayState('prev')"
-      ></v-btn>
-    </v-col>
-    <v-col lg="3">
-      <v-btn
-        icon="mdi-play"
-        color="primary"
-        @click="() => handlePlayState('all')"
-      ></v-btn>
-    </v-col>
-    <v-col lg="3">
-      <v-btn
-        icon="mdi-skip-forward"
-        @click="() => handlePlayState('next')"
-      ></v-btn>
-    </v-col>
-  </v-row> -->
-  <v-row align="center">
+  <v-row>
     <v-col lg="12">
       <div class="text-h6">
         Current Animation:

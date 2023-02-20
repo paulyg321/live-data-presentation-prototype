@@ -1,6 +1,7 @@
 import * as d3 from "d3";
 import { reactive, ref } from "vue";
 import {
+  AnimatedLine,
   Chart,
   DrawingMode,
   type Coordinate2D,
@@ -18,7 +19,10 @@ export const ChartSettings = reactive<{
   charts: Chart[];
   currentChart?: Chart;
   setCurrentChart: (index: number) => void;
-  addChart: (newChart: any) => void;
+  addChart: (newChart: Chart) => void;
+  iterateOverChartItems: (
+    callbackFn: (key: string, value: any) => void
+  ) => void;
   changeMargins: (margin: number) => void;
   canvasKeys: string[];
   setCanvasKeys: () => void;
@@ -26,6 +30,13 @@ export const ChartSettings = reactive<{
   setAnimationMode: (mode: DrawingMode) => void;
   transitionFunction: (time: number) => number;
   setTransitionFunction: (transitionFunc: (time: number) => number) => void;
+  handlePlay: (type: string) => void;
+  selectedChartItems: string[];
+  addSelectedChartItem: (itemKey: string) => void;
+  removeSelectedChartItem: (itemKey: string) => void;
+  isItemSelected: (itemKey: string) => boolean;
+  playbackExtent: number;
+  setPlaybackExtent: (value: number) => void;
 }>({
   canvasKeys: [],
   setCanvasKeys() {
@@ -115,7 +126,7 @@ export const ChartSettings = reactive<{
     ? JSON.parse(localStorage.getItem("charts") || "")
     : [],
   currentChart: undefined,
-  addChart(newChart: any) {
+  addChart(newChart: Chart) {
     this.charts = [...this.charts, newChart];
     localStorage.setItem("charts", JSON.stringify(this.charts));
   },
@@ -129,6 +140,13 @@ export const ChartSettings = reactive<{
     // Effects
     this.setCanvasKeys();
   },
+  iterateOverChartItems(callbackFn: (key: string, value: any) => void) {
+    Object.entries(this.currentChart?.getAnimatedElements() ?? {}).forEach(
+      ([key, value]: [string, any]) => {
+        callbackFn(key, value);
+      }
+    );
+  },
 
   // States for drawing
   animationMode: DrawingMode.UNDULATE_ANIMATION,
@@ -139,6 +157,61 @@ export const ChartSettings = reactive<{
   setTransitionFunction(transitionFunc: (time: number) => number) {
     this.transitionFunction = transitionFunc;
   },
-});
+  handlePlay(type: string) {
+    const play = ({ line }: { line: AnimatedLine }) => {
+      if (type === "prev") {
+        line.animateToPreviousState({
+          playRemainingStates: false,
+          transitionFunction: this.transitionFunction,
+          mode: this.animationMode,
+        });
+      } else if (type === "next") {
+        line.animateToNextState({
+          playRemainingStates: false,
+          transitionFunction: this.transitionFunction,
+          mode: this.animationMode,
+        });
+      } else if (type === "all") {
+        line.animateToNextState({
+          playRemainingStates: true,
+          transitionFunction: this.transitionFunction,
+          mode: this.animationMode,
+        });
+      }
+    };
 
-export const animationTrack = ref(1);
+    this.iterateOverChartItems((key: string, value: AnimatedLine) => {
+      if (this.selectedChartItems.length === 0) {
+        play({
+          line: value,
+        });
+        return;
+      } else if (this.isItemSelected(key)) {
+        play({
+          line: value,
+        });
+        return;
+      }
+    });
+  },
+  selectedChartItems: [],
+  removeSelectedChartItem(itemKey: string) {
+    this.selectedChartItems = this.selectedChartItems.filter((item: string) => {
+      return item !== itemKey;
+    });
+  },
+  addSelectedChartItem(itemKey: string) {
+    this.selectedChartItems = [...this.selectedChartItems, itemKey];
+  },
+  isItemSelected(itemKey: string) {
+    return this.selectedChartItems.includes(itemKey);
+  },
+  playbackExtent: 1,
+  setPlaybackExtent(value: number) {
+    if (value > 1 || value < 0) {
+      return;
+    }
+
+    this.playbackExtent = value;
+  },
+});

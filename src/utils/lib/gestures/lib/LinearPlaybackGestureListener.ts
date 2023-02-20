@@ -112,7 +112,7 @@ export class LinearPlaybackGestureListener extends GestureListener {
   }
 
   resetHandler(): void {
-    console.log("RESET LINEAR LISTENER");
+    this.emitRange = undefined;
   }
 
   protected handleNewData(fingerData: ListenerProcessedFingerData): void {

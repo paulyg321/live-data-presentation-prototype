@@ -49,7 +49,6 @@ export abstract class GestureListener {
   timer: Timer | undefined;
   context: CanvasRenderingContext2D | undefined;
   canvasDimensions: Dimensions;
-  chartDimensions: Dimensions | undefined;
   // Ordered from most dominant to least dominant
   handsToTrack: {
     dominant: HANDS;
@@ -246,12 +245,16 @@ export abstract class GestureListener {
     position,
     dimensions,
     handsToTrack,
+    canvasDimensions,
   }: Partial<GestureListenerConstructorArgs>) {
     if (position) {
       this.position = position;
     }
     if (dimensions) {
       this.dimensions = dimensions;
+    }
+    if (canvasDimensions) {
+      this.canvasDimensions = canvasDimensions;
     }
     if (handsToTrack) {
       this.handsToTrack = handsToTrack;

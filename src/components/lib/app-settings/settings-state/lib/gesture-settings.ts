@@ -80,6 +80,7 @@ watchEffect(() => {
       x: ChartSettings.position.x + ChartSettings.dimensions.width / 2,
       y: ChartSettings.position.y + ChartSettings.dimensions.height / 2,
     },
+    canvasDimensions: CanvasSettings.dimensions,
   });
 
   emphasisTracker.value.renderReferencePoints();
@@ -103,6 +104,7 @@ export const temporalPlaybackTracker = shallowRef(
     subjects: {
       [LinearPlaybackGestureListener.playbackSubjectKey]: playbackSubject,
     },
+    resetKeys: getGestureListenerResetKeys("KeyL"),
   })
 );
 
@@ -120,6 +122,7 @@ watchEffect(() => {
   temporalPlaybackTracker.value.updateState({
     position,
     dimensions,
+    canvasDimensions: CanvasSettings.dimensions,
   });
 });
 
@@ -131,30 +134,21 @@ export const radialPlaybackTracker = shallowRef(
     gestureSubject: gestureTracker.value.gestureSubject,
     canvasDimensions: CanvasSettings.dimensions,
     mode: RadialTrackerMode.NORMAL,
+    subjects: {
+      [RadialPlaybackGestureListener.playbackSubjectKey]: playbackSubject,
+    },
+    resetKeys: getGestureListenerResetKeys("KeyR"),
   })
-);
-
-export const radialDiscreteTrackerSubject = shallowRef<any | undefined>(
-  undefined
-);
-export const radialContinuousTrackerSubject = shallowRef<any | undefined>(
-  undefined
 );
 
 watchEffect(() => {
   radialPlaybackTracker.value.updateState({
     position: PlaybackComponentSettings.position,
     dimensions: PlaybackComponentSettings.dimensions,
+    canvasDimensions: CanvasSettings.dimensions,
   });
 
   radialPlaybackTracker.value.renderReferencePoints();
-
-  radialDiscreteTrackerSubject.value = radialPlaybackTracker.value.getSubject(
-    RadialPlaybackGestureListener.discreteTrackingSubjectKey
-  );
-  radialContinuousTrackerSubject.value = radialPlaybackTracker.value.getSubject(
-    RadialPlaybackGestureListener.continuousTrackingSubjectKey
-  );
 });
 
 // ---------------- FORESHADOWING ------------------------
@@ -177,6 +171,7 @@ watchEffect(() => {
   foreshadowingTracker.value.updateState({
     position: ChartSettings.position,
     dimensions: ChartSettings.dimensions,
+    canvasDimensions: CanvasSettings.dimensions,
   });
 
   foreshadowingTracker.value.renderReferencePoints();

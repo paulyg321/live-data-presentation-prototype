@@ -185,12 +185,7 @@ export class ForeshadowingGestureListener extends GestureListener {
   }
 
   private resetRangeSlider() {
-    this.rangeSlider?.updateState({
-      emitRange: {
-        start: { x: 0, y: 0 },
-        end: { x: 0, y: 0 },
-      },
-    });
+    this.rangeSlider?.resetHandler();
   }
 
   private resetShapeGestureState() {

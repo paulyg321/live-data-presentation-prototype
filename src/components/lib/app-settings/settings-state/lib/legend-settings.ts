@@ -3,13 +3,12 @@ import {
   AnimatedLine,
   GestureTracker,
   LegendItem,
+  legendSubject,
   type Coordinate2D,
   type Dimensions,
   type PartialCoordinate2D,
 } from "@/utils";
-import { Subject } from "rxjs";
 import { CanvasSettings } from "./canvas-settings";
-import _ from "lodash";
 import { ChartSettings } from "./chart-settings";
 import { gestureTracker } from "./gesture-settings";
 
@@ -22,7 +21,6 @@ export const LegendSettings = reactive<{
   position: Coordinate2D;
   changePosition: (coord: PartialCoordinate2D) => void;
   legendItems: { [key: string]: LegendItem };
-  legendSubject: Subject<any>;
   initializeLegendItems: () => void;
   addLegendItem: ({
     key,
@@ -69,7 +67,6 @@ export const LegendSettings = reactive<{
     this.updateAllLegendItems();
   },
   legendItems: {},
-  legendSubject: new Subject(),
   initializeLegendItems() {
     Object.entries(
       ChartSettings.currentChart?.getAnimatedElements() ?? {}
@@ -103,7 +100,7 @@ export const LegendSettings = reactive<{
       position: this.position,
       dimensions: this.dimensions,
       gestureTracker,
-      legendSubject: this.legendSubject,
+      legendSubject,
       index,
       canvasDimensions: CanvasSettings.dimensions,
     });

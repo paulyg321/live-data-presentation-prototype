@@ -1,4 +1,4 @@
-import { startTimeoutInstance } from "@/utils";
+import { PlaybackSubjectType, startTimeoutInstance } from "@/utils";
 import _ from "lodash";
 import { Subject } from "rxjs";
 import type { Coordinate2D } from "../../chart";
@@ -23,16 +23,11 @@ export interface RadialPlaybackGestureListenerConstructorArgs
 }
 
 export class RadialPlaybackGestureListener extends GestureListener {
-  static discreteTrackingSubjectKey = "discreteTrackingSubject";
-  static continuousTrackingSubjectKey = "continuousTrackingSubject";
+  static playbackSubjectKey = "playbackSubject";
 
   private rotations = 0;
   private angleStack: number[] = [];
   private mode: RadialTrackerMode = RadialTrackerMode.NORMAL;
-  subjects: GestureListenerSubjectMap = {
-    [RadialPlaybackGestureListener.discreteTrackingSubjectKey]: new Subject(),
-    [RadialPlaybackGestureListener.continuousTrackingSubjectKey]: new Subject(),
-  };
 
   constructor({
     position,
@@ -51,6 +46,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
     canvasDimensions,
     mode,
     resetKeys,
+    subjects
   }: RadialPlaybackGestureListenerConstructorArgs) {
     super({
       position,
@@ -60,6 +56,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
       gestureSubject,
       canvasDimensions,
       resetKeys,
+      subjects
     });
 
     this.mode = mode;
@@ -131,9 +128,13 @@ export class RadialPlaybackGestureListener extends GestureListener {
 
   private handleNewAngle(theta: number) {
     if (this.rotations >= 1 && this.mode === RadialTrackerMode.TRACKING) {
-      this.subjects[
-        RadialPlaybackGestureListener.discreteTrackingSubjectKey
-      ].next(theta / 360);
+      this.publishToSubjectIfExists(
+        RadialPlaybackGestureListener.playbackSubjectKey,
+        {
+          type: PlaybackSubjectType.DISCRETE,
+          value: theta / 360,
+        }
+      );
     } else if (theta <= 90) {
       if (this.angleStack.length === 4) {
         this.rotations++;
@@ -148,9 +149,13 @@ export class RadialPlaybackGestureListener extends GestureListener {
 
         const executeAfterTimerEnds = () => {
           if (this.rotations >= 1 && this.mode === RadialTrackerMode.NORMAL) {
-            this.subjects[
-              RadialPlaybackGestureListener.continuousTrackingSubjectKey
-            ].next(true);
+            this.publishToSubjectIfExists(
+              RadialPlaybackGestureListener.playbackSubjectKey,
+              {
+                type: PlaybackSubjectType.CONTINUOUS,
+                value: undefined,
+              }
+            );
             this.resetAngleState();
           }
           this.timer = undefined;
@@ -175,6 +180,10 @@ export class RadialPlaybackGestureListener extends GestureListener {
   private resetAngleState() {
     this.rotations = 0;
     this.angleStack = [];
+  }
+
+  private clearAllVisualIndicators() {
+    this.renderReferencePoints(true);
   }
 
   setTrackingMode(mode: RadialTrackerMode) {
@@ -205,7 +214,8 @@ export class RadialPlaybackGestureListener extends GestureListener {
   }
 
   resetHandler(): void {
-    console.log("RESET RADIAL LISTENER");
+    this.resetAngleState();
+    this.renderReferencePoints(true);
   }
 
   // Implemented to only track one finger and one hand
@@ -235,7 +245,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
       this.renderCurrentState(fingerPosition, angle);
     } else {
       this.resetAngleState();
-      this.renderReferencePoints();
+      this.clearAllVisualIndicators();
     }
   }
 }
