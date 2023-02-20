@@ -15,8 +15,8 @@ export const CameraSettings = reactive<{
   setVideo: (video: HTMLVideoElement | null) => void;
   stream: any;
   setStream: (newSource: string) => Promise<void>;
-  mirror: boolean;
-  toggleMirror: () => void;
+  grayScale: boolean;
+  toggleGrayScale: () => void;
 }>({
   videoSources: [],
   async setVideoSources() {
@@ -35,9 +35,9 @@ export const CameraSettings = reactive<{
   async setStream(newSource: string) {
     this.stream = await getVideoStream(newSource);
   },
-  mirror: true,
-  toggleMirror() {
-    this.mirror = !this.mirror;
+  grayScale: true,
+  toggleGrayScale() {
+    this.grayScale = !this.grayScale;
   },
 });
 
@@ -49,17 +49,14 @@ watch(
 );
 
 watch(
-  () => CameraSettings.mirror,
+  () => CameraSettings.grayScale,
   () => {
-    if (CameraSettings.mirror === true) {
-      CanvasSettings.canvasCtx["video"]?.save();
-      CanvasSettings.canvasCtx["video"]?.scale(-1, 1);
-      CanvasSettings.canvasCtx["video"]?.translate(
-        -CanvasSettings.dimensions.width,
-        0
-      );
+    if (!CanvasSettings.canvasCtx["video"]) return;
+
+    if (CameraSettings.grayScale === true) {
+      CanvasSettings.canvasCtx["video"].filter = "grayscale(1)";
     } else {
-      CanvasSettings.canvasCtx["video"]?.restore();
+      CanvasSettings.canvasCtx["video"].filter = "grayscale(0)";
     }
   }
 );

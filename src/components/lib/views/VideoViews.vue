@@ -6,7 +6,6 @@ type VideoViewsProps = {
   className?: string;
 };
 const props = defineProps<VideoViewsProps>();
-
 </script>
 
 <template>

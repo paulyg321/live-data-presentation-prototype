@@ -28,12 +28,12 @@ onMounted(async () => {
     <v-col lg="12">
       <input
         class="default-checkbox"
-        id="mirror-video-checkbox"
+        id="grayscale-video-checkbox"
         type="checkbox"
-        @change="CameraSettings.toggleMirror()"
-        :checked="CameraSettings.mirror"
+        @change="CameraSettings.toggleGrayScale()"
+        :checked="CameraSettings.grayScale"
       />
-      <label for="mirror-video-checkbox">Mirror video</label>
+      <label for="grayscale-video-checkbox">Grayscale</label>
     </v-col>
   </v-row>
 </template>

@@ -44,7 +44,7 @@ onMounted(() => {
     :width="CanvasSettings.dimensions.width"
     :height="CanvasSettings.dimensions.height"
     :class="className"
-    :ref="(el) => CanvasSettings.setCanvas(el, 'axes', false)"
+    :ref="(el) => CanvasSettings.setCanvas(el, 'axes')"
   ></canvas>
 </template>
 

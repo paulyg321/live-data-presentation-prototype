@@ -201,7 +201,7 @@ onMounted(() => {
           :width="CanvasSettings.dimensions.width"
           :height="CanvasSettings.dimensions.height"
           :class="className"
-          :ref="(el) => CanvasSettings.setCanvas(el, key as unknown as string, false)"
+          :ref="(el) => CanvasSettings.setCanvas(el, key as unknown as string)"
         ></canvas>
       </CanvasWrapper>
     </v-col>

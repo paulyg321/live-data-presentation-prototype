@@ -27,13 +27,17 @@ export const CanvasSettings = reactive<{
     };
   },
   canvas: {},
-  setCanvas(canvas: HTMLCanvasElement | null, key: string, allowMirror = true) {
+  setCanvas(canvas: HTMLCanvasElement | null, key: string) {
     this.canvas[key] = canvas;
     this.setCanvasCtx(key);
-    if (CameraSettings.mirror === true && allowMirror) {
-      this.canvasCtx[key]?.save();
-      this.canvasCtx[key]?.scale(-1, 1);
-      this.canvasCtx[key]?.translate(-this.dimensions.width, 0);
+    const context = this.canvasCtx[key];
+
+    if (!context) return;
+
+    if (key === "video") {
+      context.filter = "grayscale(1)";
+      context.scale(-1, 1);
+      context.translate(-this.dimensions.width, 0);
     }
   },
   canvasCtx: {},
