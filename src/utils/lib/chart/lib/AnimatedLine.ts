@@ -267,8 +267,9 @@ export class AnimatedLine {
           yScale: this.yScale,
           stroke: isSelected,
           fill: true,
-          strokeStyle: this.color,
-          fillStyle: "white",
+          fillStyle: this.color,
+          strokeStyle: "white",
+          opacity: isSelected ? 1 : 0.5,
         });
       }
     });

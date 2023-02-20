@@ -32,6 +32,7 @@ export interface GestureListenerConstructorArgs {
   }[];
   resetKeys?: Set<string>;
   subjects?: GestureListenerSubjectMap;
+  context?: CanvasRenderingContext2D;
 }
 
 export type GestureListenerSubjectMap = { [key: string]: Subject<any> };
@@ -50,40 +51,40 @@ export abstract class GestureListener {
   context: CanvasRenderingContext2D | undefined;
   canvasDimensions: Dimensions;
   // Ordered from most dominant to least dominant
+  gestureSubject: Subject<any>;
+  resetKeys: Set<string> | undefined;
+
   handsToTrack: {
     dominant: HANDS;
     nonDominant: HANDS;
-  } = {
-    dominant: HANDS.RIGHT,
-    nonDominant: HANDS.LEFT,
   };
   gestureTypes:
     | {
         rightHand: SupportedGestures;
         leftHand: SupportedGestures;
-      }[] = [];
-  gestureSubject: Subject<any>;
-  resetKeys: Set<string> | undefined;
+      }[];
 
   private gestureSubscription: Subscription | undefined;
 
   constructor({
     position,
     dimensions,
-    handsToTrack,
-    gestureTypes,
+    handsToTrack = {
+      dominant: HANDS.RIGHT,
+      nonDominant: HANDS.LEFT,
+    },
+    gestureTypes = [],
     gestureSubject,
     canvasDimensions,
     subjects,
     // ACCEPTED VALUES - https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_code_values
     resetKeys,
+    context,
   }: GestureListenerConstructorArgs) {
     this.position = position;
     this.dimensions = dimensions;
-    if (handsToTrack) {
-      this.handsToTrack = handsToTrack;
-    }
-    this.gestureTypes = gestureTypes ?? [];
+    this.handsToTrack = handsToTrack;
+    this.gestureTypes = gestureTypes;
     // Set up listener for gesture subject
     this.gestureSubject = gestureSubject;
     this.gestureSubscription = this.gestureSubject.subscribe({
@@ -95,6 +96,7 @@ export abstract class GestureListener {
       this.resetKeys = resetKeys;
       this.setResetHandler();
     }
+    this.context = context;
   }
 
   private setResetHandler() {

@@ -2,8 +2,7 @@
  * TODO: To have widgets, all the things here can be made dynamic under a gestureSettings object
  */
 import {
-  currentAnimationSubject,
-  EmphasisGestureListener,
+  emphasisSubject,
   foreshadowingAreaSubject,
   ForeshadowingGestureListener,
   GestureTracker,
@@ -54,37 +53,37 @@ watchEffect(() => {
 
 // -------------------------- EMPHASIS TRACKING --------------------------
 
-export const emphasisTracker = shallowRef(
-  new EmphasisGestureListener({
-    position: {
-      x: ChartSettings.position.x + ChartSettings.dimensions.width / 2,
-      y: ChartSettings.position.y + ChartSettings.dimensions.height / 2,
-    },
-    dimensions: {
-      width: 100,
-      height: 100,
-    },
-    gestureSubject: gestureTracker.value.gestureSubject,
-    canvasDimensions: CanvasSettings.dimensions,
-    subjects: {
-      [EmphasisGestureListener.currentAnimationSubjectKey]:
-        currentAnimationSubject,
-    },
-    resetKeys: getGestureListenerResetKeys("KeyE"),
-  })
-);
+// export const emphasisTracker = shallowRef(
+//   new EmphasisGestureListener({
+//     position: {
+//       x: ChartSettings.position.x + ChartSettings.dimensions.width / 2,
+//       y: ChartSettings.position.y + ChartSettings.dimensions.height / 2,
+//     },
+//     dimensions: {
+//       width: 100,
+//       height: 100,
+//     },
+//     gestureSubject: gestureTracker.value.gestureSubject,
+//     canvasDimensions: CanvasSettings.dimensions,
+//     subjects: {
+//       [EmphasisGestureListener.currentAnimationSubjectKey]:
+//         currentAnimationSubject,
+//     },
+//     resetKeys: getGestureListenerResetKeys("KeyE"),
+//   })
+// );
 
-watchEffect(() => {
-  emphasisTracker.value.updateState({
-    position: {
-      x: ChartSettings.position.x + ChartSettings.dimensions.width / 2,
-      y: ChartSettings.position.y + ChartSettings.dimensions.height / 2,
-    },
-    canvasDimensions: CanvasSettings.dimensions,
-  });
+// watchEffect(() => {
+//   emphasisTracker.value.updateState({
+//     position: {
+//       x: ChartSettings.position.x + ChartSettings.dimensions.width / 2,
+//       y: ChartSettings.position.y + ChartSettings.dimensions.height / 2,
+//     },
+//     canvasDimensions: CanvasSettings.dimensions,
+//   });
 
-  emphasisTracker.value.renderReferencePoints();
-});
+//   emphasisTracker.value.renderReferencePoints();
+// });
 
 // -------------------------- PLAYBACK TRACKING --------------------------
 
@@ -160,6 +159,7 @@ export const foreshadowingTracker = shallowRef(
     canvasDimensions: CanvasSettings.dimensions,
     subjects: {
       [ForeshadowingGestureListener.playbackSubjectKey]: playbackSubject,
+      [ForeshadowingGestureListener.emphasisSubjectKey]: emphasisSubject,
       [ForeshadowingGestureListener.foreshadowingAreaSubjectKey]:
         foreshadowingAreaSubject,
     },

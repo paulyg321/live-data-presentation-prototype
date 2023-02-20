@@ -12,7 +12,7 @@ export enum ForeshadowingAreaSubjectType {
 }
 
 // -------------------------- Subjects --------------------------
-export const currentAnimationSubject = new Subject();
+export const emphasisSubject = new Subject();
 export const playbackSubject = new Subject();
 export const foreshadowingAreaSubject = new Subject();
 export const legendSubject = new Subject();

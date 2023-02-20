@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {
-  currentAnimationSubject,
+  emphasisSubject,
   playbackSubject,
   PlaybackSubjectType,
   ForeshadowingAreaSubjectType,
@@ -17,7 +17,6 @@ import {
   ChartSettings,
   CanvasSettings,
   radialPlaybackTracker,
-  emphasisTracker,
   foreshadowingTracker,
   LegendSettings,
   gestureCanvasKeys,
@@ -28,7 +27,7 @@ const route = useRoute();
 ChartSettings.setCurrentChart(parseInt(route.params.id as string));
 
 // EMPHASIS CONTROLS ANIMATION
-currentAnimationSubject.subscribe({
+emphasisSubject.subscribe({
   next(animation: any) {
     ChartSettings.setAnimationMode(animation);
   },
@@ -152,10 +151,10 @@ onMounted(() => {
     radialPlaybackTracker.value.renderReferencePoints();
   }
 
-  if (CanvasSettings.canvasCtx["emphasis"]) {
-    emphasisTracker.value.setContext(CanvasSettings.canvasCtx["emphasis"]);
-    emphasisTracker.value.renderReferencePoints();
-  }
+  // if (CanvasSettings.canvasCtx["emphasis"]) {
+  //   emphasisTracker.value.setContext(CanvasSettings.canvasCtx["emphasis"]);
+  //   emphasisTracker.value.renderReferencePoints();
+  // }
 
   if (CanvasSettings.canvasCtx["foreshadowing"]) {
     foreshadowingTracker.value.setContext(

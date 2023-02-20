@@ -23,7 +23,7 @@ export type EmphasisListenerAnimationRangeConfig = [
 ];
 
 export class EmphasisGestureListener extends GestureListener {
-  static currentAnimationSubjectKey = "currentAnimationSubject";
+  static emphasisSubjectKey = "emphasisSubject";
   // These can be changed if we want to support configuration of the behaviour of our emphasis
   static MAX_EMPHASIS = 150;
   static INCREMENT_BY_VALUE = 50;
@@ -78,7 +78,7 @@ export class EmphasisGestureListener extends GestureListener {
   }
 
   private emphasisLevel = 0;
-  private emphasisMeter: EmphasisMeter | undefined;
+  private emphasisMeter: EmphasisMeter;
   private isPreviousPositionInRange = false;
 
   constructor({
@@ -98,6 +98,7 @@ export class EmphasisGestureListener extends GestureListener {
     canvasDimensions,
     subjects,
     resetKeys,
+    context,
   }: EmphasisGestureListenerConstructorArgs) {
     super({
       position,
@@ -107,9 +108,14 @@ export class EmphasisGestureListener extends GestureListener {
       canvasDimensions,
       resetKeys,
       subjects,
+      context,
     });
 
     this.gestureTypes = gestureTypes;
+    this.emphasisMeter = new EmphasisMeter({
+      context,
+      canvasDimensions,
+    });
   }
 
   private resetStateValues() {
@@ -119,7 +125,7 @@ export class EmphasisGestureListener extends GestureListener {
     this.emphasisLevel = 0;
     const currentDrawingMode = this.getAnimationBasedOnEmphasisLevel();
     this.publishToSubjectIfExists(
-      EmphasisGestureListener.currentAnimationSubjectKey,
+      EmphasisGestureListener.emphasisSubjectKey,
       currentDrawingMode
     );
   }
@@ -132,7 +138,7 @@ export class EmphasisGestureListener extends GestureListener {
     this.renderVisualIndicators();
     const currentDrawingMode = this.getAnimationBasedOnEmphasisLevel();
     this.publishToSubjectIfExists(
-      EmphasisGestureListener.currentAnimationSubjectKey,
+      EmphasisGestureListener.emphasisSubjectKey,
       currentDrawingMode
     );
   }
@@ -145,7 +151,7 @@ export class EmphasisGestureListener extends GestureListener {
     ) {
       const currentDrawingMode = this.getAnimationBasedOnEmphasisLevel();
       this.publishToSubjectIfExists(
-        EmphasisGestureListener.currentAnimationSubjectKey,
+        EmphasisGestureListener.emphasisSubjectKey,
         currentDrawingMode
       );
     }
@@ -186,9 +192,8 @@ export class EmphasisGestureListener extends GestureListener {
   setContext(ctx: CanvasRenderingContext2D): void {
     this.context = ctx;
     if (this.canvasDimensions) {
-      this.emphasisMeter = new EmphasisMeter({
-        canvasDimensions: this.canvasDimensions,
-        context: this.context,
+      this.emphasisMeter.updateState({
+        context: ctx,
       });
     }
   }

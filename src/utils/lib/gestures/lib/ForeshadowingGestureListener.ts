@@ -2,8 +2,10 @@ import {
   drawCircle,
   drawLine,
   drawRect,
+  EmphasisGestureListener,
   ForeshadowingAreaSubjectType,
   startTimeoutInstance,
+  type EmphasisGestureListenerConstructorArgs,
 } from "@/utils";
 import {
   calculateDistance,
@@ -21,7 +23,10 @@ import {
   type ListenerProcessedFingerData,
 } from "./GestureListener";
 import { SupportedGestures } from "./handGestures";
-import { LinearPlaybackGestureListener } from "./LinearPlaybackGestureListener";
+import {
+  LinearPlaybackGestureListener,
+  type LinearPlaybackGestureListenerConstructorArgs,
+} from "./LinearPlaybackGestureListener";
 
 export type ForeshadowingGestureListenerConstructorArgs =
   GestureListenerConstructorArgs;
@@ -63,6 +68,7 @@ export interface ForeshadowingShapePosition {
 
 export class ForeshadowingGestureListener extends GestureListener {
   static playbackSubjectKey = "playbackSubject";
+  static emphasisSubjectKey = "emphasisSubject";
   static foreshadowingAreaSubjectKey = "foreshadowingAreaSubject";
 
   private initialShapePositions: ForeshadowingShapePosition | undefined;
@@ -72,7 +78,9 @@ export class ForeshadowingGestureListener extends GestureListener {
   private recentRangePositions: ForeshadowingRangePosition | undefined;
 
   private currentShape: ForeshadowingShapes | undefined;
-  private rangeSlider: LinearPlaybackGestureListener | undefined;
+
+  private playbackController: LinearPlaybackGestureListener | undefined;
+  private emphasisController: EmphasisGestureListener | undefined;
 
   constructor({
     position,
@@ -143,32 +151,49 @@ export class ForeshadowingGestureListener extends GestureListener {
     };
   }
 
-  private placeListenerInPosition() {
-    if (this.recentRangePositions) {
-      if (this.rangeSlider) {
-        this.rangeSlider.updateState({
-          position: {
-            x: this.position.x,
-            y: Math.min(
-              this.recentRangePositions.leftFingerPosition.y,
-              this.recentRangePositions.rightFingerPosition.y
-            ),
-          },
-          dimensions: {
-            width: this.dimensions.width,
-            height: 50,
-          },
-          emitRange: {
-            start: this.recentRangePositions.leftFingerPosition,
-            end: this.recentRangePositions.rightFingerPosition,
-          },
-        });
-      } else {
-        const playbackSubject = this.getSubjectByKey(
-          ForeshadowingGestureListener.playbackSubjectKey
-        );
+  private placeListenerInPosition(shape: ForeshadowingShapes) {
+    if (shape === ForeshadowingShapes.RECTANGLE) {
+      const rectData = this.getRectDataFromState();
 
-        this.rangeSlider = new LinearPlaybackGestureListener({
+      if (!rectData) return;
+
+      const { coordinates, dimensions } = rectData;
+
+      const emphasisSubject = this.getSubjectByKey(
+        ForeshadowingGestureListener.emphasisSubjectKey
+      );
+
+      const emphasisControllerState: EmphasisGestureListenerConstructorArgs = {
+        position: coordinates,
+        dimensions,
+        gestureSubject: this.gestureSubject,
+        canvasDimensions: this.canvasDimensions,
+        resetKeys: this.resetKeys,
+        ...(emphasisSubject
+          ? {
+              subjects: {
+                [EmphasisGestureListener.emphasisSubjectKey]: emphasisSubject,
+              },
+            }
+          : {}),
+        context: this.context,
+      };
+
+      if (this.emphasisController) {
+        this.emphasisController.updateState(emphasisControllerState);
+      } else {
+        this.emphasisController = new EmphasisGestureListener(
+          emphasisControllerState
+        );
+      }
+    }
+    if (shape === ForeshadowingShapes.RANGE && this.recentRangePositions) {
+      const playbackSubject = this.getSubjectByKey(
+        ForeshadowingGestureListener.playbackSubjectKey
+      );
+
+      const playbackControllerState: LinearPlaybackGestureListenerConstructorArgs =
+        {
           position: {
             x: this.position.x,
             y: Math.min(
@@ -194,7 +219,15 @@ export class ForeshadowingGestureListener extends GestureListener {
                 },
               }
             : {}),
-        });
+          resetKeys: this.resetKeys,
+        };
+
+      if (this.playbackController) {
+        this.playbackController.updateState(playbackControllerState);
+      } else {
+        this.playbackController = new LinearPlaybackGestureListener(
+          playbackControllerState
+        );
       }
     }
   }
@@ -206,8 +239,8 @@ export class ForeshadowingGestureListener extends GestureListener {
     this.recentRangePositions = undefined;
   }
 
-  private resetRangeSlider() {
-    this.rangeSlider?.resetHandler();
+  private resetPlaybackController() {
+    this.playbackController?.resetHandler();
   }
 
   private resetShapeGestureState() {
@@ -215,6 +248,10 @@ export class ForeshadowingGestureListener extends GestureListener {
     this.currentShape = undefined;
     this.initialShapePositions = undefined;
     this.recentShapePositions = undefined;
+  }
+
+  private resetEmphasisController() {
+    this.emphasisController?.resetHandler();
   }
 
   private isCircleShape({
@@ -269,6 +306,49 @@ export class ForeshadowingGestureListener extends GestureListener {
     return false;
   }
 
+  private getRectDataFromState() {
+    if (this.recentShapePositions) {
+      const rectDimensions = {
+        width:
+          this.recentShapePositions.rightThumb.x -
+          this.recentShapePositions.rightIndex.x,
+        height:
+          this.recentShapePositions.rightIndex.y -
+          this.recentShapePositions.rightThumb.y,
+      };
+      const rectCoordinates = {
+        x: this.recentShapePositions.rightIndex.x,
+        y: this.recentShapePositions.rightThumb.y,
+      };
+
+      return {
+        coordinates: rectCoordinates,
+        dimensions: rectDimensions,
+      };
+    }
+    return undefined;
+  }
+
+  private getCircleDataFromState() {
+    if (this.recentShapePositions) {
+      const circleRadius =
+        (this.recentShapePositions.rightThumb.y -
+          this.recentShapePositions.rightIndex.y) /
+        2;
+      const circlePosition = {
+        x: this.recentShapePositions.rightIndex.x,
+        y: this.recentShapePositions.rightIndex.y + circleRadius,
+      };
+
+      return {
+        coordinates: circlePosition,
+        radius: circleRadius,
+      };
+    }
+
+    return undefined;
+  }
+
   private renderVisualIndicators(shape: ForeshadowingShapes) {
     if (this.context) {
       const fillStyle = "black";
@@ -280,31 +360,23 @@ export class ForeshadowingGestureListener extends GestureListener {
         shape === ForeshadowingShapes.RECTANGLE &&
         this.recentShapePositions
       ) {
-        const rectDimensions = {
-          width:
-            this.recentShapePositions.rightThumb.x -
-            this.recentShapePositions.rightIndex.x,
-          height:
-            this.recentShapePositions.rightIndex.y -
-            this.recentShapePositions.rightThumb.y,
-        };
-        const rectCoordinates = {
-          x: this.recentShapePositions.rightIndex.x,
-          y: this.recentShapePositions.rightThumb.y,
-        };
+        const rectData = this.getRectDataFromState();
 
+        if (!rectData) return;
+
+        const { coordinates, dimensions } = rectData;
         drawRect({
           context: this.context,
-          coordinates: rectCoordinates,
-          dimensions: rectDimensions,
+          coordinates,
+          dimensions,
           fill: true,
           fillStyle,
           opacity,
         });
 
         const foreshadowingArea = {
-          position: rectCoordinates,
-          dimensions: rectDimensions,
+          position: coordinates,
+          dimensions: dimensions,
         };
         this.publishToSubjectIfExists(
           ForeshadowingGestureListener.foreshadowingAreaSubjectKey,
@@ -315,25 +387,23 @@ export class ForeshadowingGestureListener extends GestureListener {
         );
       }
       if (shape === ForeshadowingShapes.CIRCLE && this.recentShapePositions) {
-        const circleRadius =
-          (this.recentShapePositions.rightThumb.y -
-            this.recentShapePositions.rightIndex.y) /
-          2;
-        const circlePosition = {
-          x: this.recentShapePositions.rightIndex.x,
-          y: this.recentShapePositions.rightIndex.y + circleRadius,
-        };
+        const circleData = this.getCircleDataFromState();
+
+        if (!circleData) return;
+
+        const { radius, coordinates } = circleData;
+
         drawCircle({
           context: this.context,
-          radius: circleRadius,
-          coordinates: circlePosition,
+          radius,
+          coordinates,
           fill: true,
           fillStyle,
           opacity,
         });
         const foreshadowingArea = {
-          position: circlePosition,
-          radius: circleRadius,
+          position: coordinates,
+          radius,
         };
         this.publishToSubjectIfExists(
           ForeshadowingGestureListener.foreshadowingAreaSubjectKey,
@@ -426,7 +496,7 @@ export class ForeshadowingGestureListener extends GestureListener {
                   if (this.currentShape === ForeshadowingShapes.RANGE) {
                     if (this.currentShape) {
                       this.renderVisualIndicators(this.currentShape);
-                      this.placeListenerInPosition();
+                      this.placeListenerInPosition(this.currentShape);
                     }
                   }
 
@@ -525,6 +595,7 @@ export class ForeshadowingGestureListener extends GestureListener {
               if (!containsValueLargerThanMax(diffs, 30)) {
                 if (this.currentShape) {
                   this.renderVisualIndicators(this.currentShape);
+                  this.placeListenerInPosition(this.currentShape);
                 }
               }
             }
@@ -561,7 +632,8 @@ export class ForeshadowingGestureListener extends GestureListener {
   resetHandler(): void {
     this.resetRangeGestureState();
     this.resetShapeGestureState();
-    this.resetRangeSlider();
+    this.resetPlaybackController();
+    this.resetEmphasisController();
     this.clearAllVisualIndicators();
   }
 

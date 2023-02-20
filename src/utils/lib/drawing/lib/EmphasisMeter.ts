@@ -6,7 +6,7 @@ import {
 } from "@/utils";
 
 interface EmphasisMeterConstructor {
-  context: CanvasRenderingContext2D | null | undefined;
+  context?: CanvasRenderingContext2D;
   canvasDimensions: Dimensions;
 }
 
@@ -82,6 +82,18 @@ export class EmphasisMeter {
         fillStyle,
         fill: true,
       });
+    }
+  }
+
+  updateState({
+    context,
+    canvasDimensions,
+  }: Partial<EmphasisMeterConstructor>) {
+    if (context) {
+      this.context = context;
+    }
+    if (canvasDimensions) {
+      this.canvasDimensions = canvasDimensions;
     }
   }
 
