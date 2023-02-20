@@ -5,15 +5,12 @@ import { HANDS } from "./gesture-utils";
 import {
   GestureListener,
   type GestureListenerConstructorArgs,
-  type GestureListenerSubjectMap,
   type ListenerProcessedFingerData,
 } from "./GestureListener";
 import { SupportedGestures } from "./handGestures";
 
-export interface EmphasisGestureListenerConstructorArgs
-  extends GestureListenerConstructorArgs {
-  subjects?: GestureListenerSubjectMap;
-}
+export type EmphasisGestureListenerConstructorArgs =
+  GestureListenerConstructorArgs;
 
 export type EmphasisListenerAnimationRangeConfig = [
   // Start value
@@ -109,29 +106,26 @@ export class EmphasisGestureListener extends GestureListener {
       gestureSubject,
       canvasDimensions,
       resetKeys,
+      subjects,
     });
 
-    this.subjects = subjects;
     this.gestureTypes = gestureTypes;
   }
 
   private resetStateValues() {
     this.resetTimer();
-    this.emphasisLevel = 0;
     this.isPreviousPositionInRange = false;
     this.emphasisMeter?.resetState();
-  }
-
-  private clearAllVisualIndicators() {
-    this.renderReferencePoints(true);
-    const currentDrawingMode =
-      EmphasisGestureListener.getConfigValuesBasedOnRange(
-        this.emphasisLevel
-      ).mode;
+    this.emphasisLevel = 0;
+    const currentDrawingMode = this.getAnimationBasedOnEmphasisLevel();
     this.publishToSubjectIfExists(
       EmphasisGestureListener.currentAnimationSubjectKey,
       currentDrawingMode
     );
+  }
+
+  private clearAllVisualIndicators() {
+    this.renderReferencePoints(true);
   }
 
   private onLevelIncrement() {
@@ -240,7 +234,8 @@ export class EmphasisGestureListener extends GestureListener {
     if (canEmit) {
       this.startDecrementTimer();
 
-      const lastValueToIncrementAt = EmphasisGestureListener.MAX_EMPHASIS -
+      const lastValueToIncrementAt =
+        EmphasisGestureListener.MAX_EMPHASIS -
         EmphasisGestureListener.INCREMENT_BY_VALUE;
 
       if (

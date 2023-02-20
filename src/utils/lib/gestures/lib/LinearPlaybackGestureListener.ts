@@ -1,13 +1,13 @@
-import { Subject } from "rxjs";
+import _ from "lodash";
 import type { Coordinate2D } from "../../chart";
 import { HANDS } from "./gesture-utils";
 import {
   GestureListener,
   type GestureListenerConstructorArgs,
-  type GestureListenerSubjectMap,
   type ListenerProcessedFingerData,
 } from "./GestureListener";
 import { SupportedGestures } from "./handGestures";
+import { PlaybackSubjectType } from "./subjects";
 
 export interface LinearListenerEmitRange {
   start: Coordinate2D;
@@ -20,16 +20,13 @@ export interface LinearPlaybackGestureListenerConstructorArgs
 }
 
 export class LinearPlaybackGestureListener extends GestureListener {
-  static trackingSubjectKey = "trackingSubject";
+  static playbackSubjectKey = "playbackSubject";
   private emitRange:
     | {
         start: Coordinate2D;
         end: Coordinate2D;
       }
     | undefined;
-  subjects: GestureListenerSubjectMap = {
-    [LinearPlaybackGestureListener.trackingSubjectKey]: new Subject(),
-  };
 
   constructor({
     position,
@@ -48,6 +45,7 @@ export class LinearPlaybackGestureListener extends GestureListener {
     canvasDimensions,
     emitRange,
     resetKeys,
+    subjects,
   }: LinearPlaybackGestureListenerConstructorArgs) {
     super({
       position,
@@ -57,6 +55,7 @@ export class LinearPlaybackGestureListener extends GestureListener {
       gestureSubject,
       canvasDimensions,
       resetKeys,
+      subjects,
     });
 
     this.emitRange = emitRange;
@@ -80,10 +79,9 @@ export class LinearPlaybackGestureListener extends GestureListener {
     }
   ) {
     if (range.min && range.max) {
-      if (value >= range.min && value <= range.max) {
-        return true;
-      }
-      return false;
+      if (range.min === range.max) return false;
+
+      return _.inRange(value, range.min, range.max);
     }
 
     return true;
@@ -154,6 +152,10 @@ export class LinearPlaybackGestureListener extends GestureListener {
         max: this.position.x + this.dimensions.width,
       }
     );
-    this.subjects.trackingSubject.next(trackingValue);
+
+    this.publishToSubjectIfExists(
+      LinearPlaybackGestureListener.playbackSubjectKey,
+      { type: PlaybackSubjectType.DISCRETE, value: trackingValue }
+    );
   }
 }
