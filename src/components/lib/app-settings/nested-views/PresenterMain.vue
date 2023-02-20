@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import {
-  DrawingMode,
+  currentAnimationSubject,
+  playbackSubject,
+  PlaybackSubjectType,
+  foreshadowingAreaSubject,
   LineEffect,
   type AnimatedLine,
   type Coordinate2D,
   type Dimensions,
+ForeshadowingAreaSubjectType,
 } from "@/utils";
 import { onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
@@ -14,17 +18,13 @@ import {
   ChartSettings,
   CanvasSettings,
   animationTrack,
-  linearTrackerSubject,
   radialDiscreteTrackerSubject,
   radialContinuousTrackerSubject,
   radialPlaybackTracker,
   emphasisTracker,
   foreshadowingTracker,
-  foreshadowingTrackerSubject,
   LegendSettings,
   gestureCanvasKeys,
-  foreshadowingAreaSubject,
-  currentAnimationSubject,
 } from "../settings-state";
 import VideoViews from "../../views/VideoViews.vue";
 
@@ -40,44 +40,37 @@ currentAnimationSubject.subscribe({
   },
 });
 
-LegendSettings.legendSubject.subscribe({
-  next(value: any) {
-    if (checkedLines.value.includes(value)) {
-      checkedLines.value = checkedLines.value.filter((line: any) => {
-        return line !== value;
-      });
-    } else {
-      checkedLines.value = [...checkedLines.value, value];
+// PLAYBACK CONTROLS
+playbackSubject.subscribe({
+  next(playbackValue: any) {
+    const { type, value } = playbackValue;
+
+    if (type === PlaybackSubjectType.DISCRETE) {
+      animationTrack.value = value;
+    }
+
+    if (type === PlaybackSubjectType.CONTINUOUS) {
+      handlePlayState("next");
     }
   },
 });
 
-linearTrackerSubject.value?.subscribe({
-  next(value: any) {
-    animationTrack.value = value;
-  },
-});
+// Foreshadowing area
+foreshadowingAreaSubject.subscribe({
+  next(foreshadowingAreaValue: any) {
+    const { type, value: foreshadowingArea } = foreshadowingAreaValue;
 
-radialDiscreteTrackerSubject.value?.subscribe({
-  next(value: any) {
-    animationTrack.value = value;
-  },
-});
-
-foreshadowingTrackerSubject.value?.subscribe({
-  next(value: any) {
-    animationTrack.value = value;
-  },
-});
-
-foreshadowingAreaSubject.value?.subscribe({
-  next(foreshadowingArea: { position: Coordinate2D; dimensions: Dimensions }) {
     Object.entries(
       ChartSettings.currentChart?.getAnimatedElements() ?? {}
     ).forEach(([key, value]: [string, AnimatedLine]) => {
       // Sets foreshdowing area for the chart item
       const triggerForeshadow = () => {
-        value.setForeshadowingArea(foreshadowingArea);
+        if (type === ForeshadowingAreaSubjectType.SET) {
+          value.setForeshadowingArea(foreshadowingArea);
+        }
+        if (type === ForeshadowingAreaSubjectType.CLEAR) {
+          value.setForeshadowingArea(undefined);
+        }
         value.drawCurrentState({
           bounds: {
             end: animationTrack.value,
@@ -93,6 +86,24 @@ foreshadowingAreaSubject.value?.subscribe({
         triggerForeshadow();
       }
     });
+  },
+});
+
+LegendSettings.legendSubject.subscribe({
+  next(value: any) {
+    if (checkedLines.value.includes(value)) {
+      checkedLines.value = checkedLines.value.filter((line: any) => {
+        return line !== value;
+      });
+    } else {
+      checkedLines.value = [...checkedLines.value, value];
+    }
+  },
+});
+
+radialDiscreteTrackerSubject.value?.subscribe({
+  next(value: any) {
+    animationTrack.value = value;
   },
 });
 
@@ -114,6 +125,7 @@ watch(checkedLines, () => {
         lineEffect = LineEffect.FOCUSED;
       } else {
         lineEffect = LineEffect.BACKGROUND;
+        value.setForeshadowingArea(undefined);
       }
     }
 
@@ -282,7 +294,7 @@ onMounted(() => {
         <VideoViews :className="className" />
         <ChartAxes :className="className" />
         <canvas
-          v-for="key in [...ChartSettings.canvasKeys, ...gestureCanvasKeys]"
+          v-for="key in [...gestureCanvasKeys, ...ChartSettings.canvasKeys]"
           v-bind:key="key"
           :width="CanvasSettings.dimensions.width"
           :height="CanvasSettings.dimensions.height"

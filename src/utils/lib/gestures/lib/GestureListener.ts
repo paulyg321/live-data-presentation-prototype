@@ -31,6 +31,7 @@ export interface GestureListenerConstructorArgs {
     leftHand: SupportedGestures;
   }[];
   resetKeys?: Set<string>;
+  subjects?: GestureListenerSubjectMap;
 }
 
 export type GestureListenerSubjectMap = { [key: string]: Subject<any> };
@@ -74,6 +75,7 @@ export abstract class GestureListener {
     gestureTypes,
     gestureSubject,
     canvasDimensions,
+    subjects,
     // ACCEPTED VALUES - https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_code_values
     resetKeys,
   }: GestureListenerConstructorArgs) {
@@ -89,6 +91,7 @@ export abstract class GestureListener {
       next: (data: any) => this.handler(data),
     });
     this.canvasDimensions = canvasDimensions;
+    this.subjects = subjects;
     if (resetKeys && resetKeys.size > 0) {
       this.resetKeys = resetKeys;
       this.setResetHandler();
@@ -171,6 +174,13 @@ export abstract class GestureListener {
     if (this.subjects && this.subjects[subjectKey]) {
       this.subjects[subjectKey].next(value);
     }
+  }
+
+  protected getSubjectByKey(subjectKey: string) {
+    if (this.subjects && this.subjects[subjectKey]) {
+      return this.subjects[subjectKey];
+    }
+    return undefined;
   }
 
   protected resetTimer() {

@@ -2,20 +2,23 @@
  * TODO: To have widgets, all the things here can be made dynamic under a gestureSettings object
  */
 import {
+  currentAnimationSubject,
   EmphasisGestureListener,
+  foreshadowingAreaSubject,
   ForeshadowingGestureListener,
   GestureTracker,
   LinearPlaybackGestureListener,
+  playbackSubject,
   RadialPlaybackGestureListener,
   RadialTrackerMode,
 } from "@/utils";
-import { Subject } from "rxjs";
 import { shallowRef, watchEffect } from "vue";
 import { CanvasSettings } from "./canvas-settings";
 import { ChartSettings } from "./chart-settings";
 import { PlaybackComponentSettings } from "./playback-component-settings";
 
 export const gestureCanvasKeys = ["dialing", "emphasis", "foreshadowing"];
+
 export const RESET_ALL_KEY = "Space";
 export function getGestureListenerResetKeys(
   keys: string | string[]
@@ -26,9 +29,6 @@ export function getGestureListenerResetKeys(
 
   return new Set([RESET_ALL_KEY, ...keys]);
 }
-
-// -------------------------- Subjects --------------------------
-export const currentAnimationSubject = new Subject();
 
 // -------------------------- GENERAL GESTURE TRACKING --------------------------
 
@@ -100,10 +100,11 @@ export const temporalPlaybackTracker = shallowRef(
     },
     gestureSubject: gestureTracker.value.gestureSubject,
     canvasDimensions: CanvasSettings.dimensions,
+    subjects: {
+      [LinearPlaybackGestureListener.playbackSubjectKey]: playbackSubject,
+    },
   })
 );
-
-export const linearTrackerSubject = shallowRef<any | undefined>(undefined);
 
 watchEffect(() => {
   const position = {
@@ -120,10 +121,6 @@ watchEffect(() => {
     position,
     dimensions,
   });
-
-  linearTrackerSubject.value = temporalPlaybackTracker.value.getSubject(
-    LinearPlaybackGestureListener.trackingSubjectKey
-  );
 });
 
 // radial tracker
@@ -167,13 +164,14 @@ export const foreshadowingTracker = shallowRef(
     dimensions: ChartSettings.dimensions,
     gestureSubject: gestureTracker.value.gestureSubject,
     canvasDimensions: CanvasSettings.dimensions,
+    subjects: {
+      [ForeshadowingGestureListener.playbackSubjectKey]: playbackSubject,
+      [ForeshadowingGestureListener.foreshadowingAreaSubjectKey]:
+        foreshadowingAreaSubject,
+    },
+    resetKeys: getGestureListenerResetKeys("KeyF"),
   })
 );
-
-export const foreshadowingTrackerSubject = shallowRef<any | undefined>(
-  undefined
-);
-export const foreshadowingAreaSubject = shallowRef<any | undefined>(undefined);
 
 watchEffect(() => {
   foreshadowingTracker.value.updateState({
@@ -182,11 +180,4 @@ watchEffect(() => {
   });
 
   foreshadowingTracker.value.renderReferencePoints();
-
-  foreshadowingTrackerSubject.value = foreshadowingTracker.value.getSubject(
-    ForeshadowingGestureListener.trackingSubjectKey
-  );
-  foreshadowingAreaSubject.value = foreshadowingTracker.value.getSubject(
-    ForeshadowingGestureListener.foreshadowingAreaSubjectKey
-  );
 });
