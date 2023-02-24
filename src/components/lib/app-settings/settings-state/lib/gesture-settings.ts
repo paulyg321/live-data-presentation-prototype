@@ -10,6 +10,7 @@ import {
   playbackSubject,
   RadialPlaybackGestureListener,
   RadialTrackerMode,
+  SupportedGestures,
 } from "@/utils";
 import { shallowRef, watchEffect } from "vue";
 import { CanvasSettings } from "./canvas-settings";
@@ -98,6 +99,12 @@ export const temporalPlaybackTracker = shallowRef(
       width: ChartSettings.dimensions.width,
       height: 50,
     },
+    gestureTypes: [
+      {
+        leftHand: SupportedGestures.OPEN_HAND,
+        rightHand: SupportedGestures.OPEN_HAND,
+      },
+    ],
     gestureSubject: gestureTracker.value.gestureSubject,
     canvasDimensions: CanvasSettings.dimensions,
     subjects: {

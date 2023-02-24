@@ -27,8 +27,8 @@ export class EmphasisGestureListener extends GestureListener {
   // These can be changed if we want to support configuration of the behaviour of our emphasis
   static MAX_EMPHASIS = 150;
   static INCREMENT_BY_VALUE = 50;
-  static DECREMENT_BY_VALUE = 1;
-  static DECREMENT_EVERY = 100;
+  static DECREMENT_BY_VALUE = 0;
+  static DECREMENT_EVERY = 125;
 
   // CONFIGURE THESE TO CONFIGURE THE ANIMATIONS AND RANGES FOR EMPHASIS VALUES
   static ANIMATION_RANGES: EmphasisListenerAnimationRangeConfig[] = [
@@ -216,12 +216,15 @@ export class EmphasisGestureListener extends GestureListener {
     this.renderBorder();
   }
 
-  protected handleNewData(fingerData: ListenerProcessedFingerData): void {
+  protected handleNewData(
+    fingerData: ListenerProcessedFingerData,
+    handCount: number
+  ): void {
     const dominantHand = fingerData[this.handsToTrack.dominant];
-    const nonDominantHand = fingerData[this.handsToTrack.nonDominant];
+    // const nonDominantHand = fingerData[this.handsToTrack.nonDominant];
 
     // Don't want non dominant hand in the frame
-    if (!dominantHand || nonDominantHand) {
+    if (!dominantHand || handCount === 2) {
       return;
     }
 

@@ -1,4 +1,5 @@
 import * as d3 from "d3";
+import dayjs from "dayjs";
 import { AnimatedLine, type Coordinate2D, type Dimensions } from "@/utils";
 
 export interface ChartType {
@@ -52,16 +53,18 @@ export class Chart {
 
   lines: ChartLineMap | undefined;
 
-  xDomain: [number, number] = [
-    Number.POSITIVE_INFINITY,
-    Number.NEGATIVE_INFINITY,
-  ];
-  yDomain: [number, number] = [
-    Number.POSITIVE_INFINITY,
-    Number.NEGATIVE_INFINITY,
-  ];
+  xDomain: [any, any] | undefined;
+  dataType:
+    | {
+        xType: "number" | "date" | undefined;
+        yType: "number" | "date" | undefined;
+      }
+    | undefined;
+  yDomain: [number, number] | undefined;
 
   context: { [key: string]: CanvasRenderingContext2D | null | undefined } = {};
+
+  keyframeData: any;
 
   /**
    * @param type the chart type
@@ -102,8 +105,8 @@ export class Chart {
     this.dimensions = dimensions;
     this.canvasDimensions = canvasDimensions;
 
-    this.setDomain();
     this.groupDataIntoKeyFrames();
+    this.setDomain();
     this.computeChartItems();
   }
 
@@ -117,30 +120,110 @@ export class Chart {
     }
   }
 
-  private setLineChartDomain() {
-    const stateAccessor = this.dataAccessor;
-    if (this.data.length > 0) {
-      this.data.forEach((statesArray: any) => {
-        // Leave as x & y because the data can be any pair of key values
-        const state = statesArray[stateAccessor] as { x: any; y: any }[];
-        const [minX, maxX] = d3.extent(state, (data) => data.x);
-        const [minY, maxY] = d3.extent(state, (data) => data.y);
+  private getDataTypeForValues(values: { x: any; y: any }) {
+    const { x, y } = values;
 
-        const [currentMinX, currentMaxX] = this.xDomain;
-        const [currentMinY, currentMaxY] = this.yDomain;
+    let xType: "date" | "number" | undefined;
+    let yType: "date" | "number" | undefined;
 
-        this.xDomain = [
-          d3.min([minX, currentMinX]),
-          d3.max([maxX, currentMaxX]),
-        ];
-        this.yDomain = [
-          d3.min([minY, currentMinY]),
-          d3.max([maxY, currentMaxY]),
-        ];
-      }, {});
-    } else {
-      throw new Error("Non existent data");
+    if (typeof x === "string") {
+      // check if it's a date, otherwise throw an error
+      if (dayjs(x).isValid()) {
+        xType = "date";
+      } else {
+        throw new Error("Type of x value unsupported");
+      }
+    } else if (typeof x === "number") {
+      xType = "number";
     }
+
+    if (typeof y === "string") {
+      // check if it's a date, otherwise throw an error
+      if (dayjs(y).isValid()) {
+        yType = "date";
+      } else {
+        throw new Error("Type of y value unsupported");
+      }
+    } else if (typeof y === "number") {
+      yType = "number";
+    }
+
+    return {
+      xType,
+      yType,
+    };
+  }
+
+  private setLineChartDomain() {
+    const parseTime = d3.timeParse("%Y-%m-%d");
+
+    let currentState = 0;
+    if (this.lines) {
+      const [key, line] = Object.entries(this.lines)[0];
+      currentState = line.currentState;
+    }
+
+    this.xDomain = undefined;
+    this.yDomain = undefined;
+    Object.entries(this.keyframeData).forEach(([_, value]: [string, any]) => {
+      const state: { x: any; y: any }[] = value[currentState].data;
+
+      if (state[0]) {
+        this.dataType = this.getDataTypeForValues(state[0]);
+      }
+
+      if (this.dataType?.xType && this.dataType?.yType) {
+        let xAccessor = (data: any) => data.x;
+        if (this.dataType.xType === "number") {
+          xAccessor = (data: any) => data.x;
+        } else if (this.dataType.xType === "date") {
+          xAccessor = (data) => parseTime(data.x);
+        } else {
+          throw new Error(
+            "Unable to instantiate new chart, data types unsupported"
+          );
+        }
+
+        const [minX, maxX] = d3.extent(state, xAccessor);
+
+        if (this.xDomain) {
+          const [currentMinX, currentMaxX] = this.xDomain;
+          this.xDomain = [
+            d3.min([minX, currentMinX]),
+            d3.max([maxX, currentMaxX]),
+          ];
+        } else {
+          this.xDomain = [minX, maxX];
+        }
+
+        let yAccessor = (data: any) => data.y;
+        if (this.dataType.yType === "number") {
+          yAccessor = (data: any) => data.y;
+        } else if (this.dataType.yType === "date") {
+          yAccessor = (data) => parseTime(data.y);
+        } else {
+          throw new Error(
+            "Unable to instantiate new chart, data types unsupported"
+          );
+        }
+
+        const [minY, maxY] = d3.extent(state, yAccessor);
+
+        if (this.yDomain) {
+          const [currentMinY, currentMaxY] = this.yDomain;
+          this.yDomain = [
+            d3.min([minY, currentMinY]),
+            d3.max([maxY, currentMaxY]),
+          ];
+        } else {
+          this.yDomain = [minY, maxY];
+        }
+      } else {
+        throw new Error(
+          "Unable to instantiate new chart, data types unsupported"
+        );
+      }
+    });
   }
 
   private groupDataIntoKeyFrames() {
@@ -182,13 +265,12 @@ export class Chart {
      *     ]
      * }
      */
-    return groupedData;
+    this.keyframeData = groupedData;
   }
 
   private setOrUpdateAnimatedLines() {
     if (this.lines === undefined) {
-      const keyframeData = this.groupDataIntoKeyFrames();
-      this.lines = Object.entries(keyframeData).reduce(
+      this.lines = Object.entries(this.keyframeData).reduce(
         (
           currentLines: any,
           [key, value]: [string, any],
@@ -197,16 +279,15 @@ export class Chart {
           const states = value.map(({ data }: any) => {
             return data;
           });
-          const { xScale, yScale } = this.getScales();
 
           currentLines[key] = new AnimatedLine({
             states,
-            xScale,
-            yScale,
+            getScales: () => this.getScales(),
             chartDimensions: this.getDimensions(),
             canvasDimensions: this.canvasDimensions,
             duration: 1000,
             color: colorArray[currentIndex],
+            dataType: this.dataType,
           });
           return currentLines;
         },
@@ -215,10 +296,8 @@ export class Chart {
     } else {
       Object.entries(this.lines).forEach(
         ([_, line]: [string, AnimatedLine]) => {
-          const { xScale, yScale } = this.getScales();
           line.updateState({
-            xScale,
-            yScale,
+            getScales: () => this.getScales(),
             chartDimensions: this.getDimensions(),
             canvasDimensions: this.canvasDimensions,
           });
@@ -272,15 +351,24 @@ export class Chart {
   }
 
   getScales() {
+    this.setDomain();
     // TODO: Change these based on the domain data
-    const xScaleFn = d3.scaleLinear;
-    const yScaleFn = d3.scaleLinear;
+    let xScaleFn: any = d3.scaleLinear;
+    let yScaleFn: any = d3.scaleLinear;
+
+    if (this.dataType?.xType === "date") {
+      xScaleFn = d3.scaleTime;
+    }
+
+    if (this.dataType?.yType === "date") {
+      yScaleFn = d3.scaleTime;
+    }
 
     const { xRange, yRange } = this.getRange();
 
     return {
-      xScale: xScaleFn(this.xDomain, xRange),
-      yScale: yScaleFn(this.yDomain, yRange),
+      xScale: xScaleFn(this.xDomain ?? [], xRange),
+      yScale: yScaleFn(this.yDomain ?? [], yRange),
     };
   }
 

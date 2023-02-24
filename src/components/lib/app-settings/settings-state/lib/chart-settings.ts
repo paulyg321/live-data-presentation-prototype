@@ -4,6 +4,7 @@ import {
   AnimatedLine,
   Chart,
   DrawingMode,
+  DrawingModeToEaseFunctionMap,
   type Coordinate2D,
   type Dimensions,
   type PartialCoordinate2D,
@@ -28,8 +29,6 @@ export const ChartSettings = reactive<{
   setCanvasKeys: () => void;
   animationMode: DrawingMode;
   setAnimationMode: (mode: DrawingMode) => void;
-  transitionFunction: (time: number) => number;
-  setTransitionFunction: (transitionFunc: (time: number) => number) => void;
   handlePlay: (type: string) => void;
   selectedChartItems: string[];
   addSelectedChartItem: (itemKey: string) => void;
@@ -153,28 +152,29 @@ export const ChartSettings = reactive<{
   setAnimationMode(mode: DrawingMode) {
     this.animationMode = mode;
   },
-  transitionFunction: (time: number) => d3.easeExpIn(Math.min(1, time + 0.5)),
-  setTransitionFunction(transitionFunc: (time: number) => number) {
-    this.transitionFunction = transitionFunc;
-  },
   handlePlay(type: string) {
     const play = ({ line }: { line: AnimatedLine }) => {
+      const { transitionFunction, duration } =
+        DrawingModeToEaseFunctionMap[`${this.animationMode}`];
+
+      line.updateState({ duration });
+
       if (type === "prev") {
         line.animateToPreviousState({
           playRemainingStates: false,
-          transitionFunction: this.transitionFunction,
+          transitionFunction,
           mode: this.animationMode,
         });
       } else if (type === "next") {
         line.animateToNextState({
           playRemainingStates: false,
-          transitionFunction: this.transitionFunction,
+          transitionFunction,
           mode: this.animationMode,
         });
       } else if (type === "all") {
         line.animateToNextState({
           playRemainingStates: true,
-          transitionFunction: this.transitionFunction,
+          transitionFunction,
           mode: this.animationMode,
         });
       }

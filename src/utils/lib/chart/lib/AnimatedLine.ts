@@ -1,7 +1,7 @@
 import type { Coordinate2D, Dimensions } from "../types";
 import * as d3 from "d3";
 import {
-  clearArea,
+  axesSubject,
   drawCircle,
   drawRect,
   drawText,
@@ -10,12 +10,33 @@ import {
   type ForeshadowingAreaData,
 } from "@/utils";
 
+const parseTime = d3.timeParse("%Y-%m-%d");
+
 export enum DrawingMode {
   DRAW_ALL = "Draw All",
   UNDULATE_ANIMATION = "Tenderness - Undulate", // level 1
   BASELINE_ANIMATION = "Joy - Baseline", // level 2
   DROP_ANIMATION = "Excitement - Drop", // level 3
 }
+
+export const DrawingModeToEaseFunctionMap = {
+  [DrawingMode.DRAW_ALL]: {
+    transitionFunction: d3.easeLinear,
+    duration: 3000,
+  },
+  [DrawingMode.UNDULATE_ANIMATION]: {
+    transitionFunction: d3.easeLinear,
+    duration: 3000,
+  },
+  [DrawingMode.BASELINE_ANIMATION]: {
+    transitionFunction: d3.easeLinear,
+    duration: 3000,
+  },
+  [DrawingMode.DROP_ANIMATION]: {
+    transitionFunction: d3.easeLinear,
+    duration: 200,
+  },
+};
 
 export enum LineShape {
   CURVED = "curved",
@@ -30,18 +51,30 @@ export enum LineEffect {
 
 export interface AnimatedLineConstructorArgs {
   states: Coordinate2D[][];
-  xScale: any;
-  yScale: any;
   chartDimensions: Dimensions;
   canvasDimensions: Dimensions;
   duration: number;
   color?: string;
   lineWidth?: number;
   opacity?: number;
+  dataType?: {
+    xType: "number" | "date" | undefined;
+    yType: "number" | "date" | undefined;
+  };
+  getScales: () => {
+    xScale: (value: any) => number;
+    yScale: (value: any) => number;
+  };
 }
 
 export class AnimatedLine {
   states: Coordinate2D[][];
+  dataType:
+    | {
+        xType: "number" | "date" | undefined;
+        yType: "number" | "date" | undefined;
+      }
+    | undefined;
   yScale: any;
   xScale: any;
   currentState: number;
@@ -52,24 +85,29 @@ export class AnimatedLine {
   color = "steelblue";
   lineWidth = 2;
   opacity = 0.7;
+  getScales: () => {
+    xScale: (value: any) => number;
+    yScale: (value: any) => number;
+  };
 
   context: CanvasRenderingContext2D | undefined;
   foreshadowingArea: ForeshadowingAreaData | undefined;
 
   constructor({
     states,
-    xScale,
-    yScale,
     chartDimensions,
     canvasDimensions,
     duration,
     color,
     lineWidth,
     opacity,
+    dataType,
+    getScales,
   }: AnimatedLineConstructorArgs) {
+    this.dataType = dataType;
     this.chartDimensions = chartDimensions;
-    this.xScale = xScale;
-    this.yScale = yScale;
+    this.getScales = getScales;
+    this.initializeScales();
     this.states = states;
     this.currentState = 0;
     this.canvasDimensions = canvasDimensions;
@@ -82,6 +120,28 @@ export class AnimatedLine {
       lineWidth,
       opacity,
     });
+  }
+
+  private initializeScales() {
+    const { xScale, yScale } = this.getScales();
+
+    if (this.dataType?.xType === "date") {
+      this.xScale = (value: any) => {
+        return xScale(parseTime(value));
+      };
+    } else {
+      this.xScale = xScale;
+    }
+
+    if (this.dataType?.yType === "date") {
+      this.yScale = (value: any) => {
+        return yScale(parseTime(value));
+      };
+    } else {
+      this.yScale = yScale;
+    }
+
+    axesSubject.next(true);
   }
 
   private configureLineContextSettings() {
@@ -112,8 +172,6 @@ export class AnimatedLine {
 
   updateState({
     states,
-    xScale,
-    yScale,
     chartDimensions,
     canvasDimensions,
     duration,
@@ -123,12 +181,6 @@ export class AnimatedLine {
   }: Partial<AnimatedLineConstructorArgs>) {
     if (states) {
       this.states = states;
-    }
-    if (xScale) {
-      this.xScale = xScale;
-    }
-    if (yScale) {
-      this.yScale = yScale;
     }
     if (chartDimensions) {
       this.chartDimensions = chartDimensions;
@@ -253,7 +305,7 @@ export class AnimatedLine {
               y: this.yScale(point.y) + 10,
             },
             text: `$${Math.round(point.y)}`,
-            fillStyle: "black",
+            fillStyle: "white",
             strokeStyle: this.color,
             fontSize: isSelected ? LARGE_FONT : DEFAULT_FONT,
             opacity: 1,
@@ -337,13 +389,14 @@ export class AnimatedLine {
   }
 
   draw(
-    coordinates: Coordinate2D[],
+    coordinates: { x: any; y: any }[],
     mode: DrawingMode,
     shape: LineShape,
     beforeClear?: () => void,
     endBound = 1,
     startBound = 0
   ) {
+    console.log(coordinates);
     this.configureLineContextSettings();
     // draw line
     const totalLength = this.lineLength({
@@ -456,6 +509,7 @@ export class AnimatedLine {
     currentState: Coordinate2D[];
     nextState: Coordinate2D[];
   }) {
+    const formatTime = d3.timeFormat("%Y-%m-%d");
     if (boundedTimeSteps.length === 1) {
       const [boundedTimeStep] = boundedTimeSteps;
       let transitionStep: number;
@@ -480,8 +534,20 @@ export class AnimatedLine {
           };
 
           return {
-            x: d3.interpolate(x, xNext)(transitionStep),
-            y: d3.interpolate(y, yNext)(transitionStep),
+            x:
+              this.dataType?.xType === "date"
+                ? formatTime(d3.interpolateDate(
+                    parseTime(x as unknown as string) ?? new Date(),
+                    parseTime(xNext as unknown as string) ?? new Date()
+                  )(transitionStep))
+                : d3.interpolate(x, xNext)(transitionStep),
+            y:
+              this.dataType?.yType === "date"
+                ? formatTime(d3.interpolateDate(
+                    parseTime(y as unknown as string) ?? new Date(),
+                    parseTime(yNext as unknown as string) ?? new Date()
+                  )(transitionStep))
+                : d3.interpolate(y, yNext)(transitionStep),
           };
         }
       );
@@ -507,6 +573,11 @@ export class AnimatedLine {
           } else {
             transitionStep = boundedTimeStep;
           }
+
+          /**
+           * NEED TO USE SCALES HERE!
+           */
+
           // We don't use scale here because the draw() & drawSequential() methods use the scales
           const { x, y } = {
             x: coordinate.x,
@@ -519,8 +590,20 @@ export class AnimatedLine {
           };
 
           return {
-            x: d3.interpolate(x, xNext)(transitionStep),
-            y: d3.interpolate(y, yNext)(transitionStep),
+            x:
+              this.dataType?.xType === "date"
+                ? formatTime(d3.interpolateDate(
+                    parseTime(x as unknown as string) ?? new Date(),
+                    parseTime(xNext as unknown as string) ?? new Date()
+                  )(transitionStep))
+                : d3.interpolate(x, xNext)(transitionStep),
+            y:
+              this.dataType?.yType === "date"
+                ? formatTime(d3.interpolateDate(
+                    parseTime(y as unknown as string) ?? new Date(),
+                    parseTime(yNext as unknown as string) ?? new Date()
+                  )(transitionStep))
+                : d3.interpolate(y, yNext)(transitionStep),
           };
         }
       );
@@ -545,9 +628,10 @@ export class AnimatedLine {
     mode: DrawingMode;
   }) {
     if (mode === DrawingMode.DROP_ANIMATION) {
-      const nextIndex = this.currentState + 1;
+      this.currentState++;
+      this.initializeScales();
 
-      const nextStateData = this.states[nextIndex];
+      const nextStateData = this.states[this.currentState];
 
       if (!nextStateData) return;
       const timer = d3.timer((elapsed: number) => {
@@ -564,7 +648,6 @@ export class AnimatedLine {
         if (boundedTimeStep === 1) {
           const lastStateIndex = this.states.length - 1;
           const moreStatesExist = this.currentState < lastStateIndex;
-          this.currentState++;
           if (playRemainingStates && moreStatesExist) {
             this.animateToNextState({
               playRemainingStates,
@@ -578,8 +661,11 @@ export class AnimatedLine {
     }
 
     if (mode === DrawingMode.DRAW_ALL) {
-      const currentIndex = this.currentState;
-      const nextIndex = this.currentState + 1;
+      this.currentState++;
+      this.initializeScales();
+
+      const currentIndex = this.currentState - 1;
+      const nextIndex = this.currentState;
 
       const currentStateData = this.states[currentIndex];
       const nextStateData = this.states[nextIndex];
@@ -597,7 +683,6 @@ export class AnimatedLine {
         if (boundedTimeStep === 1) {
           const lastStateIndex = this.states.length - 1;
           const moreStatesExist = this.currentState < lastStateIndex;
-          this.currentState++;
           if (playRemainingStates && moreStatesExist) {
             this.animateToNextState({
               playRemainingStates,
@@ -611,8 +696,11 @@ export class AnimatedLine {
     }
 
     if (mode === DrawingMode.UNDULATE_ANIMATION) {
-      const currentIndex = this.currentState;
-      const nextIndex = this.currentState + 1;
+      this.currentState++;
+      this.initializeScales();
+
+      const currentIndex = this.currentState - 1;
+      const nextIndex = this.currentState;
 
       const currentStateData = this.states[currentIndex];
       const nextStateData = this.states[nextIndex];
@@ -637,7 +725,6 @@ export class AnimatedLine {
         if (lastPointTimeStep === 1) {
           const lastStateIndex = this.states.length - 1;
           const moreStatesExist = this.currentState < lastStateIndex;
-          this.currentState++;
           if (playRemainingStates && moreStatesExist) {
             this.animateToNextState({
               playRemainingStates,
@@ -651,9 +738,10 @@ export class AnimatedLine {
     }
 
     if (mode === DrawingMode.BASELINE_ANIMATION) {
-      const nextIndex = this.currentState + 1;
+      this.currentState++;
+      this.initializeScales();
 
-      const nextStateData = this.states[nextIndex];
+      const nextStateData = this.states[this.currentState];
 
       if (!nextStateData) return;
 
@@ -662,7 +750,6 @@ export class AnimatedLine {
         DrawingMode.BASELINE_ANIMATION,
         LineShape.CURVED
       );
-      this.currentState++;
 
       const seqTimer = d3.timer((elapsed: number) => {
         const boundedTimeStep = Math.min(elapsed / this.duration, 1);
@@ -692,9 +779,10 @@ export class AnimatedLine {
     mode: DrawingMode;
   }) {
     if (mode === DrawingMode.DROP_ANIMATION) {
-      const prevIndex = this.currentState - 1;
+      this.currentState--;
+      this.initializeScales();
 
-      const prevStateData = this.states[prevIndex];
+      const prevStateData = this.states[this.currentState];
 
       if (!prevStateData) return;
 
@@ -712,7 +800,6 @@ export class AnimatedLine {
         });
         if (boundedTimeStep === 1) {
           const moreStatesExist = this.currentState > 0;
-          this.currentState--;
           if (playRemainingStates && moreStatesExist) {
             this.animateToPreviousState({
               playRemainingStates,
@@ -726,8 +813,11 @@ export class AnimatedLine {
     }
 
     if (mode === DrawingMode.DRAW_ALL) {
-      const currentIndex = this.currentState;
-      const prevIndex = this.currentState - 1;
+      this.currentState--;
+      this.initializeScales();
+
+      const currentIndex = this.currentState + 1;
+      const prevIndex = this.currentState;
 
       if (prevIndex < 0) return;
 
@@ -746,7 +836,6 @@ export class AnimatedLine {
         });
         if (boundedTimeStep === 1) {
           const moreStatesExist = this.currentState > 0;
-          this.currentState--;
           if (playRemainingStates && moreStatesExist) {
             this.animateToPreviousState({
               playRemainingStates,
@@ -760,9 +849,10 @@ export class AnimatedLine {
     }
 
     if (mode === DrawingMode.BASELINE_ANIMATION) {
-      const prevIndex = this.currentState - 1;
+      this.currentState--;
+      this.initializeScales();
 
-      const prevStateData = this.states[prevIndex];
+      const prevStateData = this.states[this.currentState];
 
       if (!prevStateData) return;
 
@@ -772,12 +862,10 @@ export class AnimatedLine {
         DrawingMode.BASELINE_ANIMATION,
         LineShape.CURVED
       );
-      this.currentState--;
       const seqTimer = d3.timer((elapsed: number) => {
         const boundedTimeStep = Math.min(elapsed / sequentialDelay, 1);
         if (boundedTimeStep === 1) {
           const moreStatesExist = this.currentState > 0;
-          this.currentState--;
           if (playRemainingStates && moreStatesExist) {
             this.animateToPreviousState({
               playRemainingStates,
@@ -791,8 +879,11 @@ export class AnimatedLine {
     }
 
     if (mode === DrawingMode.UNDULATE_ANIMATION) {
-      const currentIndex = this.currentState;
-      const prevIndex = this.currentState - 1;
+      this.currentState--;
+      this.initializeScales();
+
+      const currentIndex = this.currentState + 1;
+      const prevIndex = this.currentState;
 
       if (prevIndex < 0) return;
 
@@ -818,7 +909,6 @@ export class AnimatedLine {
         });
         if (lastPointTimeStep === 1) {
           const moreStatesExist = this.currentState > 0;
-          this.currentState--;
           if (playRemainingStates && moreStatesExist) {
             this.animateToNextState({
               playRemainingStates,

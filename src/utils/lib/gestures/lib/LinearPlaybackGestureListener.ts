@@ -115,12 +115,15 @@ export class LinearPlaybackGestureListener extends GestureListener {
     this.emitRange = undefined;
   }
 
-  protected handleNewData(fingerData: ListenerProcessedFingerData): void {
+  protected handleNewData(
+    fingerData: ListenerProcessedFingerData,
+    handCount: number
+  ): void {
     const dominantHand = fingerData[this.handsToTrack.dominant];
-    const nonDominantHand = fingerData[this.handsToTrack.nonDominant];
+    // const nonDominantHand = fingerData[this.handsToTrack.nonDominant];
 
     // Don't want non dominant hand in the frame
-    if (!dominantHand || nonDominantHand) {
+    if (!dominantHand || handCount === 2) {
       return;
     }
 

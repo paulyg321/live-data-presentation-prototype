@@ -168,7 +168,8 @@ export abstract class GestureListener {
   abstract resetHandler(): void;
 
   protected abstract handleNewData(
-    fingerData: ListenerProcessedFingerData
+    fingerData: ListenerProcessedFingerData,
+    handCount: number
   ): void;
 
   protected publishToSubjectIfExists(subjectKey: string, value: any) {
@@ -305,6 +306,9 @@ export abstract class GestureListener {
       leftHandGestures,
     } = gestureData;
 
+    const landmarks = [rightHandLandmarks, leftHandLandmarks];
+    const handCount = landmarks.filter((value: unknown) => value).length;
+
     let rightHandData: ProcessedGestureListenerFingerData | undefined;
     let leftHandData: ProcessedGestureListenerFingerData | undefined;
 
@@ -325,10 +329,13 @@ export abstract class GestureListener {
           gestureType: gestureType.leftHand,
         });
 
-        this.handleNewData({
-          [HANDS.RIGHT]: rightHandData,
-          [HANDS.LEFT]: leftHandData,
-        });
+        this.handleNewData(
+          {
+            [HANDS.RIGHT]: rightHandData,
+            [HANDS.LEFT]: leftHandData,
+          },
+          handCount
+        );
       }
     );
   }

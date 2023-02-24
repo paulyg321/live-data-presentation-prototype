@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { clearArea, drawXAxis, drawYAxis } from "@/utils";
-import { onMounted, ref, watchEffect } from "vue";
+import { axesSubject, clearArea, drawXAxis, drawYAxis } from "@/utils";
+import { onMounted, watchEffect } from "vue";
 import { CanvasSettings, ChartSettings } from "../app-settings/settings-state";
 
 type VideoViewsProps = {
@@ -10,6 +10,12 @@ const props = defineProps<VideoViewsProps>();
 
 watchEffect(() => {
   handleDrawAxes();
+});
+
+axesSubject.subscribe({
+  next(value: any) {
+    handleDrawAxes();
+  },
 });
 
 function handleDrawAxes() {
