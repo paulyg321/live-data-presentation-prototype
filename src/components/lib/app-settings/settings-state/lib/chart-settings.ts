@@ -1,13 +1,16 @@
 import * as d3 from "d3";
 import { reactive, ref } from "vue";
 import {
+  AnimatedCircle,
   AnimatedLine,
   Chart,
   DrawingMode,
-  DrawingModeToEaseFunctionMap,
+  AnimatedLineDrawingModeToEaseFunctionMap,
+  AnimatedCircleDrawingModeToEaseFunctionMap,
   type Coordinate2D,
   type Dimensions,
   type PartialCoordinate2D,
+  ChartTypeValue,
 } from "@/utils";
 
 const initialChartWidth = 400;
@@ -22,18 +25,18 @@ export const ChartSettings = reactive<{
   setCurrentChart: (index: number) => void;
   addChart: (newChart: Chart) => void;
   iterateOverChartItems: (
-    callbackFn: (key: string, value: any) => void
+    callbackFn: (items: AnimatedCircle | AnimatedLine) => void
   ) => void;
   changeMargins: (margin: number) => void;
   canvasKeys: string[];
   setCanvasKeys: () => void;
   animationMode: DrawingMode;
   setAnimationMode: (mode: DrawingMode) => void;
-  handlePlay: (type: string) => void;
+  handlePlay: (type: string, callbackFn?: any) => void;
   selectedChartItems: string[];
   addSelectedChartItem: (itemKey: string) => void;
   removeSelectedChartItem: (itemKey: string) => void;
-  isItemSelected: (itemKey: string) => boolean;
+  isItemSelected: (itemKey: AnimatedCircle | AnimatedLine | string) => boolean;
   playbackExtent: number;
   setPlaybackExtent: (value: number) => void;
 }>({
@@ -46,15 +49,12 @@ export const ChartSettings = reactive<{
      * the keys are used to access the canvas Contexts using CanvasSettings.canvasCtx[<key>]
      */
     const animatedElements = this.currentChart?.getAnimatedElements();
+    const elementKeys =
+      animatedElements?.map(
+        (item: AnimatedLine | AnimatedCircle) => item.key
+      ) ?? [];
 
-    if (animatedElements) {
-      this.canvasKeys = Object.keys(animatedElements).reduce(
-        (keys, key: string) => {
-          return [...keys, key, `${key}-legend`];
-        },
-        [] as string[]
-      );
-    }
+    this.canvasKeys = [...elementKeys, "legend"];
   },
   dimensions: {
     width: initialChartWidth,
@@ -139,10 +139,12 @@ export const ChartSettings = reactive<{
     // Effects
     this.setCanvasKeys();
   },
-  iterateOverChartItems(callbackFn: (key: string, value: any) => void) {
-    Object.entries(this.currentChart?.getAnimatedElements() ?? {}).forEach(
-      ([key, value]: [string, any]) => {
-        callbackFn(key, value);
+  iterateOverChartItems(
+    callbackFn: (item: AnimatedCircle | AnimatedLine) => void
+  ) {
+    (this.currentChart?.getAnimatedElements() ?? []).forEach(
+      (item: AnimatedCircle | AnimatedLine) => {
+        callbackFn(item);
       }
     );
   },
@@ -152,45 +154,55 @@ export const ChartSettings = reactive<{
   setAnimationMode(mode: DrawingMode) {
     this.animationMode = mode;
   },
-  handlePlay(type: string) {
-    const play = ({ line }: { line: AnimatedLine }) => {
-      const { transitionFunction, duration } =
-        DrawingModeToEaseFunctionMap[`${this.animationMode}`];
+  handlePlay(type: string, callbackFn?: any) {
+    const play = ({ item }: { item: any }) => {
+      let transitionFunction,
+        duration = 3000;
 
-      line.updateState({ duration });
+      if (this.currentChart?.type.value === ChartTypeValue.LINE) {
+        ({ transitionFunction, duration } =
+          AnimatedLineDrawingModeToEaseFunctionMap[`${this.animationMode}`]);
+      }
+      if (this.currentChart?.type.value === ChartTypeValue.SCATTER) {
+        ({ transitionFunction, duration } =
+          AnimatedCircleDrawingModeToEaseFunctionMap[`${this.animationMode}`]);
+      }
+
+      item.updateState({ duration });
 
       if (type === "prev") {
-        line.animateToPreviousState({
+        item.animateToPreviousState({
           playRemainingStates: false,
           transitionFunction,
           mode: this.animationMode,
+          callbackFn,
         });
       } else if (type === "next") {
-        line.animateToNextState({
+        item.animateToNextState({
           playRemainingStates: false,
           transitionFunction,
           mode: this.animationMode,
+          callbackFn,
         });
       } else if (type === "all") {
-        line.animateToNextState({
+        item.animateToNextState({
           playRemainingStates: true,
           transitionFunction,
           mode: this.animationMode,
+          callbackFn,
         });
       }
     };
 
-    this.iterateOverChartItems((key: string, value: AnimatedLine) => {
+    this.iterateOverChartItems((item: AnimatedCircle | AnimatedLine) => {
       if (this.selectedChartItems.length === 0) {
         play({
-          line: value,
+          item,
         });
-        return;
-      } else if (this.isItemSelected(key)) {
+      } else if (this.isItemSelected(item)) {
         play({
-          line: value,
+          item,
         });
-        return;
       }
     });
   },
@@ -203,8 +215,15 @@ export const ChartSettings = reactive<{
   addSelectedChartItem(itemKey: string) {
     this.selectedChartItems = [...this.selectedChartItems, itemKey];
   },
-  isItemSelected(itemKey: string) {
-    return this.selectedChartItems.includes(itemKey);
+  isItemSelected(item: AnimatedCircle | AnimatedLine | string) {
+    if (typeof item === "string") {
+      return this.selectedChartItems.includes(item);
+    }
+
+    return (
+      this.selectedChartItems.includes(item.key) ||
+      this.selectedChartItems.includes(item.group)
+    );
   },
   playbackExtent: 1,
   setPlaybackExtent(value: number) {

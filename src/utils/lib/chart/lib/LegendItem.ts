@@ -17,13 +17,12 @@ import type { Subject } from "rxjs";
 
 export interface LegendConstructorArgs {
   label: string;
-  position: Coordinate2D;
+  position?: Coordinate2D;
+  dimensions?: Dimensions;
   canvasDimensions: Dimensions;
-  dimensions: Dimensions;
   color: string;
-  gestureTracker: GestureTracker;
-  legendSubject: Subject<any>;
-  index: number;
+  gestureTracker?: GestureTracker;
+  legendSubject?: Subject<any>;
 }
 
 const selectionWaitTime = 500;
@@ -31,47 +30,66 @@ const selectionWaitTime = 500;
 export class LegendItem {
   label: string;
   private color: string;
-  private position: Coordinate2D;
+  private position: Coordinate2D | undefined;
+  private dimensions: Dimensions | undefined;
   private canvasDimensions: Dimensions;
-  private dimensions: Dimensions;
-  gestureTracker: GestureTracker;
-  legendSubject: Subject<any>;
+  gestureTracker: GestureTracker | undefined;
+  legendSubject: Subject<any> | undefined;
   private previousHandPositionInRange: boolean | undefined = false;
   private timer: d3.Timer | undefined;
   private context: CanvasRenderingContext2D | undefined;
-  private index: number;
+
+  static getPositionFromIndex(
+    position: Coordinate2D,
+    index: number,
+    dimensions: Dimensions
+  ) {
+    return {
+      x: position.x,
+      y: position.y + index * dimensions.height,
+    };
+  }
 
   constructor({
     label,
     color,
     dimensions,
     position,
-    gestureTracker,
     // passing the subject so all legends can share the same subject and push their keys when they're in range
     legendSubject,
-    index,
-    canvasDimensions
+    canvasDimensions,
+    gestureTracker,
   }: LegendConstructorArgs) {
-    this.dimensions = dimensions;
+    if (dimensions) {
+      this.dimensions = dimensions;
+    }
+    if (position) {
+      this.position = position;
+    }
+    if (legendSubject) {
+      this.legendSubject = legendSubject;
+    }
     this.label = label;
     this.color = color;
-    this.index = index;
-    this.position = this.getPositionFromIndex(position);
-    this.legendSubject = legendSubject;
-    this.gestureTracker = gestureTracker;
-    this.gestureTracker.gestureSubject.subscribe({
-      next: (gestureData: GestureTrackerValues) => {
-        this.gestureListener(gestureData);
-      },
-    });
     this.canvasDimensions = canvasDimensions;
+    if (gestureTracker) {
+      this.setGestureTracker(gestureTracker);
+    }
   }
 
-  getPositionFromIndex(position: Coordinate2D) {
-    return {
-      x: position.x,
-      y: position.y + this.index * this.dimensions.height,
-    };
+  setGestureTracker(gestureTracker: GestureTracker) {
+    this.gestureTracker = gestureTracker;
+    if (this.gestureTracker) {
+      this.gestureTracker.gestureSubject.subscribe({
+        next: (gestureData: GestureTrackerValues) => {
+          this.gestureListener(gestureData);
+        },
+      });
+    }
+  }
+
+  setLegendSubject(legendSubject: Subject<any>) {
+    this.legendSubject = legendSubject;
   }
 
   setContext(ctx: CanvasRenderingContext2D) {
@@ -88,7 +106,7 @@ export class LegendItem {
     dimensions?: Dimensions;
   }) {
     if (position) {
-      this.position = this.getPositionFromIndex(position);
+      this.position = position;
     }
     if (color) {
       this.color = color;
@@ -99,15 +117,22 @@ export class LegendItem {
   }
 
   getBounds() {
+    if (this.position && this.dimensions) {
+      return {
+        x: {
+          start: this.position.x,
+          end: this.position.x + this.dimensions.width,
+        },
+        y: {
+          start: this.position.y,
+          end: this.position.y + this.dimensions.height,
+        },
+      };
+    }
+
     return {
-      x: {
-        start: this.position.x,
-        end: this.position.x + this.dimensions.width,
-      },
-      y: {
-        start: this.position.y,
-        end: this.position.y + this.dimensions.height,
-      },
+      x: { start: 0, end: 0 },
+      y: { start: 0, end: 0 },
     };
   }
 
@@ -153,7 +178,7 @@ export class LegendItem {
     this.timer = startTimeoutInstance({
       onCompletion: () => {
         if (this.previousHandPositionInRange) {
-          this.legendSubject.next(this.label);
+          this.legendSubject?.next(this.label);
         }
         this.previousHandPositionInRange = undefined;
         this.timer = undefined;
@@ -163,12 +188,12 @@ export class LegendItem {
   }
 
   drawLegend() {
-    if (this.context) {
-      clearArea({
-        context: this.context,
-        coordinates: { x: 0, y: 0 },
-        dimensions: this.canvasDimensions,
-      });
+    if (this.context && this.position) {
+      // clearArea({
+      //   context: this.context,
+      //   coordinates: { x: 0, y: 0 },
+      //   dimensions: this.canvasDimensions,
+      // });
       drawRect({
         context: this.context,
         coordinates: this.position,

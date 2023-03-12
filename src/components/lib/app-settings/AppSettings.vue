@@ -113,7 +113,7 @@ onMounted(() => {
         </v-list>
       </v-navigation-drawer>
 
-      <v-navigation-drawer permanent width="450">
+      <v-navigation-drawer permanent width="300">
         <!-- Chart Settings -->
         <div class="form-row" v-if="currentTab === SettingsTab.CHART_SETTINGS">
           <ChartSettingsTab />

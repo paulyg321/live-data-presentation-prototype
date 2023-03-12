@@ -10,6 +10,7 @@ interface DrawingArgs {
   fill?: boolean;
   stroke?: boolean;
   strokeStyle?: string;
+  lineWidth?: number;
   fillStyle?: string;
   opacity?: number;
   clip?: boolean;
@@ -22,6 +23,7 @@ export interface ModifyContextStyleArgs {
   fontSize?: number;
   opacity?: number;
   lineWidth?: number;
+  lineDash?: number[];
 }
 
 export interface DrawCircleArgs extends DrawingArgs {
@@ -46,6 +48,8 @@ export interface DrawLineArgs {
   endCoordinates: Coordinate2D;
   strokeStyle?: string;
   lineWidth?: number;
+  opacity?: number;
+  lineDash?: number[];
 }
 
 export function drawText({
@@ -97,6 +101,7 @@ export function drawCircle({
   fillStyle,
   drawLineToCenter = false,
   opacity,
+  lineWidth,
 }: DrawCircleArgs) {
   if (clip) {
     context.beginPath();
@@ -117,6 +122,7 @@ export function drawCircle({
     fillStyle,
     strokeStyle,
     opacity,
+    lineWidth,
   };
 
   function drawFn() {
@@ -152,11 +158,13 @@ export function drawLine({
   endCoordinates,
   strokeStyle,
   lineWidth,
+  opacity
 }: DrawLineArgs) {
   const settings = {
     context,
     strokeStyle,
     lineWidth,
+    opacity,
   };
 
   function drawFn() {
@@ -181,6 +189,7 @@ export function drawRect({
   strokeStyle,
   fillStyle,
   opacity,
+  lineWidth,
 }: DrawRectArgs) {
   if (clip) {
     context.beginPath();
@@ -199,6 +208,7 @@ export function drawRect({
     fillStyle,
     strokeStyle,
     opacity,
+    lineWidth,
   };
 
   function drawFn() {
@@ -247,7 +257,7 @@ export function modifyContextStyleAndDraw(
   settings: ModifyContextStyleArgs,
   drawFn: () => void
 ) {
-  const { context, fillStyle, strokeStyle, fontSize, opacity, lineWidth } =
+  const { context, fillStyle, strokeStyle, fontSize, opacity, lineWidth, lineDash } =
     settings;
 
   context.save();
@@ -270,6 +280,10 @@ export function modifyContextStyleAndDraw(
 
   if (lineWidth) {
     context.lineWidth = lineWidth;
+  }
+
+  if (lineDash) {
+    context.setLineDash(lineDash);
   }
 
   drawFn();

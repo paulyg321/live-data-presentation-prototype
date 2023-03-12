@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import * as monaco from "monaco-editor";
-import { Chart, ChartTypeValue, type ChartType } from "@/utils";
+import { Chart, ChartTypeValue, gestureSubject, playbackSubject, type ChartType } from "@/utils";
 import _ from "lodash";
 import { CanvasSettings, ChartSettings } from "../settings-state";
 
@@ -36,7 +36,6 @@ function createChart() {
     field.value &&
     key.value &&
     step.value &&
-    dataAccessor.value &&
     xField.value &&
     yField.value
   ) {
@@ -51,9 +50,11 @@ function createChart() {
         dataAccessor: dataAccessor.value,
         xField: xField.value,
         yField: yField.value,
+        zField: zField.value,
         position: ChartSettings.position,
         dimensions: ChartSettings.dimensions,
         canvasDimensions: CanvasSettings.dimensions,
+        useGroups: useGroups.value,
       })
     );
   } else {
@@ -112,6 +113,23 @@ async function handleNext() {
           alert("ERROR - LINE data accessor and x/y fields not set ");
         }
       }
+      if (newChartType.value?.value === "scatter") {
+        if (xField.value && yField.value) {
+          if (
+            chartData.value[0][xField.value] !== undefined &&
+            chartData.value[0][yField.value] !== undefined
+          ) {
+            createChart();
+          } else {
+            alert(
+              "ERROR - Unable to access data using specified fields for x/y fields"
+            );
+          }
+        } else {
+          //set for error
+          alert("ERROR - SCATTER x/y fields not set ");
+        }
+      }
     } else {
       alert("ERROR - Required fields missing");
     }
@@ -135,6 +153,8 @@ const key = ref<string>();
 const dataAccessor = ref<string>();
 const xField = ref<string>();
 const yField = ref<string>();
+const zField = ref<string>();
+const useGroups = ref<boolean>(true);
 const step = ref<number>(500);
 const columnOptions = ref<any>([]);
 watch([field, key], () => {
@@ -223,18 +243,21 @@ onMounted(() => {
               ></v-select>
             </v-col>
             <v-col lg="12">
-              <v-text-field
-                v-if="newChartType?.value === ChartTypeValue.LINE"
-                label="X Field"
-                v-model="xField"
-              ></v-text-field>
+              <v-text-field label="X Field" v-model="xField"></v-text-field>
+            </v-col>
+            <v-col lg="12">
+              <v-text-field label="Y Field" v-model="yField"></v-text-field>
             </v-col>
             <v-col lg="12">
               <v-text-field
-                v-if="newChartType?.value === ChartTypeValue.LINE"
-                label="Y Field"
-                v-model="yField"
+                v-if="newChartType?.value === ChartTypeValue.SCATTER"
+                label="Z Field"
+                v-model="zField"
               ></v-text-field>
+            </v-col>
+            <v-col lg="12" v-if="zField !== undefined">
+              <input type="checkbox" id="checkbox" v-model="useGroups" />
+              <label for="checkbox">Group Items by Z Field</label>
             </v-col>
             <v-col lg="12">
               <v-text-field label="Step" v-model="step"></v-text-field>

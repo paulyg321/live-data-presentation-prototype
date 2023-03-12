@@ -1,13 +1,11 @@
 import { PlaybackSubjectType, startTimeoutInstance } from "@/utils";
 import _ from "lodash";
-import { Subject } from "rxjs";
 import type { Coordinate2D } from "../../chart";
 import { drawCircle, drawLine, drawText } from "../../drawing";
 import { HANDS } from "./gesture-utils";
 import {
   GestureListener,
   type GestureListenerConstructorArgs,
-  type GestureListenerSubjectMap,
   type ListenerProcessedFingerData,
 } from "./GestureListener";
 import { SupportedGestures } from "./handGestures";
@@ -106,12 +104,6 @@ export class RadialPlaybackGestureListener extends GestureListener {
     const endAngle = this.angleStack.length > 0 ? angle * (Math.PI / 180) : 0;
     if (this.context) {
       this.renderReferencePoints();
-      drawLine({
-        context: this.context,
-        startCoordinates: centerPoint,
-        endCoordinates: fingerPosition,
-        strokeStyle: "skyblue",
-      });
       drawCircle({
         context: this.context,
         coordinates: centerPoint,
@@ -123,6 +115,30 @@ export class RadialPlaybackGestureListener extends GestureListener {
         drawLineToCenter: true,
         opacity: 0.3,
       });
+    }
+  }
+
+  private renderAnimationContext(percentComplete: number) {
+    const centerPoint = this.getCenterPoint();
+    const endAngle = 2 * Math.PI * percentComplete;
+    if (this.context) {
+      if (percentComplete === 1) {
+        this.renderReferencePoints();
+      } else {
+        this.clearCanvas();
+        drawCircle({
+          context: this.context,
+          coordinates: centerPoint,
+          radius: this.dimensions.width / 2,
+          startAngle: 0,
+          endAngle,
+          stroke: true,
+          strokeStyle: "#90EE90",
+          drawLineToCenter: true,
+          opacity: 0.3,
+          lineWidth: 10,
+        });
+      }
     }
   }
 
@@ -153,7 +169,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
               RadialPlaybackGestureListener.playbackSubjectKey,
               {
                 type: PlaybackSubjectType.CONTINUOUS,
-                value: undefined,
+                value: (percentComplete: number) => this.renderAnimationContext(percentComplete),
               }
             );
             this.resetAngleState();

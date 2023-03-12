@@ -13,6 +13,8 @@ import { PortalState } from "../settings-state";
       />
       <label for="presenter-portal-checkbox">Presenter Portal</label>
     </v-col>
+  </v-row>
+  <v-row>
     <v-col lg="12" align-self="center">
       <input
         class="default-checkbox"

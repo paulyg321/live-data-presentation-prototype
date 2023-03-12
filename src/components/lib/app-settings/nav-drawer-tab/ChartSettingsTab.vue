@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ChartSettings } from "../settings-state";
+import { ChartSettings, LegendSettings } from "../settings-state";
 import lineChartPng from "@/assets/line-chart.png";
 import barChartPng from "@/assets/bar-chart.png";
 import scatterPlotPng from "@/assets/scatter-plot.png";
@@ -66,15 +66,25 @@ function getChartColor(type: string) {
     </v-col>
   </v-row>
   <v-row>
+    <v-col lg="12">
+      <v-text-field
+        label="Legend Page"
+        :value="LegendSettings.page"
+        @input="(event: any) => LegendSettings.changePage(event.target.value)"
+        type="number"
+      ></v-text-field>
+    </v-col>
+  </v-row>
+  <v-row>
     <v-col
       cols="12"
       v-for="(chart, index) in ChartSettings.charts"
       :key="chart.title"
     >
       <v-card :color="getChartColor(chart.type.value)" dark>
-        <div class="d-flex flex-no-wrap justify-space-between">
+        <div class="d-flex flex-no-wrap justify-space-between align-center">
           <div>
-            <v-card-title class="text-h5">{{ chart.title }}</v-card-title>
+            <v-card-title class="text-h6">{{ `${chart.title.substring(0, 10)}...` }}</v-card-title>
 
             <v-card-subtitle>{{ chart.type.title }}</v-card-subtitle>
 
@@ -93,7 +103,7 @@ function getChartColor(type: string) {
             </v-card-actions>
           </div>
 
-          <v-avatar class="ma-3 pa-5" :size="imageSize" tile>
+          <v-avatar class="ma-3 pa-5" :size="80" tile>
             <v-img :src="getChartImage(chart.type.value)"></v-img>
           </v-avatar>
         </div>

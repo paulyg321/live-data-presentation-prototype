@@ -1,7 +1,6 @@
 import { reactive } from "vue";
 import {
-  AnimatedLine,
-  GestureTracker,
+  clearArea,
   LegendItem,
   legendSubject,
   type Coordinate2D,
@@ -11,52 +10,41 @@ import {
 import { CanvasSettings } from "./canvas-settings";
 import { ChartSettings } from "./chart-settings";
 import { gestureTracker } from "./gesture-settings";
+import _ from "lodash";
 
 const legendWidth = 200;
 const legendHeight = 35;
 
 export const LegendSettings = reactive<{
   dimensions: Dimensions;
-  changeDimensions: (newDimensions: Partial<Dimensions>) => void;
   position: Coordinate2D;
+  legendItems: LegendItem[];
+  page: number;
+  numItems: number;
+  changeDimensions: (newDimensions: Partial<Dimensions>) => void;
   changePosition: (coord: PartialCoordinate2D) => void;
-  legendItems: { [key: string]: LegendItem };
+  changePage: (pageNumber: number) => void;
   initializeLegendItems: () => void;
-  addLegendItem: ({
-    key,
-    color,
-    gestureTracker,
-    index,
-    context,
-  }: {
-    key: string;
-    color: string;
-    gestureTracker: GestureTracker;
-    index: number;
-    context?: CanvasRenderingContext2D | null;
-  }) => void;
-  updateAllLegendItems: () => void;
-  updateLegendItem: (key: string) => void;
-  updateAllLegendItemsContext: () => void;
-  updateLegendItemContext: (key: string) => void;
   drawLegendItems: () => void;
-  drawLegendItem: (key: string) => void;
 }>({
   dimensions: {
     width: legendWidth,
     height: legendHeight,
   },
+  position: {
+    x: 450,
+    y: 10,
+  },
+  legendItems: [],
+  page: 0,
+  numItems: 5,
   changeDimensions(newDimensions: Partial<Dimensions>) {
     this.dimensions = {
       ...this.dimensions,
       ...(newDimensions.width ? { width: newDimensions.width } : {}),
       ...(newDimensions.height ? { width: newDimensions.height } : {}),
     };
-    this.updateAllLegendItems();
-  },
-  position: {
-    x: 450,
-    y: 10,
+    this.drawLegendItems();
   },
   changePosition(coords: PartialCoordinate2D) {
     this.position = {
@@ -64,83 +52,51 @@ export const LegendSettings = reactive<{
       ...(coords.x ? { x: coords.x } : {}),
       ...(coords.y ? { x: coords.y } : {}),
     };
-    this.updateAllLegendItems();
+    this.drawLegendItems();
   },
-  legendItems: {},
+  changePage(pageNumber: number) {
+    this.page = pageNumber;
+    this.drawLegendItems();
+  },
   initializeLegendItems() {
-    Object.entries(
-      ChartSettings.currentChart?.getAnimatedElements() ?? {}
-    ).forEach(([key, element]: [string, AnimatedLine], index: number) => {
-      const legendKey = `${key}-legend`;
-      this.addLegendItem({
-        key,
-        color: element.color,
-        context: CanvasSettings.canvasCtx[legendKey],
-        gestureTracker: gestureTracker.value,
-        index,
-      });
-    });
-  },
-  addLegendItem({
-    key,
-    color,
-    gestureTracker,
-    context,
-    index,
-  }: {
-    key: string;
-    color: string;
-    gestureTracker: GestureTracker;
-    index: number;
-    context?: CanvasRenderingContext2D | null;
-  }) {
-    const newLegendItem = new LegendItem({
-      label: key,
-      color,
-      position: this.position,
-      dimensions: this.dimensions,
-      gestureTracker,
-      legendSubject,
-      index,
-      canvasDimensions: CanvasSettings.dimensions,
-    });
-    if (context) {
-      newLegendItem.setContext(context);
-    }
-    this.legendItems[key] = newLegendItem;
-  },
-  updateAllLegendItems() {
-    Object.keys(this.legendItems).forEach((key: any) => {
-      this.updateLegendItem(key);
-    });
-  },
-  updateLegendItem(key: string) {
-    if (this.legendItems[key]) {
-      this.legendItems[key].updateState({
-        position: this.position,
-        dimensions: this.dimensions,
-      });
-    }
-  },
-  updateAllLegendItemsContext() {
-    Object.keys(this.legendItems).forEach((key: string) => {
-      this.updateLegendItemContext(key);
-    });
-  },
-  updateLegendItemContext(key: string) {
-    const contextIsAvailable =
-      CanvasSettings.canvasCtx[key] !== undefined ||
-      CanvasSettings.canvasCtx[key] !== null;
-    if (this.legendItems[key] && contextIsAvailable) {
-      this.legendItems[key].setContext(CanvasSettings.canvasCtx[key]!);
-    }
+    const legendItems = ChartSettings.currentChart?.getLegendItems();
+    this.legendItems = legendItems ?? [];
   },
   drawLegendItems() {
-    Object.keys(this.legendItems).forEach((key: string) => {
-      this.drawLegendItem(key);
+    const context = CanvasSettings.canvasCtx["legend"];
+    const start = this.page * this.numItems;
+    const end = this.page * this.numItems + this.numItems;
+    if (context) {
+      clearArea({
+        context,
+        coordinates: { x: 0, y: 0 },
+        dimensions: CanvasSettings.dimensions,
+      });
+    }
+    this.legendItems.forEach((legendItem: LegendItem, index: number) => {
+      const isInRange = index >= start && index < end;
+      if (context && isInRange) {
+        const displayedItemIndex = index - start;
+        legendItem.setContext(context);
+        legendItem.setGestureTracker(gestureTracker.value);
+        legendItem.setLegendSubject(legendSubject);
+        legendItem.updateState({
+          position: LegendItem.getPositionFromIndex(
+            this.position,
+            displayedItemIndex,
+            this.dimensions
+          ),
+          dimensions: this.dimensions,
+        });
+        legendItem.drawLegend();
+      } else {
+        legendItem.updateState({
+          position: LegendItem.getPositionFromIndex({ x: 0, y: 0 }, -1, {
+            width: 0,
+            height: 0,
+          }),
+        });
+      }
     });
-  },
-  drawLegendItem(key: string) {
-    this.legendItems[key].drawLegend();
   },
 });

@@ -5,9 +5,10 @@ import {
   PlaybackSubjectType,
   ForeshadowingAreaSubjectType,
   foreshadowingAreaSubject,
-  LineEffect,
+  Effect,
   type AnimatedLine,
   legendSubject,
+  AnimatedCircle,
 } from "@/utils";
 import { onMounted, watch } from "vue";
 import { useRoute } from "vue-router";
@@ -18,8 +19,8 @@ import {
   CanvasSettings,
   radialPlaybackTracker,
   foreshadowingTracker,
-  LegendSettings,
   gestureCanvasKeys,
+  LegendSettings,
 } from "../settings-state";
 import VideoViews from "../../views/VideoViews.vue";
 
@@ -43,7 +44,7 @@ playbackSubject.subscribe({
     }
 
     if (type === PlaybackSubjectType.CONTINUOUS) {
-      ChartSettings.handlePlay("next");
+      ChartSettings.handlePlay("next", value);
     }
   },
 });
@@ -53,34 +54,49 @@ foreshadowingAreaSubject.subscribe({
   next(foreshadowingAreaValue: any) {
     const { type, value: foreshadowingArea } = foreshadowingAreaValue;
 
-    ChartSettings.iterateOverChartItems((key: string, value: AnimatedLine) => {
-      // Sets foreshdowing area for the chart item
-      const triggerForeshadow = () => {
-        value.setForeshadowingArea(type, foreshadowingArea);
-        value.drawCurrentState({
-          bounds: {
-            end: ChartSettings.playbackExtent,
-          },
-        });
-      };
+    ChartSettings.iterateOverChartItems(
+      (item: AnimatedLine | AnimatedCircle) => {
+        // Sets foreshdowing area for the chart item
+        const triggerForeshadow = () => {
+          item.setForeshadowingArea(type, foreshadowingArea);
 
-      if (ChartSettings.selectedChartItems.length > 0) {
-        if (ChartSettings.isItemSelected(key)) {
+          if (type === ForeshadowingAreaSubjectType.RANGE) {
+            const resetTo =
+              Math.abs(
+                ChartSettings.position.x - foreshadowingArea?.position.x
+              ) / ChartSettings.dimensions.width;
+            item.drawCurrentState({
+              end: resetTo,
+            });
+          } else {
+            item.drawCurrentState({
+              end: ChartSettings.playbackExtent,
+            });
+          }
+        };
+
+        const isSelected =
+          ChartSettings.isItemSelected(item.key) ||
+          ChartSettings.isItemSelected(item.group);
+
+        if (ChartSettings.selectedChartItems.length > 0) {
+          if (isSelected) {
+            triggerForeshadow();
+          }
+        } else {
           triggerForeshadow();
         }
-      } else {
-        triggerForeshadow();
       }
-    });
+    );
   },
 });
 
 legendSubject.subscribe({
-  next(value: any) {
-    if (ChartSettings.isItemSelected(value)) {
-      ChartSettings.removeSelectedChartItem(value);
+  next(key: any) {
+    if (ChartSettings.isItemSelected(key)) {
+      ChartSettings.removeSelectedChartItem(key);
     } else {
-      ChartSettings.addSelectedChartItem(value);
+      ChartSettings.addSelectedChartItem(key);
     }
   },
 });
@@ -88,52 +104,57 @@ legendSubject.subscribe({
 watch(
   () => ChartSettings.selectedChartItems,
   (selectedItems: string[]) => {
-    ChartSettings.iterateOverChartItems((key: string, value: AnimatedLine) => {
-      let lineEffect;
+    ChartSettings.iterateOverChartItems(
+      (item: AnimatedLine | AnimatedCircle) => {
+        let lineEffect;
 
-      // No selected items then all lines should have default values
-      if (selectedItems.length === 0) {
-        lineEffect = LineEffect.DEFAULT;
-      } else if (ChartSettings.isItemSelected(key)) {
-        lineEffect = LineEffect.FOCUSED;
-      } else {
-        lineEffect = LineEffect.BACKGROUND;
-        value.setForeshadowingArea(
-          ForeshadowingAreaSubjectType.CLEAR,
-          undefined
-        );
-      }
+        const isSelected =
+          ChartSettings.isItemSelected(item.key) ||
+          ChartSettings.isItemSelected(item.group);
+        // No selected items then all lines should have default values
+        if (selectedItems.length === 0) {
+          lineEffect = Effect.DEFAULT;
+        } else if (isSelected) {
+          lineEffect = Effect.FOCUSED;
+        } else {
+          lineEffect = Effect.BACKGROUND;
+          item.setForeshadowingArea(
+            ForeshadowingAreaSubjectType.CLEAR,
+            undefined
+          );
+        }
 
-      value.setLineAppearanceFromEffect(lineEffect);
-      value.drawCurrentState({
-        bounds: {
+        item.setAppearanceFromEffect(lineEffect);
+        item.drawCurrentState({
           end: ChartSettings.playbackExtent,
-        },
-      });
-    });
+        });
+      }
+    );
   }
 );
 
 watch(
   () => ChartSettings.playbackExtent,
   (newValue, oldValue) => {
-    ChartSettings.iterateOverChartItems((key: string, value: AnimatedLine) => {
-      if (ChartSettings.selectedChartItems.length === 0) {
-        value.drawCurrentState({
-          bounds: {
+    ChartSettings.iterateOverChartItems(
+      (item: AnimatedLine | AnimatedCircle) => {
+        const isSelected =
+          ChartSettings.isItemSelected(item.key) ||
+          ChartSettings.isItemSelected(item.group);
+
+        if (ChartSettings.selectedChartItems.length === 0) {
+          item.drawCurrentState({
             start: oldValue,
             end: newValue,
-          },
-        });
-      } else if (ChartSettings.isItemSelected(key)) {
-        value.drawCurrentState({
-          bounds: {
+          });
+        } else if (isSelected) {
+          item.drawCurrentState({
             start: oldValue,
             end: newValue,
-          },
-        });
+          });
+        }
       }
-    });
+    );
   }
 );
 

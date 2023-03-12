@@ -10,7 +10,8 @@ onMounted(async () => {
     <v-col lg="12">
       <p class="text-body-1 font-weight-bold">Camera:</p>
     </v-col>
-
+  </v-row>
+  <v-row>
     <v-col lg="12">
       <v-select
         label="Select"
@@ -21,10 +22,13 @@ onMounted(async () => {
         @update:modelValue="(source: string) => CameraSettings.setCurrentSource(source)"
       ></v-select>
     </v-col>
+  </v-row>
+  <v-row>
     <v-col lg="12">
       <p class="text-body-1 font-weight-bold">My Video:</p>
     </v-col>
-
+  </v-row>
+  <v-row>
     <v-col lg="12">
       <input
         class="default-checkbox"

@@ -12,7 +12,7 @@ import {
   openHandGesture,
   pointingGesture,
 } from "@/utils";
-import { Subject } from "rxjs";
+import type { Subject } from "rxjs";
 
 export interface GestureTrackerValues {
   leftHandLandmarks: any;
@@ -36,13 +36,15 @@ export class GestureTracker {
       foreshadowingLeftC,
       foreshadowingRightC,
     ],
+    gestureSubject,
   }: {
     canvasDimensions: Dimensions;
     gestures?: any;
+    gestureSubject: Subject<any>
   }) {
     this.canvasDimensions = canvasDimensions;
     this.gestureEstimatorInstance = new fp.GestureEstimator(gestures);
-    this.gestureSubject = new Subject<any>();
+    this.gestureSubject = gestureSubject;
   }
 
   changeCanvasDimensions(canvasDimensions: Dimensions) {

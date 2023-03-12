@@ -5,6 +5,8 @@ import {
   emphasisSubject,
   foreshadowingAreaSubject,
   ForeshadowingGestureListener,
+  ForeshadowingShapes,
+  gestureSubject,
   GestureTracker,
   LinearPlaybackGestureListener,
   playbackSubject,
@@ -38,6 +40,7 @@ function getArgsForGestureTracker() {
       width: CanvasSettings.dimensions.width,
       height: CanvasSettings.dimensions.height,
     },
+    gestureSubject: gestureSubject,
   };
 }
 
@@ -171,6 +174,8 @@ export const foreshadowingTracker = shallowRef(
         foreshadowingAreaSubject,
     },
     resetKeys: getGestureListenerResetKeys("KeyF"),
+    mode: ForeshadowingShapes.RECTANGLE,
+    playbackControllerType: "absolute",
   })
 );
 

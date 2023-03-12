@@ -2,7 +2,7 @@ import type { Coordinate2D, Dimensions, PartialCoordinate2D } from "@/utils";
 import { reactive } from "vue";
 import { initialCanvasWidth } from "./canvas-settings";
 
-const initialPlaybackComponentWidth = 250;
+const initialPlaybackComponentWidth = 200;
 
 export const PlaybackComponentSettings = reactive<{
   dimensions: Dimensions;
@@ -21,8 +21,8 @@ export const PlaybackComponentSettings = reactive<{
     };
   },
   position: {
-    x: initialCanvasWidth - initialPlaybackComponentWidth,
-    y: initialCanvasWidth * (3 / 4) - initialPlaybackComponentWidth,
+    x: initialCanvasWidth - initialPlaybackComponentWidth - 30,
+    y: initialCanvasWidth * (3 / 4) - initialPlaybackComponentWidth - 50,
   },
   changePosition(coords: PartialCoordinate2D) {
     this.position = {

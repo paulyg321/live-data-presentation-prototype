@@ -2,12 +2,15 @@ import type { Coordinate2D, Dimensions } from "../types";
 import * as d3 from "d3";
 import {
   axesSubject,
+  calculateDistance,
   drawCircle,
   drawRect,
   drawText,
+  Effect,
   ForeshadowingAreaSubjectType,
   modifyContextStyleAndDraw,
   type ForeshadowingAreaData,
+  type ModifyContextStyleArgs,
 } from "@/utils";
 
 const parseTime = d3.timeParse("%Y-%m-%d");
@@ -19,14 +22,14 @@ export enum DrawingMode {
   DROP_ANIMATION = "Excitement - Drop", // level 3
 }
 
-export const DrawingModeToEaseFunctionMap = {
+export const AnimatedLineDrawingModeToEaseFunctionMap = {
   [DrawingMode.DRAW_ALL]: {
     transitionFunction: d3.easeLinear,
     duration: 3000,
   },
   [DrawingMode.UNDULATE_ANIMATION]: {
-    transitionFunction: d3.easeLinear,
-    duration: 3000,
+    transitionFunction: d3.easeBounce,
+    duration: 1500,
   },
   [DrawingMode.BASELINE_ANIMATION]: {
     transitionFunction: d3.easeLinear,
@@ -43,18 +46,15 @@ export enum LineShape {
   SHARP = "sharp",
 }
 
-export enum LineEffect {
-  DEFAULT = "default",
-  FOCUSED = "focused",
-  BACKGROUND = "background",
-}
-
 export interface AnimatedLineConstructorArgs {
   states: Coordinate2D[][];
   chartDimensions: Dimensions;
+  chartPosition: Coordinate2D;
   canvasDimensions: Dimensions;
   duration: number;
   color?: string;
+  key: string;
+  group?: string;
   lineWidth?: number;
   opacity?: number;
   dataType?: {
@@ -80,6 +80,9 @@ export class AnimatedLine {
   currentState: number;
   canvasDimensions: Dimensions;
   chartDimensions: Dimensions;
+  chartPosition: Coordinate2D;
+  key: string;
+  group: string;
   duration = 2000;
   mainColor = "steelblue";
   color = "steelblue";
@@ -91,11 +94,15 @@ export class AnimatedLine {
   };
 
   context: CanvasRenderingContext2D | undefined;
+
   foreshadowingArea: ForeshadowingAreaData | undefined;
+  foreshadowingState: number | undefined;
+  foreshadowingType: ForeshadowingAreaSubjectType | undefined;
 
   constructor({
     states,
     chartDimensions,
+    chartPosition,
     canvasDimensions,
     duration,
     color,
@@ -103,19 +110,28 @@ export class AnimatedLine {
     opacity,
     dataType,
     getScales,
+    key,
+    group,
   }: AnimatedLineConstructorArgs) {
     this.dataType = dataType;
     this.chartDimensions = chartDimensions;
+    this.chartPosition = chartPosition;
     this.getScales = getScales;
     this.initializeScales();
     this.states = states;
     this.currentState = 0;
     this.canvasDimensions = canvasDimensions;
     this.duration = duration;
+    this.key = key;
+    if (group) {
+      this.group = group;
+    } else {
+      this.group = key;
+    }
     if (color) {
       this.mainColor = color;
     }
-    this.setLineAppearance({
+    this.setAppearance({
       color,
       lineWidth,
       opacity,
@@ -144,7 +160,7 @@ export class AnimatedLine {
     axesSubject.next(true);
   }
 
-  private configureLineContextSettings() {
+  private configureContextSettings() {
     if (this.context) {
       this.context.lineWidth = this.lineWidth;
       this.context.globalAlpha = this.opacity;
@@ -162,11 +178,20 @@ export class AnimatedLine {
   ) {
     if (type === ForeshadowingAreaSubjectType.CLEAR) {
       this.foreshadowingArea = undefined;
+      this.foreshadowingType = undefined;
+      this.foreshadowingState = undefined;
     } else if (
       type === ForeshadowingAreaSubjectType.CIRCLE ||
-      type === ForeshadowingAreaSubjectType.RECTANGLE
+      type === ForeshadowingAreaSubjectType.RECTANGLE ||
+      type === ForeshadowingAreaSubjectType.RANGE
     ) {
       this.foreshadowingArea = foreshadowingArea;
+      this.foreshadowingType = type;
+      const nextState = this.currentState + 1;
+      const lastValidState = this.states.length - 1;
+      if (nextState <= lastValidState) {
+        this.foreshadowingState = nextState;
+      }
     }
   }
 
@@ -191,14 +216,14 @@ export class AnimatedLine {
     if (duration) {
       this.duration = duration;
     }
-    this.setLineAppearance({
+    this.setAppearance({
       color,
       lineWidth,
       opacity,
     });
   }
 
-  setLineAppearance({
+  setAppearance({
     lineWidth,
     opacity,
     color,
@@ -218,8 +243,8 @@ export class AnimatedLine {
     }
   }
 
-  convertLineEffectForContext(lineEffect: LineEffect) {
-    if (lineEffect === LineEffect.FOCUSED) {
+  convertEffectForContext(lineEffect: Effect) {
+    if (lineEffect === Effect.FOCUSED) {
       return {
         lineWidth: 3,
         opacity: 0.9,
@@ -227,7 +252,7 @@ export class AnimatedLine {
       };
     }
 
-    if (lineEffect === LineEffect.BACKGROUND) {
+    if (lineEffect === Effect.BACKGROUND) {
       return {
         lineWidth: 1,
         opacity: 0.5,
@@ -242,8 +267,8 @@ export class AnimatedLine {
     };
   }
 
-  setLineAppearanceFromEffect(lineEffect: LineEffect) {
-    this.setLineAppearance(this.convertLineEffectForContext(lineEffect));
+  setAppearanceFromEffect(lineEffect: Effect) {
+    this.setAppearance(this.convertEffectForContext(lineEffect));
   }
 
   clearCanvas() {
@@ -257,98 +282,58 @@ export class AnimatedLine {
     }
   }
 
-  lineLength({
-    coordinates,
-    shape,
-  }: {
-    coordinates: Coordinate2D[];
-    shape?: LineShape;
-  }) {
-    function dist(x1: number, y1: number, x2: number, y2: number) {
-      return Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2));
-    }
+  drawMarkers(
+    points: Coordinate2D[],
+    drawLabel = false,
+    pointBoundaries?: { coordinates: Coordinate2D; radius: number },
+    isHighlighted = false
+  ) {
+    const FONT_SIZE = 14;
+    const RADIUS = 5;
 
-    let totalLength = 0;
-    for (let i = 0; i < coordinates.length - 1; i++) {
-      const [x1, y1] = [
-        this.xScale(coordinates[i].x),
-        this.yScale(coordinates[i].y),
-      ];
-      const [x2, y2] = [
-        this.xScale(coordinates[i + 1].x),
-        this.yScale(coordinates[i + 1].y),
-      ];
-      if (shape === LineShape.CURVED) {
-        totalLength += dist(x1, y1, x2, y2) * 1.2;
-      } else {
-        totalLength += dist(x1, y1, x2, y2);
-      }
-    }
-
-    return totalLength;
-  }
-
-  drawLabels(points: Coordinate2D[], isSelected = false) {
-    const LARGE_FONT = 20;
-    const DEFAULT_FONT = 12;
-
-    const DEFAULT_RADIUS = 5;
-    const LARGE_RADIUS = 10;
     // draw points
     points.forEach((point) => {
-      if (this.context) {
-        if (isSelected) {
+      let isWithinBounds = true;
+      if (pointBoundaries) {
+        const dist = calculateDistance(
+          {
+            x: this.xScale(point.x),
+            y: this.yScale(point.y),
+          },
+          pointBoundaries?.coordinates
+        );
+        if (dist.euclideanDistance > pointBoundaries.radius) {
+          isWithinBounds = false;
+        }
+      }
+      if (this.context && isWithinBounds) {
+        if (drawLabel) {
           drawText({
             context: this.context,
             coordinates: {
               x: this.xScale(point.x) + 15,
               y: this.yScale(point.y) + 10,
             },
-            text: `$${Math.round(point.y)}`,
-            fillStyle: "white",
-            strokeStyle: this.color,
-            fontSize: isSelected ? LARGE_FONT : DEFAULT_FONT,
+            text: `${Math.round(point.y)}`,
+            fillStyle: isHighlighted ? "white" : this.color,
+            fontSize: FONT_SIZE,
             opacity: 1,
           });
         }
         drawCircle({
           context: this.context,
           coordinates: point,
-          radius: isSelected ? LARGE_RADIUS : DEFAULT_RADIUS,
+          radius: RADIUS,
           xScale: this.xScale,
           yScale: this.yScale,
-          stroke: isSelected,
+          stroke: isHighlighted,
+          strokeStyle: "white",
           fill: true,
           fillStyle: this.color,
-          strokeStyle: "white",
-          opacity: isSelected ? 1 : 0.5,
+          opacity: isHighlighted ? 1 : 0.3,
         });
       }
     });
-  }
-
-  drawForeshadow(drawFn: () => void) {
-    if (this.context && this.foreshadowingArea) {
-      const settings = {
-        context: this.context,
-        lineWidth: 5,
-      };
-      this.context.save();
-      if (this.foreshadowingArea.dimensions) {
-        this.clearAndClipRect({
-          dimensions: this.foreshadowingArea.dimensions,
-          coordinates: this.foreshadowingArea.position,
-        });
-      } else if (this.foreshadowingArea.radius) {
-        this.clearAndClipCircle({
-          radius: this.foreshadowingArea.radius,
-          coordinates: this.foreshadowingArea.position,
-        });
-      }
-
-      modifyContextStyleAndDraw(settings, drawFn);
-      this.context.restore();
-    }
   }
 
   // MOVE TO DRAWING UTIL
@@ -388,21 +373,116 @@ export class AnimatedLine {
     }
   }
 
+  drawForeshadow(
+    drawFn: ({
+      drawLabels,
+      pointBoundaries,
+      states,
+      isHighlighted,
+      drawLine,
+    }: {
+      drawLabels: boolean;
+      drawLine?: boolean;
+      pointBoundaries?: { coordinates: Coordinate2D; radius: number };
+      states?: "current" | "foreshadow";
+      isHighlighted?: boolean;
+    }) => void,
+    clipAreaStart?: Coordinate2D
+  ) {
+    let pointBoundaries: { coordinates: Coordinate2D; radius: number };
+    if (this.context && this.foreshadowingArea) {
+      this.context.save();
+      const settings: ModifyContextStyleArgs = {
+        context: this.context,
+      };
+      if (this.foreshadowingArea.dimensions) {
+        if (this.foreshadowingType === ForeshadowingAreaSubjectType.RECTANGLE) {
+          const rectangleContextSettings = {
+            ...settings,
+            lineWidth: 3,
+            lineDash: [3, 3],
+          };
+          this.clearAndClipRect({
+            dimensions: this.foreshadowingArea.dimensions,
+            coordinates: this.foreshadowingArea.position,
+          });
+          drawFn({ drawLabels: false, states: "current", isHighlighted: true });
+          modifyContextStyleAndDraw(rectangleContextSettings, () =>
+            drawFn({
+              drawLabels: false,
+              states: "foreshadow",
+              isHighlighted: false,
+            })
+          );
+        }
+        if (this.foreshadowingType === ForeshadowingAreaSubjectType.RANGE) {
+          const rangeContextSettings = {
+            ...settings,
+            lineWidth: 1,
+            lineDash: [3, 3],
+          };
+          let xCoord = clipAreaStart?.x ?? this.foreshadowingArea.position.x;
+          let widthDiff = xCoord - this.foreshadowingArea.position.x;
+
+          if (widthDiff < 0) {
+            widthDiff = 0;
+            xCoord = this.foreshadowingArea.position.x;
+          }
+
+          const reduceWidthBy = Math.min(
+            widthDiff,
+            this.foreshadowingArea.dimensions.width
+          );
+
+          this.clearAndClipRect({
+            dimensions: {
+              width: this.foreshadowingArea.dimensions.width - reduceWidthBy,
+              height: this.chartDimensions.height,
+            },
+            coordinates: {
+              ...this.foreshadowingArea.position,
+              x: xCoord,
+            },
+          });
+          modifyContextStyleAndDraw(rangeContextSettings, () =>
+            drawFn({
+              drawLabels: true,
+              pointBoundaries,
+              states: "current",
+              isHighlighted: false,
+            })
+          );
+        }
+      } else if (
+        this.foreshadowingArea.radius &&
+        this.foreshadowingType === ForeshadowingAreaSubjectType.CIRCLE
+      ) {
+        pointBoundaries = {
+          coordinates: this.foreshadowingArea.position,
+          radius: this.foreshadowingArea.radius,
+        };
+        modifyContextStyleAndDraw(settings, () =>
+          drawFn({
+            drawLabels: true,
+            drawLine: false,
+            pointBoundaries,
+            states: "current",
+            isHighlighted: true,
+          })
+        );
+      }
+      this.context.restore();
+    }
+  }
+
   draw(
     coordinates: { x: any; y: any }[],
-    mode: DrawingMode,
     shape: LineShape,
-    beforeClear?: () => void,
+    drawMore?: () => void,
     endBound = 1,
-    startBound = 0
+    drawPoints = true
   ) {
-    console.log(coordinates);
-    this.configureLineContextSettings();
-    // draw line
-    const totalLength = this.lineLength({
-      coordinates,
-      shape,
-    });
+    this.configureContextSettings();
 
     let line = d3
       .line<Coordinate2D>()
@@ -416,89 +496,85 @@ export class AnimatedLine {
 
     if (this.context) {
       const drawLine = line.context(this.context);
-      const drawFn = () => {
-        this.context?.beginPath();
-        drawLine(coordinates);
-        this.context?.stroke();
+      const drawFn = (state: "current" | "foreshadow" = "current") => {
+        if (state === "current") {
+          this.context?.beginPath();
+          drawLine(coordinates);
+          this.context?.stroke();
+        }
+        if (state === "foreshadow" && this.foreshadowingState) {
+          this.context?.beginPath();
+          drawLine(this.states[this.foreshadowingState]);
+          this.context?.stroke();
+        }
+        if (drawMore) {
+          drawMore();
+        }
       };
 
-      if (mode === DrawingMode.BASELINE_ANIMATION) {
-        const lineTimer = d3.timer((elapsed: number) => {
-          this.clearCanvas();
-          if (beforeClear) {
-            beforeClear();
-          }
-          let boundedTimeStep;
-
-          if (startBound < endBound) {
-            boundedTimeStep = Math.min(
-              elapsed / this.duration + startBound,
-              endBound
-            );
-          } else {
-            boundedTimeStep = Math.max(
-              startBound - elapsed / this.duration,
-              endBound
-            );
-          }
-
-          const maxIndex = Math.round(boundedTimeStep * coordinates.length);
-
-          if (this.context) {
-            this.context.setLineDash([totalLength]);
-            this.context.lineDashOffset = d3.interpolate(
-              totalLength,
-              0
-            )(boundedTimeStep);
-            drawFn();
-            // Draw points
-            this.drawLabels(coordinates.slice(0, maxIndex));
-            this.drawForeshadow(() => {
-              drawFn();
-              this.drawLabels(coordinates.slice(0, maxIndex), true);
-            });
-          }
-
-          if (boundedTimeStep === endBound) {
-            lineTimer.stop();
-          }
-        });
-      } else if (mode === DrawingMode.DRAW_ALL) {
-        const maxIndex = Math.round(endBound * coordinates.length);
-        this.clearCanvas();
-        if (beforeClear) {
-          beforeClear();
-        }
-        this.context.setLineDash([totalLength]);
-        this.context.lineDashOffset = d3.interpolate(totalLength, 0)(endBound);
-        drawFn();
-        this.drawLabels(coordinates.slice(0, maxIndex));
-        this.drawForeshadow(() => {
-          drawFn();
-          this.drawLabels(coordinates.slice(0, maxIndex), true);
-        });
+      const maxIndex = Math.round(endBound * coordinates.length);
+      this.clearCanvas();
+      this.context.save();
+      this.clearAndClipRect({
+        dimensions: {
+          width: this.chartDimensions.width * endBound,
+          height: this.chartDimensions.height,
+        },
+        coordinates: this.chartPosition,
+      });
+      drawFn("current");
+      if (drawPoints) {
+        this.drawMarkers(
+          coordinates.slice(0, maxIndex),
+          false,
+          undefined,
+          false
+        );
       }
+      this.context.restore();
+      this.drawForeshadow(
+        ({
+          drawLabels,
+          pointBoundaries,
+          states,
+          isHighlighted,
+          drawLine = true,
+        }: {
+          drawLabels: boolean;
+          drawLine?: boolean;
+          pointBoundaries?: { coordinates: Coordinate2D; radius: number };
+          states?: "current" | "foreshadow";
+          isHighlighted?: boolean;
+        }) => {
+          if (drawLine) {
+            drawFn(states);
+          }
+          this.drawMarkers(
+            coordinates.slice(0, maxIndex),
+            drawLabels,
+            pointBoundaries,
+            isHighlighted
+          );
+        },
+        {
+          x: this.chartPosition.x + this.chartDimensions.width * endBound,
+          y: this.chartPosition.y,
+        }
+      );
     }
   }
 
-  drawCurrentState({
-    bounds,
-    drawingMode = DrawingMode.DRAW_ALL,
-  }: {
-    bounds?: { start?: number; end: number };
-    drawingMode?: DrawingMode;
-  }) {
+  drawCurrentState(bounds?: { start?: number; end: number }) {
+    this.initializeScales();
     this.draw(
       this.states[this.currentState],
-      drawingMode,
       LineShape.CURVED,
       () => void 0,
-      bounds?.end,
-      bounds?.start
+      bounds?.end
     );
   }
 
-  drawTransitionBetweenStates({
+  interpolateAndDraw({
     boundedTimeSteps,
     transitionFunction,
     currentState,
@@ -536,17 +612,21 @@ export class AnimatedLine {
           return {
             x:
               this.dataType?.xType === "date"
-                ? formatTime(d3.interpolateDate(
-                    parseTime(x as unknown as string) ?? new Date(),
-                    parseTime(xNext as unknown as string) ?? new Date()
-                  )(transitionStep))
+                ? formatTime(
+                    d3.interpolateDate(
+                      parseTime(x as unknown as string) ?? new Date(),
+                      parseTime(xNext as unknown as string) ?? new Date()
+                    )(transitionStep)
+                  )
                 : d3.interpolate(x, xNext)(transitionStep),
             y:
               this.dataType?.yType === "date"
-                ? formatTime(d3.interpolateDate(
-                    parseTime(y as unknown as string) ?? new Date(),
-                    parseTime(yNext as unknown as string) ?? new Date()
-                  )(transitionStep))
+                ? formatTime(
+                    d3.interpolateDate(
+                      parseTime(y as unknown as string) ?? new Date(),
+                      parseTime(yNext as unknown as string) ?? new Date()
+                    )(transitionStep)
+                  )
                 : d3.interpolate(y, yNext)(transitionStep),
           };
         }
@@ -554,15 +634,18 @@ export class AnimatedLine {
 
       this.draw(
         interPolatedState,
-        DrawingMode.DRAW_ALL,
         LineShape.CURVED,
         () => {
           if (transitionStep === 1) {
-            this.drawLabels(nextState);
+            this.drawMarkers(nextState, false, undefined, true);
           }
-        }
+        },
+        undefined,
+        false
       );
     } else {
+      // Not all points are updated at the same rate so we update get the timestep from the passed array
+      // boundedTimeSteps[index]
       const interPolatedState = currentState.map(
         (coordinate: Coordinate2D, index: number) => {
           const boundedTimeStep = boundedTimeSteps[index];
@@ -592,24 +675,29 @@ export class AnimatedLine {
           return {
             x:
               this.dataType?.xType === "date"
-                ? formatTime(d3.interpolateDate(
-                    parseTime(x as unknown as string) ?? new Date(),
-                    parseTime(xNext as unknown as string) ?? new Date()
-                  )(transitionStep))
+                ? formatTime(
+                    d3.interpolateDate(
+                      parseTime(x as unknown as string) ?? new Date(),
+                      parseTime(xNext as unknown as string) ?? new Date()
+                    )(transitionStep)
+                  )
                 : d3.interpolate(x, xNext)(transitionStep),
             y:
               this.dataType?.yType === "date"
-                ? formatTime(d3.interpolateDate(
-                    parseTime(y as unknown as string) ?? new Date(),
-                    parseTime(yNext as unknown as string) ?? new Date()
-                  )(transitionStep))
+                ? formatTime(
+                    d3.interpolateDate(
+                      parseTime(y as unknown as string) ?? new Date(),
+                      parseTime(yNext as unknown as string) ?? new Date()
+                    )(transitionStep)
+                  )
                 : d3.interpolate(y, yNext)(transitionStep),
           };
         }
       );
 
-      this.draw(interPolatedState, DrawingMode.DRAW_ALL, LineShape.CURVED, () =>
-        this.drawLabels(
+      this.draw(interPolatedState, LineShape.CURVED, () =>
+        // ONLY DRAW MARKERS ON FINISHED ANIMATIONS
+        this.drawMarkers(
           boundedTimeSteps
             .filter((step) => step === 1)
             .map((_, index) => nextState[index])
@@ -622,10 +710,12 @@ export class AnimatedLine {
     playRemainingStates = false,
     transitionFunction,
     mode,
+    callbackFn,
   }: {
     playRemainingStates: boolean;
     transitionFunction?: (time: number) => number;
     mode: DrawingMode;
+    callbackFn?: any;
   }) {
     if (mode === DrawingMode.DROP_ANIMATION) {
       this.currentState++;
@@ -636,7 +726,7 @@ export class AnimatedLine {
       if (!nextStateData) return;
       const timer = d3.timer((elapsed: number) => {
         const boundedTimeStep = Math.min(elapsed / this.duration, 1);
-        this.drawTransitionBetweenStates({
+        this.interpolateAndDraw({
           boundedTimeSteps: [boundedTimeStep],
           transitionFunction,
           currentState: nextStateData.map((coord: Coordinate2D) => ({
@@ -645,6 +735,7 @@ export class AnimatedLine {
           })),
           nextState: nextStateData,
         });
+        callbackFn(boundedTimeStep);
         if (boundedTimeStep === 1) {
           const lastStateIndex = this.states.length - 1;
           const moreStatesExist = this.currentState < lastStateIndex;
@@ -653,6 +744,7 @@ export class AnimatedLine {
               playRemainingStates,
               transitionFunction,
               mode,
+              callbackFn,
             });
           }
           timer.stop();
@@ -674,12 +766,13 @@ export class AnimatedLine {
 
       const timer = d3.timer((elapsed: number) => {
         const boundedTimeStep = Math.min(elapsed / this.duration, 1);
-        this.drawTransitionBetweenStates({
+        this.interpolateAndDraw({
           boundedTimeSteps: [boundedTimeStep],
           transitionFunction,
           currentState: currentStateData,
           nextState: nextStateData,
         });
+        callbackFn(boundedTimeStep);
         if (boundedTimeStep === 1) {
           const lastStateIndex = this.states.length - 1;
           const moreStatesExist = this.currentState < lastStateIndex;
@@ -688,6 +781,7 @@ export class AnimatedLine {
               playRemainingStates,
               transitionFunction,
               mode,
+              callbackFn,
             });
           }
           timer.stop();
@@ -716,12 +810,13 @@ export class AnimatedLine {
           }
         );
         const [lastPointTimeStep] = boundedTimeSteps.slice(-1);
-        this.drawTransitionBetweenStates({
+        this.interpolateAndDraw({
           boundedTimeSteps,
           transitionFunction,
           currentState: currentStateData,
           nextState: nextStateData,
         });
+        callbackFn(lastPointTimeStep);
         if (lastPointTimeStep === 1) {
           const lastStateIndex = this.states.length - 1;
           const moreStatesExist = this.currentState < lastStateIndex;
@@ -730,6 +825,7 @@ export class AnimatedLine {
               playRemainingStates,
               transitionFunction,
               mode,
+              callbackFn,
             });
           }
           timer.stop();
@@ -737,6 +833,7 @@ export class AnimatedLine {
       });
     }
 
+    // TODO: Use callbackFn for this
     if (mode === DrawingMode.BASELINE_ANIMATION) {
       this.currentState++;
       this.initializeScales();
@@ -745,14 +842,17 @@ export class AnimatedLine {
 
       if (!nextStateData) return;
 
-      this.draw(
-        nextStateData,
-        DrawingMode.BASELINE_ANIMATION,
-        LineShape.CURVED
-      );
-
       const seqTimer = d3.timer((elapsed: number) => {
         const boundedTimeStep = Math.min(elapsed / this.duration, 1);
+        let transitionStep: number;
+
+        if (transitionFunction) {
+          transitionStep = transitionFunction(boundedTimeStep);
+        } else {
+          transitionStep = boundedTimeStep;
+        }
+
+        this.draw(nextStateData, LineShape.CURVED, undefined, transitionStep);
         if (boundedTimeStep === 1) {
           const lastStateIndex = this.states.length - 1;
           const moreStatesExist = this.currentState < lastStateIndex;
@@ -773,10 +873,12 @@ export class AnimatedLine {
     playRemainingStates = false,
     transitionFunction,
     mode,
+    callbackFn,
   }: {
     playRemainingStates: boolean;
     transitionFunction?: (time: number) => number;
     mode: DrawingMode;
+    callbackFn?: any;
   }) {
     if (mode === DrawingMode.DROP_ANIMATION) {
       this.currentState--;
@@ -788,7 +890,7 @@ export class AnimatedLine {
 
       const timer = d3.timer((elapsed: number) => {
         const boundedTimeStep = Math.min(elapsed / this.duration, 1);
-        this.drawTransitionBetweenStates({
+        this.interpolateAndDraw({
           boundedTimeSteps: [boundedTimeStep],
           transitionFunction,
           // TODO: Make the current state and next state differ by Y position
@@ -798,6 +900,7 @@ export class AnimatedLine {
           })),
           nextState: prevStateData,
         });
+        callbackFn(boundedTimeStep);
         if (boundedTimeStep === 1) {
           const moreStatesExist = this.currentState > 0;
           if (playRemainingStates && moreStatesExist) {
@@ -805,6 +908,7 @@ export class AnimatedLine {
               playRemainingStates,
               transitionFunction,
               mode,
+              callbackFn,
             });
           }
           timer.stop();
@@ -828,12 +932,13 @@ export class AnimatedLine {
 
       const timer = d3.timer((elapsed: number) => {
         const boundedTimeStep = Math.min(elapsed / this.duration, 1);
-        this.drawTransitionBetweenStates({
+        this.interpolateAndDraw({
           boundedTimeSteps: [boundedTimeStep],
           transitionFunction,
           currentState,
           nextState: prevStateData,
         });
+        callbackFn(boundedTimeStep);
         if (boundedTimeStep === 1) {
           const moreStatesExist = this.currentState > 0;
           if (playRemainingStates && moreStatesExist) {
@@ -841,6 +946,7 @@ export class AnimatedLine {
               playRemainingStates,
               transitionFunction,
               mode,
+              callbackFn,
             });
           }
           timer.stop();
@@ -848,6 +954,7 @@ export class AnimatedLine {
       });
     }
 
+    // TODO: Use callbackFn here
     if (mode === DrawingMode.BASELINE_ANIMATION) {
       this.currentState--;
       this.initializeScales();
@@ -856,14 +963,17 @@ export class AnimatedLine {
 
       if (!prevStateData) return;
 
-      const sequentialDelay = this.duration;
-      this.draw(
-        prevStateData,
-        DrawingMode.BASELINE_ANIMATION,
-        LineShape.CURVED
-      );
       const seqTimer = d3.timer((elapsed: number) => {
-        const boundedTimeStep = Math.min(elapsed / sequentialDelay, 1);
+        const boundedTimeStep = Math.min(elapsed / this.duration, 1);
+        let transitionStep: number;
+
+        if (transitionFunction) {
+          transitionStep = transitionFunction(boundedTimeStep);
+        } else {
+          transitionStep = boundedTimeStep;
+        }
+
+        this.draw(prevStateData, LineShape.CURVED, undefined, transitionStep);
         if (boundedTimeStep === 1) {
           const moreStatesExist = this.currentState > 0;
           if (playRemainingStates && moreStatesExist) {
@@ -901,19 +1011,21 @@ export class AnimatedLine {
           }
         );
         const [lastPointTimeStep] = boundedTimeSteps.slice(-1);
-        this.drawTransitionBetweenStates({
+        this.interpolateAndDraw({
           boundedTimeSteps,
           transitionFunction,
           currentState: currentState,
           nextState: prevStateData,
         });
+        callbackFn(lastPointTimeStep);
         if (lastPointTimeStep === 1) {
           const moreStatesExist = this.currentState > 0;
           if (playRemainingStates && moreStatesExist) {
-            this.animateToNextState({
+            this.animateToPreviousState({
               playRemainingStates,
               transitionFunction,
               mode,
+              callbackFn,
             });
           }
           timer.stop();

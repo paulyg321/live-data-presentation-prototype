@@ -1,14 +1,32 @@
 import * as d3 from "d3";
 import dayjs from "dayjs";
-import { AnimatedLine, type Coordinate2D, type Dimensions } from "@/utils";
+import {
+  AnimatedLine,
+  LegendItem,
+  type Coordinate2D,
+  type Dimensions,
+} from "@/utils";
+import { AnimatedCircle } from "./AnimatedCircle";
+import _ from "lodash";
+import type { Subject } from "rxjs";
+
+export enum Effect {
+  DEFAULT = "default",
+  FOCUSED = "focused",
+  BACKGROUND = "background",
+}
 
 export interface ChartType {
   title: "Line Chart" | "Bar Chart" | "Scatter Plot";
   value: ChartTypeValue;
 }
 
-export interface ChartLineMap {
-  [key: string]: AnimatedLine;
+export interface ChartItemsMap {
+  [key: string]: AnimatedLine | AnimatedCircle;
+}
+
+export interface LegendItemsMap {
+  [key: string]: LegendItem;
 }
 
 export enum ChartTypeValue {
@@ -24,9 +42,11 @@ export interface NewChartArgs {
   field: string;
   key: string;
   step: number;
-  dataAccessor: string;
+  dataAccessor?: string;
   xField: string;
   yField: string;
+  zField?: string;
+  useGroups: boolean;
 
   position: Coordinate2D;
   dimensions: Dimensions;
@@ -34,6 +54,17 @@ export interface NewChartArgs {
 }
 
 const colorArray = d3["schemeCategory10"];
+const gapMinderColorFn = d3
+  .scaleOrdinal()
+  .domain([
+    "Africa",
+    "Europe",
+    "North America",
+    "Oceania",
+    "Asia",
+    "South America",
+  ])
+  .range(colorArray);
 const defaultMargins = 30;
 
 export class Chart {
@@ -43,15 +74,18 @@ export class Chart {
   field: string;
   key: string;
   step: number;
-  dataAccessor: string;
+  dataAccessor: string | undefined;
   xField: string;
   yField: string;
+  zField: string | undefined;
+  useGroups = false;
 
   position: Coordinate2D;
   dimensions: Dimensions;
   canvasDimensions: Dimensions;
 
-  lines: ChartLineMap | undefined;
+  animatedItems: AnimatedLine[] | AnimatedCircle[] | undefined;
+  legendItems: LegendItem[] | undefined;
 
   xDomain: [any, any] | undefined;
   dataType:
@@ -60,7 +94,7 @@ export class Chart {
         yType: "number" | "date" | undefined;
       }
     | undefined;
-  yDomain: [number, number] | undefined;
+  yDomain: [any, any] | undefined;
 
   context: { [key: string]: CanvasRenderingContext2D | null | undefined } = {};
 
@@ -87,9 +121,11 @@ export class Chart {
     dataAccessor,
     xField,
     yField,
+    zField,
     position,
     canvasDimensions,
     dimensions,
+    useGroups,
   }: NewChartArgs) {
     this.title = title;
     this.type = type;
@@ -100,6 +136,8 @@ export class Chart {
     this.dataAccessor = dataAccessor;
     this.xField = xField;
     this.yField = yField;
+    this.zField = zField;
+    this.useGroups = useGroups;
 
     this.position = position;
     this.dimensions = dimensions;
@@ -114,6 +152,9 @@ export class Chart {
     switch (this.type.value) {
       case ChartTypeValue.LINE:
         this.setLineChartDomain();
+        break;
+      case ChartTypeValue.SCATTER:
+        this.setScatterPlotDomain();
         break;
       default:
         break;
@@ -154,12 +195,67 @@ export class Chart {
     };
   }
 
+  private setScatterPlotDomain() {
+    const parseTime = d3.timeParse("%Y-%m-%d");
+    let currentState = 0;
+    if (this.animatedItems) {
+      const circle = this.animatedItems[0];
+      currentState = circle.currentState;
+    }
+
+    this.xDomain = undefined;
+    this.yDomain = undefined;
+    const currentChartState = Object.entries(this.keyframeData).map(
+      ([_, value]: [string, any]) => {
+        const state: { x: any; y: any } = value[currentState].data;
+
+        if (state) {
+          this.dataType = this.getDataTypeForValues(state);
+        }
+
+        return state;
+      }
+    );
+
+    if (this.dataType?.xType && this.dataType?.yType) {
+      let xAccessor = (data: any) => data.x;
+      if (this.dataType.xType === "number") {
+        xAccessor = (data: any) => data.x;
+      } else if (this.dataType.xType === "date") {
+        xAccessor = (data) => parseTime(data.x);
+      } else {
+        throw new Error(
+          "Unable to instantiate new chart, data types unsupported"
+        );
+      }
+
+      this.xDomain = d3.extent(currentChartState, xAccessor);
+
+      let yAccessor = (data: any) => data.y;
+      if (this.dataType.yType === "number") {
+        yAccessor = (data: any) => data.y;
+      } else if (this.dataType.yType === "date") {
+        yAccessor = (data) => parseTime(data.y);
+      } else {
+        throw new Error(
+          "Unable to instantiate new chart, data types unsupported"
+        );
+      }
+
+      this.yDomain = d3.extent(currentChartState, yAccessor);
+    } else {
+      throw new Error(
+        "Unable to instantiate new chart, data types unsupported"
+      );
+    }
+  }
+
   private setLineChartDomain() {
     const parseTime = d3.timeParse("%Y-%m-%d");
 
     let currentState = 0;
-    if (this.lines) {
-      const [key, line] = Object.entries(this.lines)[0];
+    if (this.animatedItems) {
+      const line = this.animatedItems[0];
       currentState = line.currentState;
     }
 
@@ -228,29 +324,50 @@ export class Chart {
 
   private groupDataIntoKeyFrames() {
     const groupedData = this.data.reduce(
-      (currentLines: any, currentData: any) => {
+      (chartItems: any, currentData: any) => {
         const fieldVal = currentData[this.field];
         const keyVal = currentData[this.key];
 
-        const lineExists = currentLines[keyVal];
+        const exists = chartItems[keyVal];
         // TODO: sort data by the keyframe
-        const keyFrame = {
-          keyframe: fieldVal,
-          data: currentData[this.dataAccessor],
-        };
-        // Each line is an array of its different states/keyframes
-        if (lineExists) {
-          currentLines[keyVal] = [...currentLines[keyVal], keyFrame];
+
+        let keyFrame;
+        if (this.type.value === ChartTypeValue.LINE && this.dataAccessor) {
+          keyFrame = {
+            keyframe: fieldVal,
+            data: currentData[this.dataAccessor].map((datum: any) => {
+              return {
+                x: datum[this.xField],
+                y: datum[this.yField],
+              };
+            }),
+          };
         } else {
-          currentLines[keyVal] = [keyFrame];
+          keyFrame = {
+            keyframe: fieldVal,
+            ...(this.zField ? { group: currentData[this.zField] } : {}),
+            data: {
+              x: currentData[this.xField],
+              y: currentData[this.yField],
+            },
+          };
         }
-        return currentLines;
+
+        // Each line is an array of its different states/keyframes
+        if (exists) {
+          chartItems[keyVal] = [...chartItems[keyVal], keyFrame];
+        } else {
+          chartItems[keyVal] = [keyFrame];
+        }
+        return chartItems;
       },
       {}
     );
 
     /**
      * The data will look somewhat like this
+     *
+     * LINE CHART:
      *
      * {
      *     [key]: [
@@ -264,47 +381,123 @@ export class Chart {
      *         },
      *     ]
      * }
+     *
+     * SCATTER PLOT:
+     *
+     * {
+     *        [key]: [
+     *         {
+     *              keyframe: 2000,
+     *              data: { x: 0, y: 21 }
+     *         },
+     *         {
+     *              keyframe: 2001,
+     *              data: { x: 22, y: 99 }
+     *         },
+     *     ]
+     * }
+     *
      */
     this.keyframeData = groupedData;
   }
 
+  private setOrUpdateAnimatedCircles() {
+    if (this.animatedItems === undefined) {
+      this.animatedItems = _.slice(
+        Object.entries(this.keyframeData),
+        0,
+        20
+      ).map(([key, value]: [string, any]) => {
+        let item_group = key;
+        if (this.useGroups) {
+          item_group = value[0].group;
+        }
+        const states = value.map(({ data }: any) => {
+          return data;
+        });
+
+        return new AnimatedCircle({
+          states,
+          getScales: () => this.getScales(),
+          chartDimensions: this.getDimensions(),
+          canvasDimensions: this.canvasDimensions,
+          duration: 1000,
+          key,
+          group: item_group,
+          color: gapMinderColorFn(item_group) as string,
+          dataType: this.dataType,
+        });
+      });
+    } else {
+      this.animatedItems.forEach((circle: AnimatedCircle | AnimatedLine) => {
+        circle.updateState({
+          getScales: () => this.getScales(),
+          chartDimensions: this.getDimensions(),
+          canvasDimensions: this.canvasDimensions,
+        });
+      }, {});
+    }
+  }
+
   private setOrUpdateAnimatedLines() {
-    if (this.lines === undefined) {
-      this.lines = Object.entries(this.keyframeData).reduce(
-        (
-          currentLines: any,
-          [key, value]: [string, any],
-          currentIndex: number
-        ) => {
+    if (this.animatedItems === undefined) {
+      this.animatedItems = Object.entries(this.keyframeData).map(
+        ([key, value]: [string, any], currentIndex: number) => {
           const states = value.map(({ data }: any) => {
             return data;
           });
 
-          currentLines[key] = new AnimatedLine({
+          return new AnimatedLine({
             states,
             getScales: () => this.getScales(),
             chartDimensions: this.getDimensions(),
+            chartPosition: this.getPosition(),
             canvasDimensions: this.canvasDimensions,
             duration: 1000,
+            key,
             color: colorArray[currentIndex],
             dataType: this.dataType,
           });
-          return currentLines;
-        },
-        {} as ChartLineMap
+        }
       );
     } else {
-      Object.entries(this.lines).forEach(
-        ([_, line]: [string, AnimatedLine]) => {
-          line.updateState({
-            getScales: () => this.getScales(),
-            chartDimensions: this.getDimensions(),
-            canvasDimensions: this.canvasDimensions,
-          });
-        },
-        {}
-      );
+      this.animatedItems.forEach((line: AnimatedCircle | AnimatedLine) => {
+        line.updateState({
+          getScales: () => this.getScales(),
+          chartDimensions: this.getDimensions(),
+          canvasDimensions: this.canvasDimensions,
+        });
+      }, {});
     }
+  }
+
+  setLegendItems() {
+    const groupItems = this.useGroups;
+    const existingKeys: Record<string, boolean> = {};
+    this.legendItems = this.animatedItems?.reduce<LegendItem[]>(
+      (legendItems: LegendItem[], animatedItem: any) => {
+        let item_group = animatedItem.key;
+
+        if (groupItems && this.zField) {
+          item_group = animatedItem.group;
+        }
+
+        if (!existingKeys[item_group]) {
+          existingKeys[item_group] = true;
+          return [
+            ...legendItems,
+            new LegendItem({
+              label: item_group,
+              color: animatedItem.color,
+              canvasDimensions: this.canvasDimensions,
+            }),
+          ];
+        }
+
+        return legendItems;
+      },
+      [] as LegendItem[]
+    );
   }
 
   getPosition(): Coordinate2D {
@@ -352,7 +545,6 @@ export class Chart {
 
   getScales() {
     this.setDomain();
-    // TODO: Change these based on the domain data
     let xScaleFn: any = d3.scaleLinear;
     let yScaleFn: any = d3.scaleLinear;
 
@@ -385,8 +577,13 @@ export class Chart {
     switch (this.type.value) {
       case ChartTypeValue.LINE:
       default:
-        return this.lines;
+        return this.animatedItems;
     }
+  }
+
+  getLegendItems() {
+    this.setLegendItems();
+    return this.legendItems;
   }
 
   updateState({
@@ -409,9 +606,12 @@ export class Chart {
     [key: string]: CanvasRenderingContext2D | null | undefined;
   }) {
     this.context = ctxObj;
-    if (this.lines) {
-      Object.entries(this.lines).forEach(([key, value]: any) => {
-        value.setContext(ctxObj[key]);
+    if (this.animatedItems) {
+      this.animatedItems.forEach((item: AnimatedCircle | AnimatedLine) => {
+        const itemContext = ctxObj[item.key];
+        if (itemContext) {
+          item.setContext(itemContext);
+        }
       });
     }
   }
@@ -422,17 +622,19 @@ export class Chart {
         this.setOrUpdateAnimatedLines();
         break;
       }
+      case ChartTypeValue.SCATTER: {
+        this.setOrUpdateAnimatedCircles();
+        break;
+      }
       default:
     }
   }
 
   drawAll() {
-    if (this.lines) {
-      Object.entries(this.lines).forEach(
-        ([_, value]: [string, AnimatedLine]) => {
-          value.drawCurrentState({});
-        }
-      );
+    if (this.animatedItems) {
+      this.animatedItems.forEach((item: AnimatedCircle | AnimatedLine) => {
+        item.drawCurrentState();
+      });
     }
   }
 }
