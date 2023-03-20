@@ -1,6 +1,6 @@
 import { reactive } from "vue";
 import {
-  clearArea,
+  DrawingUtils,
   LegendItem,
   legendSubject,
   type Coordinate2D,
@@ -59,16 +59,18 @@ export const LegendSettings = reactive<{
     this.drawLegendItems();
   },
   initializeLegendItems() {
-    const legendItems = ChartSettings.currentChart?.getLegendItems();
+    const legendItems = ChartSettings.currentChart?.legendItems as LegendItem[];
     this.legendItems = legendItems ?? [];
   },
   drawLegendItems() {
     const context = CanvasSettings.canvasCtx["legend"];
+
+    if (!context) return;
     const start = this.page * this.numItems;
     const end = this.page * this.numItems + this.numItems;
+    const drawingUtils = new DrawingUtils(context);
     if (context) {
-      clearArea({
-        context,
+      drawingUtils.clearArea({
         coordinates: { x: 0, y: 0 },
         dimensions: CanvasSettings.dimensions,
       });

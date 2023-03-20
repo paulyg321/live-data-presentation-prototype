@@ -1,12 +1,12 @@
 import * as d3 from "d3";
 import { reactive, ref } from "vue";
 import {
-  AnimatedCircle,
-  AnimatedLine,
+  // AnimatedCircle,
+  // AnimatedLine,
   Chart,
-  DrawingMode,
-  AnimatedLineDrawingModeToEaseFunctionMap,
-  AnimatedCircleDrawingModeToEaseFunctionMap,
+  // DrawingMode,
+  // AnimatedLineDrawingModeToEaseFunctionMap,
+  // AnimatedCircleDrawingModeToEaseFunctionMap,
   type Coordinate2D,
   type Dimensions,
   type PartialCoordinate2D,
@@ -24,19 +24,16 @@ export const ChartSettings = reactive<{
   currentChart?: Chart;
   setCurrentChart: (index: number) => void;
   addChart: (newChart: Chart) => void;
-  iterateOverChartItems: (
-    callbackFn: (items: AnimatedCircle | AnimatedLine) => void
-  ) => void;
   changeMargins: (margin: number) => void;
   canvasKeys: string[];
   setCanvasKeys: () => void;
-  animationMode: DrawingMode;
-  setAnimationMode: (mode: DrawingMode) => void;
+  // animationMode: DrawingMode;
+  // setAnimationMode: (mode: DrawingMode) => void;
   handlePlay: (type: string, callbackFn?: any) => void;
   selectedChartItems: string[];
   addSelectedChartItem: (itemKey: string) => void;
   removeSelectedChartItem: (itemKey: string) => void;
-  isItemSelected: (itemKey: AnimatedCircle | AnimatedLine | string) => boolean;
+  // isItemSelected: (itemKey: AnimatedCircle | AnimatedLine | string) => boolean;
   playbackExtent: number;
   setPlaybackExtent: (value: number) => void;
 }>({
@@ -48,13 +45,7 @@ export const ChartSettings = reactive<{
      *
      * the keys are used to access the canvas Contexts using CanvasSettings.canvasCtx[<key>]
      */
-    const animatedElements = this.currentChart?.getAnimatedElements();
-    const elementKeys =
-      animatedElements?.map(
-        (item: AnimatedLine | AnimatedCircle) => item.key
-      ) ?? [];
-
-    this.canvasKeys = [...elementKeys, "legend"];
+    this.canvasKeys = ["chart", "legend"];
   },
   dimensions: {
     width: initialChartWidth,
@@ -68,6 +59,7 @@ export const ChartSettings = reactive<{
   },
   changeDimensions(width: number) {
     const newDimensions = {
+      ...this.dimensions,
       width,
       height: width * (3 / 4),
     };
@@ -78,7 +70,6 @@ export const ChartSettings = reactive<{
       this.currentChart.updateState({
         dimensions: newDimensions,
       });
-      this.currentChart?.drawAll();
     }
   },
   changeMargins(margin: number) {
@@ -98,7 +89,6 @@ export const ChartSettings = reactive<{
       this.currentChart.updateState({
         dimensions: newDimensions,
       });
-      this.currentChart?.drawAll();
     }
   },
   position: {
@@ -118,7 +108,6 @@ export const ChartSettings = reactive<{
       this.currentChart.updateState({
         position: newPosition,
       });
-      this.currentChart?.drawAll();
     }
   },
   charts: localStorage.getItem("charts")
@@ -133,78 +122,45 @@ export const ChartSettings = reactive<{
     const currentChart = new Chart({
       ...this.charts[index],
     });
-
+    
     this.currentChart = currentChart;
 
     // Effects
     this.setCanvasKeys();
   },
-  iterateOverChartItems(
-    callbackFn: (item: AnimatedCircle | AnimatedLine) => void
-  ) {
-    (this.currentChart?.getAnimatedElements() ?? []).forEach(
-      (item: AnimatedCircle | AnimatedLine) => {
-        callbackFn(item);
-      }
-    );
-  },
-
   // States for drawing
-  animationMode: DrawingMode.UNDULATE_ANIMATION,
-  setAnimationMode(mode: DrawingMode) {
-    this.animationMode = mode;
-  },
+  // animationMode: DrawingMode.BASELINE_ANIMATION,
+  // setAnimationMode(mode: DrawingMode) {
+  //   this.animationMode = mode;
+  // },
   handlePlay(type: string, callbackFn?: any) {
-    const play = ({ item }: { item: any }) => {
-      let transitionFunction,
-        duration = 3000;
+    const duration = 3000;
+    if (type === "prev") {
+      /**
+       * TODO: Determine if it makes sense to animate to previouss state
+       * this might be a rewind or something 
+       * (starting from 1 and going to 0 - then decrementing state)
+       * */ 
+    } else if (type === "next") {
+      const timer = d3.timer((elapsed: number) => {
+        const boundedTimeStep = Math.min(elapsed / duration, 1);
+        this.currentChart?.chart?.updateState({
+          extent: boundedTimeStep,
+        })
 
-      if (this.currentChart?.type.value === ChartTypeValue.LINE) {
-        ({ transitionFunction, duration } =
-          AnimatedLineDrawingModeToEaseFunctionMap[`${this.animationMode}`]);
-      }
-      if (this.currentChart?.type.value === ChartTypeValue.SCATTER) {
-        ({ transitionFunction, duration } =
-          AnimatedCircleDrawingModeToEaseFunctionMap[`${this.animationMode}`]);
-      }
-
-      item.updateState({ duration });
-
-      if (type === "prev") {
-        item.animateToPreviousState({
-          playRemainingStates: false,
-          transitionFunction,
-          mode: this.animationMode,
-          callbackFn,
-        });
-      } else if (type === "next") {
-        item.animateToNextState({
-          playRemainingStates: false,
-          transitionFunction,
-          mode: this.animationMode,
-          callbackFn,
-        });
-      } else if (type === "all") {
-        item.animateToNextState({
-          playRemainingStates: true,
-          transitionFunction,
-          mode: this.animationMode,
-          callbackFn,
-        });
-      }
-    };
-
-    this.iterateOverChartItems((item: AnimatedCircle | AnimatedLine) => {
-      if (this.selectedChartItems.length === 0) {
-        play({
-          item,
-        });
-      } else if (this.isItemSelected(item)) {
-        play({
-          item,
-        });
-      }
-    });
+        if (boundedTimeStep === 1) {
+          this.currentChart?.chart?.setStates("increment");
+          timer.stop();
+        }
+      })
+    } else if (type === "all") {
+      // item.animateToNextState({
+      //   playRemainingStates: true,
+      //   transitionFunction,
+      //   mode: this.animationMode,
+      //   callbackFn,
+      // });
+    }
   },
   selectedChartItems: [],
   removeSelectedChartItem(itemKey: string) {
@@ -215,22 +171,15 @@ export const ChartSettings = reactive<{
   addSelectedChartItem(itemKey: string) {
     this.selectedChartItems = [...this.selectedChartItems, itemKey];
   },
-  isItemSelected(item: AnimatedCircle | AnimatedLine | string) {
-    if (typeof item === "string") {
-      return this.selectedChartItems.includes(item);
-    }
-
-    return (
-      this.selectedChartItems.includes(item.key) ||
-      this.selectedChartItems.includes(item.group)
-    );
-  },
   playbackExtent: 1,
   setPlaybackExtent(value: number) {
     if (value > 1 || value < 0) {
       return;
     }
 
+    this.currentChart?.chart?.updateState({
+      extent: value,
+    })
     this.playbackExtent = value;
   },
 });

@@ -1,9 +1,15 @@
+import * as d3 from "d3";
 import type { Coordinate2D, Dimensions } from "../../chart";
 
-const defaultScale = (value: any) => value;
+export const defaultScale = (value: any) => value;
+
+export enum LineShape {
+  CURVED = "curved",
+  SHARP = "sharp",
+}
 
 interface DrawingArgs {
-  context: CanvasRenderingContext2D;
+  context?: CanvasRenderingContext2D;
   coordinates: Coordinate2D;
   xScale?: (value: any) => number;
   yScale?: (value: any) => number;
@@ -17,7 +23,7 @@ interface DrawingArgs {
 }
 
 export interface ModifyContextStyleArgs {
-  context: CanvasRenderingContext2D;
+  context?: CanvasRenderingContext2D;
   strokeStyle?: string;
   fillStyle?: string;
   fontSize?: number;
@@ -52,82 +58,57 @@ export interface DrawLineArgs {
   lineDash?: number[];
 }
 
-export function drawText({
-  context,
-  coordinates,
-  text,
-  xScale = defaultScale,
-  yScale = defaultScale,
-  fontSize,
-  fill = true,
-  stroke = false,
-  strokeStyle,
-  fillStyle,
-  opacity,
-}: DrawTextArgs) {
-  const settings = {
-    context,
-    fillStyle,
-    strokeStyle,
-    fontSize,
-    opacity,
-  };
+export class DrawingUtils {
+  context: CanvasRenderingContext2D;
+  constructor(context: CanvasRenderingContext2D) {
+    this.context = context
+  }
 
-  function drawFn() {
+  drawText({
+    coordinates,
+    text,
+    xScale = defaultScale,
+    yScale = defaultScale,
+    fill = true,
+    stroke = false,
+  }: DrawTextArgs) {  
     if (fill) {
-      context.fillText(text, xScale(coordinates.x), yScale(coordinates.y));
+      this.context.fillText(text, xScale(coordinates.x), yScale(coordinates.y));
     }
 
     if (stroke) {
-      context.strokeText(text, xScale(coordinates.x), yScale(coordinates.y));
+      this.context.strokeText(text, xScale(coordinates.x), yScale(coordinates.y));
     }
   }
 
-  modifyContextStyleAndDraw(settings, drawFn);
-}
-
-export function drawCircle({
-  context,
-  coordinates,
-  radius,
-  startAngle = 0,
-  endAngle = 2 * Math.PI,
-  xScale = defaultScale,
-  yScale = defaultScale,
-  fill = false,
-  stroke = false,
-  clip = false,
-  strokeStyle,
-  fillStyle,
-  drawLineToCenter = false,
-  opacity,
-  lineWidth,
-}: DrawCircleArgs) {
-  if (clip) {
-    context.beginPath();
-    context.arc(
-      xScale(coordinates.x),
-      yScale(coordinates.y),
-      radius,
-      startAngle,
-      endAngle,
-      false
-    );
-    context.clip();
-    return;
-  }
-
-  const settings = {
-    context,
-    fillStyle,
-    strokeStyle,
-    opacity,
-    lineWidth,
-  };
-
-  function drawFn() {
-    context.beginPath();
-    context.arc(
+  drawCircle({
+    coordinates,
+    radius,
+    startAngle = 0,
+    endAngle = 2 * Math.PI,
+    xScale = defaultScale,
+    yScale = defaultScale,
+    fill = false,
+    stroke = false,
+    clip = false,
+    drawLineToCenter = false,
+  }: DrawCircleArgs) {
+    if (clip) {
+      this.context.beginPath();
+      this.context.arc(
+        xScale(coordinates.x),
+        yScale(coordinates.y),
+        radius,
+        startAngle,
+        endAngle,
+        false
+      );
+      this.context.clip();
+      return;
+    }
+  
+    this.context.beginPath();
+    this.context.arc(
       xScale(coordinates.x),
       yScale(coordinates.y),
       radius,
@@ -137,156 +118,221 @@ export function drawCircle({
     );
 
     if (drawLineToCenter) {
-      context.lineTo(xScale(coordinates.x), yScale(coordinates.y));
+      this.context.lineTo(xScale(coordinates.x), yScale(coordinates.y));
     }
 
     if (fill) {
-      context.fill();
+      this.context.fill();
     }
 
     if (stroke) {
-      context.stroke();
+      this.context.stroke();
     }
   }
 
-  modifyContextStyleAndDraw(settings, drawFn);
-}
+  drawLine({
+    coordinates,
+    shape = LineShape.CURVED,
+    filterMode = "defined",
+    range,
+    xScale = defaultScale,
+    yScale = defaultScale,
+  }:{
+    coordinates: { x: any; y: any }[],
+    shape?: LineShape,
+    filterMode?: 'defined' | 'clip'
+    range?: {
+      xRange: [number, number],
+      yRange: [number, number],
+    },
+    xScale?: (value: number) => number,
+    yScale?: (value: number) => number,
+  }) {
+    if (!this.context) return;
 
-export function drawLine({
-  context,
-  startCoordinates,
-  endCoordinates,
-  strokeStyle,
-  lineWidth,
-  opacity
-}: DrawLineArgs) {
-  const settings = {
-    context,
-    strokeStyle,
-    lineWidth,
-    opacity,
-  };
+    let line = d3
+      .line<Coordinate2D>()
+      .x((d: Coordinate2D) => xScale(d.x))
+      .y((d: Coordinate2D) => yScale(d.y));
+      
+    if (shape === LineShape.CURVED) {
+      // https://github.com/d3/d3-shape/blob/main/README.md#curves
+      line = line.curve(d3.curveBumpX);
+    }
 
-  function drawFn() {
-    context.beginPath();
-    context.moveTo(startCoordinates.x, startCoordinates.y);
-    context.lineTo(endCoordinates.x, endCoordinates.y);
-    context.stroke();
-  };
+    if (range !== undefined) {
+      if (filterMode === "defined") {
+        line = line.defined(function (value: Coordinate2D) {
+          const d = {
+            x: xScale(value.x),
+            y: yScale(value.y),
+          }
+          const result = d.x <= range.xRange[1] && d.x >= range.xRange[0] && d.y <= range.yRange[0] && d.y >= range.yRange[1]
+          return result;
+        })
+      } else if (filterMode === "clip") {
+        const dimensions = {
+          width: range.xRange[1] - range.xRange[0],
+          height: range.yRange[0] - range.yRange[1]
+        }
+        const coordinates = {
+          x: range.xRange[0],
+          y: range.yRange[1],
+        }
+        this.clearAndClipRect({
+          dimensions,
+          coordinates,
+        });
+      }
+    }
 
-  modifyContextStyleAndDraw(settings, drawFn);
-}
-
-export function drawRect({
-  context,
-  coordinates,
-  dimensions,
-  xScale = defaultScale,
-  yScale = defaultScale,
-  fill = false,
-  stroke = false,
-  clip = false,
-  strokeStyle,
-  fillStyle,
-  opacity,
-  lineWidth,
-}: DrawRectArgs) {
-  if (clip) {
-    context.beginPath();
-    context.rect(
-      xScale(coordinates.x),
-      yScale(coordinates.y),
-      dimensions.width,
-      dimensions.height
-    );
-    context.clip();
-    return;
+    const drawLine = line.context(this.context);
+      
+    this.context.save();
+    this.context?.beginPath();
+    drawLine(coordinates);
+    this.context?.stroke();
+    this.context.restore();
   }
 
-  const settings = {
-    context,
-    fillStyle,
-    strokeStyle,
-    opacity,
-    lineWidth,
-  };
-
-  function drawFn() {
+  drawRect({
+    coordinates,
+    dimensions,
+    xScale = defaultScale,
+    yScale = defaultScale,
+    fill = false,
+    stroke = false,
+    clip = false,
+  }: DrawRectArgs) {
+    if (clip) {
+      this.context.beginPath();
+      this.context.rect(
+        xScale(coordinates.x),
+        yScale(coordinates.y),
+        dimensions.width,
+        dimensions.height
+      );
+      this.context.clip();
+      return;
+    }
+  
     if (fill) {
-      context.fillRect(
+      this.context.fillRect(
         xScale(coordinates.x),
         yScale(coordinates.y),
         dimensions.width,
         dimensions.height
       );
     } else if (stroke) {
-      context.strokeRect(
+      this.context.strokeRect(
         xScale(coordinates.x),
         yScale(coordinates.y),
         dimensions.width,
         dimensions.height
       );
     }
-  };
-
-  modifyContextStyleAndDraw(settings, drawFn);
-}
-
-export function clearArea({
-  context,
-  coordinates,
-  dimensions,
-  xScale = defaultScale,
-  yScale = defaultScale,
-}: {
-  context: CanvasRenderingContext2D;
-  coordinates: Coordinate2D;
-  dimensions: Dimensions;
-  xScale?: (value: any) => number;
-  yScale?: (value: any) => number;
-}) {
-  context.clearRect(
-    xScale(coordinates.x),
-    yScale(coordinates.y),
-    dimensions.width,
-    dimensions.height
-  );
-}
-
-export function modifyContextStyleAndDraw(
-  settings: ModifyContextStyleArgs,
-  drawFn: () => void
-) {
-  const { context, fillStyle, strokeStyle, fontSize, opacity, lineWidth, lineDash } =
-    settings;
-
-  context.save();
-
-  if (fillStyle) {
-    context.fillStyle = fillStyle;
   }
 
-  if (strokeStyle) {
-    context.strokeStyle = strokeStyle;
+  clearArea({
+    coordinates,
+    dimensions,
+    xScale = defaultScale,
+    yScale = defaultScale,
+  }: {
+    coordinates: Coordinate2D;
+    dimensions: Dimensions;
+    xScale?: (value: any) => number;
+    yScale?: (value: any) => number;
+  }) {
+    this.context.clearRect(
+      xScale(coordinates.x),
+      yScale(coordinates.y),
+      dimensions.width,
+      dimensions.height
+    );
   }
 
-  if (fontSize) {
-    context.font = `${fontSize}px Arial`;
+  clearAndClipRect({
+    dimensions,
+    coordinates,
+  }: {
+    dimensions: Dimensions;
+    coordinates: Coordinate2D;
+  }) {
+    if (!this.context) return;
+    this.drawRect({
+      context: this.context,
+      coordinates,
+      dimensions,
+      clip: true,
+    });
   }
 
-  if (opacity) {
-    context.globalAlpha = opacity;
+  // clearAndClipCircle({
+  //   radius,
+  //   coordinates,
+  // }: {
+  //   radius: number;
+  //   coordinates: Coordinate2D;
+  // }) {
+  //   if (this.context) {
+  //     this.drawCircle({
+  //       context: this.context,
+  //       coordinates,
+  //       radius,
+  //       clip: true,
+  //     });
+  //     this.clearCanvas();
+  //   }
+  // }
+
+  modifyContextStyleAndDraw(
+    settings: ModifyContextStyleArgs,
+    drawFn: () => void
+  ) {
+    const {
+      context: contextArg, 
+      fillStyle,
+      strokeStyle,
+      fontSize,
+      opacity,
+      lineWidth,
+      lineDash,
+    } = settings;
+  
+    let context = this.context;
+    if (contextArg) {
+      context = contextArg
+    }
+
+    context.save();
+  
+    if (fillStyle) {
+      context.fillStyle = fillStyle;
+    }
+  
+    if (strokeStyle) {
+      context.strokeStyle = strokeStyle;
+    }
+  
+    if (fontSize) {
+      context.font = `${fontSize}px Arial`;
+    }
+  
+    if (opacity) {
+      context.globalAlpha = opacity;
+    }
+  
+    if (lineWidth) {
+      context.lineWidth = lineWidth;
+    }
+  
+    if (lineDash) {
+      context.setLineDash(lineDash);
+    }
+  
+    drawFn();
+  
+    context.restore();
   }
-
-  if (lineWidth) {
-    context.lineWidth = lineWidth;
-  }
-
-  if (lineDash) {
-    context.setLineDash(lineDash);
-  }
-
-  drawFn();
-
-  context.restore();
 }

@@ -1,6 +1,5 @@
 import {
-  clearArea,
-  drawRect,
+  DrawingUtils,
   EmphasisGestureListener,
   type Dimensions,
 } from "@/utils";
@@ -13,6 +12,7 @@ interface EmphasisMeterConstructor {
 export class EmphasisMeter {
   context: CanvasRenderingContext2D | null | undefined;
   canvasDimensions: Dimensions;
+  drawingUtils?: DrawingUtils;
   private dimensions: Dimensions = {
     width: 50,
     height: 0,
@@ -27,6 +27,9 @@ export class EmphasisMeter {
   constructor({ context, canvasDimensions }: EmphasisMeterConstructor) {
     this.context = context;
     this.canvasDimensions = canvasDimensions;
+    if (context) {
+      this.drawingUtils = new DrawingUtils(context);
+    }
   }
 
   private setDimensions(newDimensions: Partial<Dimensions>) {
@@ -44,8 +47,7 @@ export class EmphasisMeter {
 
   protected clearCanvas() {
     if (this.context) {
-      clearArea({
-        context: this.context,
+      this.drawingUtils?.clearArea({
         coordinates: { x: 0, y: 0 },
         dimensions: this.canvasDimensions,
       });
@@ -54,8 +56,7 @@ export class EmphasisMeter {
 
   private draw() {
     if (this.context) {
-      clearArea({
-        context: this.context,
+      this.drawingUtils?.clearArea({
         dimensions: this.canvasDimensions,
         coordinates: {
           x: 0,
@@ -72,7 +73,7 @@ export class EmphasisMeter {
         y: EmphasisGestureListener.MAX_EMPHASIS + padding,
       };
 
-      drawRect({
+      this.drawingUtils?.drawRect({
         context: this.context,
         coordinates,
         dimensions: {
@@ -91,6 +92,7 @@ export class EmphasisMeter {
   }: Partial<EmphasisMeterConstructor>) {
     if (context) {
       this.context = context;
+      this.drawingUtils = new DrawingUtils(context);
     }
     if (canvasDimensions) {
       this.canvasDimensions = canvasDimensions;

@@ -1,4 +1,5 @@
-import type { Coordinate2D } from "../../chart";
+import type { Coordinate2D, Dimensions } from "../../chart";
+import { defaultScale } from "../../drawing";
 import { HORIZONTAL_ORDER, VERTICAL_ORDER } from "../../media-pipe";
 
 export function calculateAngleBetweenPoints(
@@ -63,4 +64,52 @@ export function keepBetween({
   } else {
     return output;
   }
+}
+
+export function isInBound(
+  point: Coordinate2D,
+  boundaries: {
+    position: Coordinate2D;
+    dimensions?: Dimensions;
+    radius?: number;
+  },
+  xScale = defaultScale,
+  yScale = defaultScale,
+) {
+  let isWithinBounds = true;
+  const scaledPoint = {
+    x: xScale(point.x),
+    y: yScale(point.y),
+  };
+
+  if (boundaries.radius) {
+    const dist = calculateDistance(scaledPoint, boundaries?.position);
+
+    if (dist.euclideanDistance > boundaries.radius) {
+      isWithinBounds = false;
+    } else {
+      isWithinBounds = true;
+    }
+  }
+
+  if (boundaries.dimensions) {
+    const { x: minX, y: minY } = boundaries.position;
+    const { maxX, maxY } = {
+      maxX: boundaries.position.x + boundaries.dimensions.width,
+      maxY: boundaries.position.y + boundaries.dimensions.height,
+    };
+
+    if (
+      scaledPoint.x > minX &&
+      scaledPoint.x < maxX &&
+      scaledPoint.y > minY &&
+      scaledPoint.y < maxY
+    ) {
+      isWithinBounds = true;
+    } else {
+      isWithinBounds = false;
+    }
+  }
+
+  return isWithinBounds;
 }

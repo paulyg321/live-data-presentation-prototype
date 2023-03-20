@@ -6,14 +6,14 @@ import {
   ForeshadowingAreaSubjectType,
   foreshadowingAreaSubject,
   Effect,
-  type AnimatedLine,
+  // type AnimatedLine,
   legendSubject,
-  AnimatedCircle,
+  // AnimatedCircle,
 } from "@/utils";
 import { onMounted, watch } from "vue";
 import { useRoute } from "vue-router";
 import CanvasWrapper from "../../CanvasWrapper.vue";
-import ChartAxes from "../../axes/ChartAxes.vue";
+// import ChartAxes from "../../axes/ChartAxes.vue";
 import {
   ChartSettings,
   CanvasSettings,
@@ -30,7 +30,7 @@ ChartSettings.setCurrentChart(parseInt(route.params.id as string));
 // EMPHASIS CONTROLS ANIMATION
 emphasisSubject.subscribe({
   next(animation: any) {
-    ChartSettings.setAnimationMode(animation);
+    // ChartSettings.setAnimationMode(animation);
   },
 });
 
@@ -44,7 +44,7 @@ playbackSubject.subscribe({
     }
 
     if (type === PlaybackSubjectType.CONTINUOUS) {
-      ChartSettings.handlePlay("next", value);
+      ChartSettings.handlePlay("next");
     }
   },
 });
@@ -52,116 +52,52 @@ playbackSubject.subscribe({
 // Foreshadowing area
 foreshadowingAreaSubject.subscribe({
   next(foreshadowingAreaValue: any) {
-    const { type, value: foreshadowingArea } = foreshadowingAreaValue;
-
-    ChartSettings.iterateOverChartItems(
-      (item: AnimatedLine | AnimatedCircle) => {
-        // Sets foreshdowing area for the chart item
-        const triggerForeshadow = () => {
-          item.setForeshadowingArea(type, foreshadowingArea);
-
-          if (type === ForeshadowingAreaSubjectType.RANGE) {
-            const resetTo =
-              Math.abs(
-                ChartSettings.position.x - foreshadowingArea?.position.x
-              ) / ChartSettings.dimensions.width;
-            item.drawCurrentState({
-              end: resetTo,
-            });
-          } else {
-            item.drawCurrentState({
-              end: ChartSettings.playbackExtent,
-            });
-          }
-        };
-
-        const isSelected =
-          ChartSettings.isItemSelected(item.key) ||
-          ChartSettings.isItemSelected(item.group);
-
-        if (ChartSettings.selectedChartItems.length > 0) {
-          if (isSelected) {
-            triggerForeshadow();
-          }
-        } else {
-          triggerForeshadow();
-        }
-      }
-    );
+    ChartSettings.currentChart?.chart?.setForeshadowing(foreshadowingAreaValue)
   },
 });
 
 legendSubject.subscribe({
   next(key: any) {
-    if (ChartSettings.isItemSelected(key)) {
-      ChartSettings.removeSelectedChartItem(key);
-    } else {
-      ChartSettings.addSelectedChartItem(key);
-    }
+    ChartSettings.currentChart?.chart?.toggleSelection(key);
   },
 });
 
 watch(
-  () => ChartSettings.selectedChartItems,
-  (selectedItems: string[]) => {
-    ChartSettings.iterateOverChartItems(
-      (item: AnimatedLine | AnimatedCircle) => {
-        let lineEffect;
-
-        const isSelected =
-          ChartSettings.isItemSelected(item.key) ||
-          ChartSettings.isItemSelected(item.group);
-        // No selected items then all lines should have default values
-        if (selectedItems.length === 0) {
-          lineEffect = Effect.DEFAULT;
-        } else if (isSelected) {
-          lineEffect = Effect.FOCUSED;
-        } else {
-          lineEffect = Effect.BACKGROUND;
-          item.setForeshadowingArea(
-            ForeshadowingAreaSubjectType.CLEAR,
-            undefined
-          );
-        }
-
-        item.setAppearanceFromEffect(lineEffect);
-        item.drawCurrentState({
-          end: ChartSettings.playbackExtent,
-        });
-      }
-    );
-  }
-);
-
-watch(
   () => ChartSettings.playbackExtent,
-  (newValue, oldValue) => {
-    ChartSettings.iterateOverChartItems(
-      (item: AnimatedLine | AnimatedCircle) => {
-        const isSelected =
-          ChartSettings.isItemSelected(item.key) ||
-          ChartSettings.isItemSelected(item.group);
+  (newValue) => {
+    ChartSettings.currentChart?.chart?.updateState({
+      extent: newValue
+    });
+    // ChartSettings.iterateOverChartItems(
+    //   (item: AnimatedLine | AnimatedCircle) => {
+    //     const isSelected =
+    //       ChartSettings.isItemSelected(item.key) ||
+    //       ChartSettings.isItemSelected(item.group);
 
-        if (ChartSettings.selectedChartItems.length === 0) {
-          item.drawCurrentState({
-            start: oldValue,
-            end: newValue,
-          });
-        } else if (isSelected) {
-          item.drawCurrentState({
-            start: oldValue,
-            end: newValue,
-          });
-        }
-      }
-    );
+    //     if (ChartSettings.selectedChartItems.length === 0) {
+    //       item.drawState({
+    //         bounds: {
+    //           start: oldValue,
+    //           end: newValue,
+    //         }
+    //       });
+    //     } else if (isSelected) {
+    //       item.drawState({
+    //         bounds: {
+    //           start: oldValue,
+    //           end: newValue,
+    //         }
+    //       });
+    //     }
+    //   }
+    // );
   }
 );
 
 onMounted(() => {
   // Do whatever you need to do with canvasCtx after this
-  ChartSettings.currentChart?.setContext(CanvasSettings.canvasCtx);
-  ChartSettings.currentChart?.drawAll();
+  ChartSettings.currentChart?.setContext('chart', CanvasSettings.canvasCtx['chart']);
+  ChartSettings.currentChart?.chart?.draw();
 
   LegendSettings.initializeLegendItems();
   LegendSettings.drawLegendItems();
@@ -197,7 +133,7 @@ onMounted(() => {
       ></v-slider>
     </v-col>
   </v-row>
-  <v-row>
+  <!-- <v-row>
     <v-col lg="12">
       <div class="text-h6">
         Current Animation:
@@ -206,7 +142,7 @@ onMounted(() => {
         }}</span>
       </div>
     </v-col>
-  </v-row>
+  </v-row> -->
   <v-row class="mt-10">
     <v-col lg="12">
       <CanvasWrapper
@@ -215,7 +151,7 @@ onMounted(() => {
         v-slot="{ className }"
       >
         <VideoViews :className="className" />
-        <ChartAxes :className="className" />
+        <!-- <ChartAxes :className="className" /> -->
         <canvas
           v-for="key in [...gestureCanvasKeys, ...ChartSettings.canvasKeys]"
           v-bind:key="key"

@@ -174,7 +174,7 @@ export const foreshadowingTracker = shallowRef(
         foreshadowingAreaSubject,
     },
     resetKeys: getGestureListenerResetKeys("KeyF"),
-    mode: ForeshadowingShapes.RECTANGLE,
+    mode: ForeshadowingShapes.RANGE,
     playbackControllerType: "absolute",
   })
 );

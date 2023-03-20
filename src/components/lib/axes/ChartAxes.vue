@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<!-- <script setup lang="ts">
 import { axesSubject, clearArea, drawXAxis, drawYAxis } from "@/utils";
 import { onMounted, watchEffect } from "vue";
 import { CanvasSettings, ChartSettings } from "../app-settings/settings-state";
@@ -54,4 +54,4 @@ onMounted(() => {
   ></canvas>
 </template>
 
-<style></style>
+<style></style> -->

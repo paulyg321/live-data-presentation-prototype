@@ -1,19 +1,20 @@
 import * as d3 from "d3";
-import dayjs from "dayjs";
 import {
-  AnimatedLine,
+  // AnimatedLine,
   LegendItem,
   type Coordinate2D,
   type Dimensions,
 } from "@/utils";
-import { AnimatedCircle } from "./AnimatedCircle";
+// import { AnimatedCircle } from "./AnimatedCircle";
 import _ from "lodash";
-import type { Subject } from "rxjs";
+import { LineChart, type LineItemStates } from "./LineChart";
+import { ScatterPlot } from "./ScatterPlot";
 
 export enum Effect {
   DEFAULT = "default",
   FOCUSED = "focused",
   BACKGROUND = "background",
+  FORESHADOW = "foreshadow",
 }
 
 export interface ChartType {
@@ -21,9 +22,7 @@ export interface ChartType {
   value: ChartTypeValue;
 }
 
-export interface ChartItemsMap {
-  [key: string]: AnimatedLine | AnimatedCircle;
-}
+export const NON_FOCUSED_COLOR = "grey";
 
 export interface LegendItemsMap {
   [key: string]: LegendItem;
@@ -34,6 +33,15 @@ export enum ChartTypeValue {
   SCATTER = "scatter",
   BAR = "bar",
 }
+
+type LineChartItemTypes = Record<
+  string,
+  { color: string; states: LineItemStates }
+>;
+type ScatterPlotItemTypes = Record<
+  string,
+  { color: string; states: Coordinate2D[] }
+>;
 
 export interface NewChartArgs {
   title: string;
@@ -84,7 +92,7 @@ export class Chart {
   dimensions: Dimensions;
   canvasDimensions: Dimensions;
 
-  animatedItems: AnimatedLine[] | AnimatedCircle[] | undefined;
+  chart: LineChart | ScatterPlot | undefined;
   legendItems: LegendItem[] | undefined;
 
   xDomain: [any, any] | undefined;
@@ -95,9 +103,6 @@ export class Chart {
       }
     | undefined;
   yDomain: [any, any] | undefined;
-
-  context: { [key: string]: CanvasRenderingContext2D | null | undefined } = {};
-
   keyframeData: any;
 
   /**
@@ -144,182 +149,7 @@ export class Chart {
     this.canvasDimensions = canvasDimensions;
 
     this.groupDataIntoKeyFrames();
-    this.setDomain();
     this.computeChartItems();
-  }
-
-  private setDomain() {
-    switch (this.type.value) {
-      case ChartTypeValue.LINE:
-        this.setLineChartDomain();
-        break;
-      case ChartTypeValue.SCATTER:
-        this.setScatterPlotDomain();
-        break;
-      default:
-        break;
-    }
-  }
-
-  private getDataTypeForValues(values: { x: any; y: any }) {
-    const { x, y } = values;
-
-    let xType: "date" | "number" | undefined;
-    let yType: "date" | "number" | undefined;
-
-    if (typeof x === "string") {
-      // check if it's a date, otherwise throw an error
-      if (dayjs(x).isValid()) {
-        xType = "date";
-      } else {
-        throw new Error("Type of x value unsupported");
-      }
-    } else if (typeof x === "number") {
-      xType = "number";
-    }
-
-    if (typeof y === "string") {
-      // check if it's a date, otherwise throw an error
-      if (dayjs(y).isValid()) {
-        yType = "date";
-      } else {
-        throw new Error("Type of y value unsupported");
-      }
-    } else if (typeof y === "number") {
-      yType = "number";
-    }
-
-    return {
-      xType,
-      yType,
-    };
-  }
-
-  private setScatterPlotDomain() {
-    const parseTime = d3.timeParse("%Y-%m-%d");
-    let currentState = 0;
-    if (this.animatedItems) {
-      const circle = this.animatedItems[0];
-      currentState = circle.currentState;
-    }
-
-    this.xDomain = undefined;
-    this.yDomain = undefined;
-    const currentChartState = Object.entries(this.keyframeData).map(
-      ([_, value]: [string, any]) => {
-        const state: { x: any; y: any } = value[currentState].data;
-
-        if (state) {
-          this.dataType = this.getDataTypeForValues(state);
-        }
-
-        return state;
-      }
-    );
-
-    if (this.dataType?.xType && this.dataType?.yType) {
-      let xAccessor = (data: any) => data.x;
-      if (this.dataType.xType === "number") {
-        xAccessor = (data: any) => data.x;
-      } else if (this.dataType.xType === "date") {
-        xAccessor = (data) => parseTime(data.x);
-      } else {
-        throw new Error(
-          "Unable to instantiate new chart, data types unsupported"
-        );
-      }
-
-      this.xDomain = d3.extent(currentChartState, xAccessor);
-
-      let yAccessor = (data: any) => data.y;
-      if (this.dataType.yType === "number") {
-        yAccessor = (data: any) => data.y;
-      } else if (this.dataType.yType === "date") {
-        yAccessor = (data) => parseTime(data.y);
-      } else {
-        throw new Error(
-          "Unable to instantiate new chart, data types unsupported"
-        );
-      }
-
-      this.yDomain = d3.extent(currentChartState, yAccessor);
-    } else {
-      throw new Error(
-        "Unable to instantiate new chart, data types unsupported"
-      );
-    }
-  }
-
-  private setLineChartDomain() {
-    const parseTime = d3.timeParse("%Y-%m-%d");
-
-    let currentState = 0;
-    if (this.animatedItems) {
-      const line = this.animatedItems[0];
-      currentState = line.currentState;
-    }
-
-    this.xDomain = undefined;
-    this.yDomain = undefined;
-    Object.entries(this.keyframeData).forEach(([_, value]: [string, any]) => {
-      const state: { x: any; y: any }[] = value[currentState].data;
-
-      if (state[0]) {
-        this.dataType = this.getDataTypeForValues(state[0]);
-      }
-
-      if (this.dataType?.xType && this.dataType?.yType) {
-        let xAccessor = (data: any) => data.x;
-        if (this.dataType.xType === "number") {
-          xAccessor = (data: any) => data.x;
-        } else if (this.dataType.xType === "date") {
-          xAccessor = (data) => parseTime(data.x);
-        } else {
-          throw new Error(
-            "Unable to instantiate new chart, data types unsupported"
-          );
-        }
-
-        const [minX, maxX] = d3.extent(state, xAccessor);
-
-        if (this.xDomain) {
-          const [currentMinX, currentMaxX] = this.xDomain;
-          this.xDomain = [
-            d3.min([minX, currentMinX]),
-            d3.max([maxX, currentMaxX]),
-          ];
-        } else {
-          this.xDomain = [minX, maxX];
-        }
-
-        let yAccessor = (data: any) => data.y;
-        if (this.dataType.yType === "number") {
-          yAccessor = (data: any) => data.y;
-        } else if (this.dataType.yType === "date") {
-          yAccessor = (data) => parseTime(data.y);
-        } else {
-          throw new Error(
-            "Unable to instantiate new chart, data types unsupported"
-          );
-        }
-
-        const [minY, maxY] = d3.extent(state, yAccessor);
-
-        if (this.yDomain) {
-          const [currentMinY, currentMaxY] = this.yDomain;
-          this.yDomain = [
-            d3.min([minY, currentMinY]),
-            d3.max([maxY, currentMaxY]),
-          ];
-        } else {
-          this.yDomain = [minY, maxY];
-        }
-      } else {
-        throw new Error(
-          "Unable to instantiate new chart, data types unsupported"
-        );
-      }
-    });
   }
 
   private groupDataIntoKeyFrames() {
@@ -401,85 +231,136 @@ export class Chart {
     this.keyframeData = groupedData;
   }
 
-  private setOrUpdateAnimatedCircles() {
-    if (this.animatedItems === undefined) {
-      this.animatedItems = _.slice(
-        Object.entries(this.keyframeData),
-        0,
-        20
-      ).map(([key, value]: [string, any]) => {
-        let item_group = key;
-        if (this.useGroups) {
-          item_group = value[0].group;
-        }
-        const states = value.map(({ data }: any) => {
-          return data;
-        });
+  // private setOrUpdateAnimatedCircles() {
+  //   if (this.animatedItems === undefined) {
+  //     this.animatedItems = _.slice(
+  //       Object.entries(this.keyframeData),
+  //       0,
+  //       20
+  //     ).map(([key, value]: [string, any]) => {
+  //       let item_group = key;
+  //       if (this.useGroups) {
+  //         item_group = value[0].group;
+  //       }
+  //       const states = value.map(({ data }: any) => {
+  //         return data;
+  //       });
 
-        return new AnimatedCircle({
-          states,
-          getScales: () => this.getScales(),
-          chartDimensions: this.getDimensions(),
-          canvasDimensions: this.canvasDimensions,
-          duration: 1000,
-          key,
-          group: item_group,
-          color: gapMinderColorFn(item_group) as string,
-          dataType: this.dataType,
-        });
-      });
-    } else {
-      this.animatedItems.forEach((circle: AnimatedCircle | AnimatedLine) => {
-        circle.updateState({
-          getScales: () => this.getScales(),
-          chartDimensions: this.getDimensions(),
-          canvasDimensions: this.canvasDimensions,
-        });
-      }, {});
-    }
-  }
+  //       return new AnimatedCircle({
+  //         states,
+  //         getScales: () => this.getScales(),
+  //         chartDimensions: this.getDimensions(),
+  //         canvasDimensions: this.canvasDimensions,
+  //         duration: 1000,
+  //         key,
+  //         group: item_group,
+  //         color: gapMinderColorFn(item_group) as string,
+  //         dataType: this.dataType,
+  //       });
+  //     });
+  //   } else {
+  //     this.animatedItems.forEach((circle: AnimatedCircle | AnimatedLine) => {
+  //       circle.updateState({
+  //         getScales: () => this.getScales(),
+  //         chartDimensions: this.getDimensions(),
+  //         canvasDimensions: this.canvasDimensions,
+  //       });
+  //     }, {});
+  //   }
+  // }
 
-  private setOrUpdateAnimatedLines() {
-    if (this.animatedItems === undefined) {
-      this.animatedItems = Object.entries(this.keyframeData).map(
-        ([key, value]: [string, any], currentIndex: number) => {
+  private setOrUpdateLineChart(context?: CanvasRenderingContext2D) {
+    if (this.chart === undefined && context) {
+      const items = Object.entries(this.keyframeData).reduce(
+        (
+          chartMap: LineChartItemTypes,
+          [key, value]: [string, any],
+          currentIndex: number
+        ) => {
           const states = value.map(({ data }: any) => {
             return data;
           });
 
-          return new AnimatedLine({
-            states,
-            getScales: () => this.getScales(),
-            chartDimensions: this.getDimensions(),
-            chartPosition: this.getPosition(),
-            canvasDimensions: this.canvasDimensions,
-            duration: 1000,
-            key,
-            color: colorArray[currentIndex],
-            dataType: this.dataType,
-          });
-        }
+          return {
+            ...chartMap,
+            [key]: {
+              states,
+              color: colorArray[currentIndex],
+            },
+          };
+        },
+        {} as LineChartItemTypes
       );
+
+      this.chart = new LineChart({
+        items,
+        canvasDimensions: this.canvasDimensions,
+        chartDimensions: this.dimensions,
+        position: this.position,
+        context,
+      });
+
+      this.setLegendItems(items);
     } else {
-      this.animatedItems.forEach((line: AnimatedCircle | AnimatedLine) => {
-        line.updateState({
-          getScales: () => this.getScales(),
-          chartDimensions: this.getDimensions(),
-          canvasDimensions: this.canvasDimensions,
-        });
-      }, {});
+      this.chart?.updateState({
+        chartDimensions: this.dimensions,
+        canvasDimensions: this.canvasDimensions,
+        context,
+      });
     }
   }
 
-  setLegendItems() {
+  private setOrUpdateScatterPlot(context?: CanvasRenderingContext2D) {
+    if (this.chart === undefined && context) {
+      const items = _.slice(Object.entries(this.keyframeData), 0, 20).reduce(
+        (chartMap: ScatterPlotItemTypes, [key, value]: [string, any]) => {
+          let item_group = key;
+          if (this.useGroups) {
+            item_group = value[0].group;
+          }
+          const states = value.map(({ data }: any) => {
+            return data;
+          });
+
+          return {
+            ...chartMap,
+            [key]: {
+              states,
+              color: gapMinderColorFn(item_group) as string,
+              group: item_group,
+            },
+          };
+        },
+        {} as ScatterPlotItemTypes
+      );
+
+      this.chart = new ScatterPlot({
+        items,
+        canvasDimensions: this.canvasDimensions,
+        chartDimensions: this.dimensions,
+        position: this.position,
+        context,
+      });
+
+      this.setLegendItems(items);
+    } else {
+      this.chart?.updateState({
+        chartDimensions: this.dimensions,
+        canvasDimensions: this.canvasDimensions,
+        context,
+      });
+    }
+  }
+
+  setLegendItems(items: any) {
     const groupItems = this.useGroups;
     const existingKeys: Record<string, boolean> = {};
-    this.legendItems = this.animatedItems?.reduce<LegendItem[]>(
-      (legendItems: LegendItem[], animatedItem: any) => {
-        let item_group = animatedItem.key;
+    this.legendItems = Object.entries(items).reduce<LegendItem[]>(
+      (legendItems: LegendItem[], [key, value]: any) => {
+        let item_group = key;
 
         if (groupItems && this.zField) {
-          item_group = animatedItem.group;
+          item_group = value.group;
         }
 
         if (!existingKeys[item_group]) {
@@ -488,7 +369,7 @@ export class Chart {
             ...legendItems,
             new LegendItem({
               label: item_group,
-              color: animatedItem.color,
+              color: value.color,
               canvasDimensions: this.canvasDimensions,
             }),
           ];
@@ -498,92 +379,6 @@ export class Chart {
       },
       [] as LegendItem[]
     );
-  }
-
-  getPosition(): Coordinate2D {
-    return this.position;
-  }
-
-  getDimensions(): Required<Dimensions> {
-    if (this.dimensions.margin) {
-      return this.dimensions as Required<Dimensions>;
-    }
-
-    return {
-      ...this.dimensions,
-      margin: {
-        left: 30,
-        right: 30,
-        top: 30,
-        bottom: 30,
-      },
-    };
-  }
-
-  getBounds() {
-    const dimensions = this.getDimensions();
-    const position = this.getPosition();
-    return {
-      x: {
-        start: position.x + dimensions.margin?.left,
-        end: position.x + (this.dimensions.width - dimensions.margin.right),
-      },
-      y: {
-        start: position.y + dimensions.height - dimensions.margin.bottom,
-        end: position.y + dimensions.margin.top,
-      },
-    };
-  }
-
-  getRange() {
-    const chartBounds = this.getBounds();
-    return {
-      xRange: [chartBounds.x.start, chartBounds.x.end],
-      yRange: [chartBounds.y.start, chartBounds.y.end],
-    };
-  }
-
-  getScales() {
-    this.setDomain();
-    let xScaleFn: any = d3.scaleLinear;
-    let yScaleFn: any = d3.scaleLinear;
-
-    if (this.dataType?.xType === "date") {
-      xScaleFn = d3.scaleTime;
-    }
-
-    if (this.dataType?.yType === "date") {
-      yScaleFn = d3.scaleTime;
-    }
-
-    const { xRange, yRange } = this.getRange();
-
-    return {
-      xScale: xScaleFn(this.xDomain ?? [], xRange),
-      yScale: yScaleFn(this.yDomain ?? [], yRange),
-    };
-  }
-
-  getAxesPositions() {
-    const position = this.getPosition();
-    const dimensions = this.getDimensions();
-    return {
-      xAxis: position.y + (dimensions.height - dimensions.margin.top),
-      yAxis: position.x + dimensions.margin.left,
-    };
-  }
-
-  getAnimatedElements() {
-    switch (this.type.value) {
-      case ChartTypeValue.LINE:
-      default:
-        return this.animatedItems;
-    }
-  }
-
-  getLegendItems() {
-    this.setLegendItems();
-    return this.legendItems;
   }
 
   updateState({
@@ -602,39 +397,26 @@ export class Chart {
     this.computeChartItems();
   }
 
-  setContext(ctxObj: {
-    [key: string]: CanvasRenderingContext2D | null | undefined;
-  }) {
-    this.context = ctxObj;
-    if (this.animatedItems) {
-      this.animatedItems.forEach((item: AnimatedCircle | AnimatedLine) => {
-        const itemContext = ctxObj[item.key];
-        if (itemContext) {
-          item.setContext(itemContext);
-        }
-      });
+  setContext(
+    key: "chart" | "legend",
+    context: CanvasRenderingContext2D | null | undefined
+  ) {
+    if (context) {
+      this.computeChartItems(context);
     }
   }
 
-  computeChartItems() {
+  computeChartItems(context?: CanvasRenderingContext2D) {
     switch (this.type.value) {
       case ChartTypeValue.LINE: {
-        this.setOrUpdateAnimatedLines();
+        this.setOrUpdateLineChart(context);
         break;
       }
       case ChartTypeValue.SCATTER: {
-        this.setOrUpdateAnimatedCircles();
+        this.setOrUpdateScatterPlot(context);
         break;
       }
       default:
-    }
-  }
-
-  drawAll() {
-    if (this.animatedItems) {
-      this.animatedItems.forEach((item: AnimatedCircle | AnimatedLine) => {
-        item.drawCurrentState();
-      });
     }
   }
 }

@@ -31,3 +31,32 @@ export interface BezierCoordinate {
   cpLeft?: Coordinate2D;
   cpRight?: Coordinate2D;
 }
+
+export interface ForeshadowingSettings {
+  area: ForeshadowingAreaData;
+  type: ForeshadowingAreaSubjectType;
+}
+
+export interface EaseFunctionConfig {
+  transitionFunction: (value: number) => number;
+  duration: number;
+}
+
+export interface ChartRangeType {
+  xRange: [number, number];
+  yRange: [number, number];
+  xRangeNext: [number, number];
+}
+
+export interface EaseFunctionConfig {
+  transitionFunction: (value: number) => number;
+  duration: number;
+}
+
+export interface ChartRangeType {
+  xRange: [number, number];
+  yRange: [number, number];
+  xRangeNext: [number, number];
+}
+
+export type ScaleFn = (int: number) => number;

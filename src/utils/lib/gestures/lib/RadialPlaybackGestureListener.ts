@@ -1,7 +1,6 @@
 import { PlaybackSubjectType, startTimeoutInstance } from "@/utils";
 import _ from "lodash";
 import type { Coordinate2D } from "../../chart";
-import { drawCircle, drawLine, drawText } from "../../drawing";
 import { HANDS } from "./gesture-utils";
 import {
   GestureListener,
@@ -44,7 +43,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
     canvasDimensions,
     mode,
     resetKeys,
-    subjects
+    subjects,
   }: RadialPlaybackGestureListenerConstructorArgs) {
     super({
       position,
@@ -54,7 +53,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
       gestureSubject,
       canvasDimensions,
       resetKeys,
-      subjects
+      subjects,
     });
 
     this.mode = mode;
@@ -81,21 +80,26 @@ export class RadialPlaybackGestureListener extends GestureListener {
 
   private renderCenterPoint() {
     const centerPoint = this.getCenterPoint();
-    const fontSize = 60;
+    const fontSize = 40;
     if (this.context) {
-      drawText({
-        context: this.context,
-        coordinates: centerPoint,
-        text: this.rotations.toString(),
-        fillStyle: "skyblue",
-        fontSize,
-        xScale: (value: number) => {
-          return value - fontSize / 4;
+      this.drawingUtils?.modifyContextStyleAndDraw(
+        {
+          fillStyle: "skyblue",
+          fontSize,
         },
-        yScale: (value: number) => {
-          return value + fontSize / 4;
-        },
-      });
+        () => {
+          this.drawingUtils?.drawText({
+            coordinates: centerPoint,
+            text: this.rotations.toString(),
+            xScale: (value: number) => {
+              return value - fontSize / 4;
+            },
+            yScale: (value: number) => {
+              return value + fontSize / 4;
+            },
+          });
+        }
+      );
     }
   }
 
@@ -104,17 +108,22 @@ export class RadialPlaybackGestureListener extends GestureListener {
     const endAngle = this.angleStack.length > 0 ? angle * (Math.PI / 180) : 0;
     if (this.context) {
       this.renderReferencePoints();
-      drawCircle({
-        context: this.context,
-        coordinates: centerPoint,
-        radius: this.dimensions.width / 2,
-        startAngle: 0,
-        endAngle,
-        fill: true,
-        fillStyle: "#90EE90",
-        drawLineToCenter: true,
-        opacity: 0.3,
-      });
+      this.drawingUtils?.modifyContextStyleAndDraw(
+        {
+          fillStyle: "#90EE90",
+          opacity: 0.3,
+        },
+        () => {
+          this.drawingUtils?.drawCircle({
+            coordinates: centerPoint,
+            radius: this.dimensions.width / 2,
+            startAngle: 0,
+            endAngle,
+            fill: true,
+            drawLineToCenter: true,
+          });
+        }
+      );
     }
   }
 
@@ -126,18 +135,23 @@ export class RadialPlaybackGestureListener extends GestureListener {
         this.renderReferencePoints();
       } else {
         this.clearCanvas();
-        drawCircle({
-          context: this.context,
-          coordinates: centerPoint,
-          radius: this.dimensions.width / 2,
-          startAngle: 0,
-          endAngle,
-          stroke: true,
-          strokeStyle: "#90EE90",
-          drawLineToCenter: true,
-          opacity: 0.3,
-          lineWidth: 10,
-        });
+        this.drawingUtils?.modifyContextStyleAndDraw(
+          {
+            strokeStyle: "#90EE90",
+            opacity: 0.3,
+            lineWidth: 10,
+          },
+          () => {
+            this.drawingUtils?.drawCircle({
+              coordinates: centerPoint,
+              radius: this.dimensions.width / 2,
+              startAngle: 0,
+              endAngle,
+              stroke: true,
+              drawLineToCenter: true,
+            });
+          }
+        );
       }
     }
   }
@@ -169,7 +183,8 @@ export class RadialPlaybackGestureListener extends GestureListener {
               RadialPlaybackGestureListener.playbackSubjectKey,
               {
                 type: PlaybackSubjectType.CONTINUOUS,
-                value: (percentComplete: number) => this.renderAnimationContext(percentComplete),
+                value: (percentComplete: number) =>
+                  this.renderAnimationContext(percentComplete),
               }
             );
             this.resetAngleState();
@@ -209,13 +224,19 @@ export class RadialPlaybackGestureListener extends GestureListener {
   renderBorder() {
     const centerPoint = this.getCenterPoint();
     if (this.context) {
-      drawCircle({
-        context: this.context,
-        coordinates: centerPoint,
-        radius: this.dimensions.width / 2,
-        strokeStyle: "skyblue",
-        stroke: true,
-      });
+      this.drawingUtils?.modifyContextStyleAndDraw(
+        {
+          strokeStyle: "skyblue",
+        },
+        () => {
+          this.drawingUtils?.drawCircle({
+            context: this.context,
+            coordinates: centerPoint,
+            radius: this.dimensions.width / 2,
+            stroke: true,
+          });
+        }
+      );
     }
   }
 

@@ -7,13 +7,16 @@ export function drawXAxis(
   Y: number,
   range: number[],
   fontSize: number,
+  tickCount?: number,
+  rotate?: boolean
 ) {
   const [startX, endX] = range;
   const tickSize = 6,
-    xTicks = xScale.ticks(), // You may choose tick counts. ex: xScale.ticks(20)
+    xTicks = xScale.ticks(tickCount), // You may choose tick counts. ex: xScale.ticks(20)
     xTickFormat = xScale.tickFormat(); // you may choose the format. ex: xScale.tickFormat(tickCount, ".0s")
 
   context.strokeStyle = AXES_COLOR;
+  context.font = `${fontSize}px Arial`;
 
   context.beginPath();
   xTicks.forEach((d: any) => {
@@ -32,10 +35,51 @@ export function drawXAxis(
   context.textAlign = "center";
   context.textBaseline = "top";
   context.fillStyle = AXES_COLOR;
+
+  // Determine if there's overlap
+  let overlap = false;
+  xTicks.forEach((d: any, index: number) => {
+    const nextTick = xTicks.at(index + 1);
+
+    if (nextTick) {
+      const label = xTickFormat(d);
+      const xPos = xScale(d);
+      const { width } = context.measureText(label);
+      const endOfLabel = xPos + width / 2;
+
+      const nextTickLabel = xTickFormat(nextTick);
+      const { width: nextTickLabelWidth } = context.measureText(nextTickLabel);
+      const xNextTickPos = xScale(nextTick);
+      const beginningOfNextTickLabel = xNextTickPos - nextTickLabelWidth / 2;
+
+      const positionDiff = beginningOfNextTickLabel - endOfLabel;
+
+      if (positionDiff <= 0) {
+        overlap = true;
+      }
+    }
+  });
+
   xTicks.forEach((d: any) => {
+    const label = xTickFormat(d);
+    const xPos = xScale(d);
+    const yPos = Y + tickSize + 3;
+
+    // rotate if there's overlaps
+    if (overlap) {
+      context.save();
+      context.textAlign = "right";
+      // https://stackoverflow.com/questions/3167928/drawing-rotated-text-on-a-html5-canvas
+      context.translate(xPos, yPos);
+      context.rotate(-Math.PI / 2);
+      context.fillText(label, -tickSize, -(fontSize / 2));
+      context.beginPath();
+      context.restore();
+      return;
+    }
+
+    context.fillText(label, xPos, yPos);
     context.beginPath();
-    context.font = `${fontSize}px Arial`;
-    context.fillText(xTickFormat(d), xScale(d), Y + tickSize);
   });
 }
 
@@ -44,7 +88,7 @@ export function drawYAxis(
   yScale: any,
   X: number,
   range: number[],
-  fontSize: number,
+  fontSize: number
 ) {
   const [startY, endY] = range;
   const tickPadding = 3,

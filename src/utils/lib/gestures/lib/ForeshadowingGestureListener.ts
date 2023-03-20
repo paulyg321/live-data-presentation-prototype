@@ -1,7 +1,4 @@
 import {
-  drawCircle,
-  drawLine,
-  drawRect,
   EmphasisGestureListener,
   ForeshadowingAreaSubjectType,
   startTimeoutInstance,
@@ -16,6 +13,7 @@ import {
   type Coordinate2D,
   type Dimensions,
 } from "../../chart";
+import { LineShape } from "../../chart/lib/LineChart";
 import { HANDS } from "./gesture-utils";
 import {
   GestureListener,
@@ -33,6 +31,8 @@ export interface ForeshadowingGestureListenerConstructorArgs
   mode?: ForeshadowingShapes;
   playbackControllerType?: "absolute" | "relative";
 }
+
+type ForeshadowingResetKeys = "KeyC" | "KeyA" | "KeyE";
 
 export type ForeshadowingAreaData =
   | {
@@ -132,7 +132,7 @@ export class ForeshadowingGestureListener extends GestureListener {
     this.setModeSwitcher();
   }
 
-  private keyToModeMap: Record<"KeyC" | "KeyA" | "KeyE", ForeshadowingShapes> =
+  private keyToModeMap: Record<ForeshadowingResetKeys, ForeshadowingShapes> =
     {
       KeyC: ForeshadowingShapes.CIRCLE,
       KeyA: ForeshadowingShapes.RANGE,
@@ -141,10 +141,10 @@ export class ForeshadowingGestureListener extends GestureListener {
 
   private setModeSwitcher() {
     Object.keys(this.keyToModeMap)?.forEach(
-      (modeSwitchKey: "KeyC" | "KeyA" | "KeyE") => {
+      (modeSwitchKey: string) => {
         document.addEventListener("keypress", (event) => {
           if (event.code === modeSwitchKey) {
-            this.mode = this.keyToModeMap[modeSwitchKey];
+            this.mode = this.keyToModeMap[modeSwitchKey as ForeshadowingResetKeys];
           }
         });
       }
@@ -450,14 +450,16 @@ export class ForeshadowingGestureListener extends GestureListener {
         if (!rectData) return;
 
         const { coordinates, dimensions } = rectData;
-        drawRect({
-          context: this.context,
-          coordinates,
-          dimensions,
-          fill: true,
+        this.drawingUtils?.modifyContextStyleAndDraw({
           fillStyle,
           opacity,
-        });
+        }, () => {
+          this.drawingUtils?.drawRect({
+            coordinates,
+            dimensions,
+            fill: true,
+          });
+        })
 
         const foreshadowingArea = {
           position: coordinates,
@@ -467,7 +469,7 @@ export class ForeshadowingGestureListener extends GestureListener {
           ForeshadowingGestureListener.foreshadowingAreaSubjectKey,
           {
             type: ForeshadowingAreaSubjectType.RECTANGLE,
-            value: foreshadowingArea,
+            area: foreshadowingArea, 
           }
         );
       }
@@ -477,15 +479,16 @@ export class ForeshadowingGestureListener extends GestureListener {
         if (!circleData) return;
 
         const { radius, coordinates } = circleData;
-
-        drawCircle({
-          context: this.context,
-          radius,
-          coordinates,
-          fill: true,
+        this.drawingUtils?.modifyContextStyleAndDraw({
           fillStyle,
           opacity,
-        });
+        }, () => {
+          this.drawingUtils?.drawCircle({
+            radius,
+            coordinates,
+            fill: true,
+          });
+        })
         const foreshadowingArea = {
           position: coordinates,
           radius,
@@ -494,7 +497,7 @@ export class ForeshadowingGestureListener extends GestureListener {
           ForeshadowingGestureListener.foreshadowingAreaSubjectKey,
           {
             type: ForeshadowingAreaSubjectType.CIRCLE,
-            value: foreshadowingArea,
+            area: foreshadowingArea,
           }
         );
       }
@@ -507,14 +510,19 @@ export class ForeshadowingGestureListener extends GestureListener {
 
         const { startCoordinates, endCoordinates } = rangeData;
 
-        drawLine({
-          context: this.context,
-          startCoordinates,
-          endCoordinates,
+        this.drawingUtils?.modifyContextStyleAndDraw({
           lineWidth,
           strokeStyle: "red",
           opacity,
-        });
+        }, () => {
+          this.drawingUtils?.drawLine({
+            coordinates: [
+              startCoordinates,
+              endCoordinates
+            ],
+            shape: LineShape.SHARP
+          });
+        })
 
         const foreshadowingArea = {
           position: {
@@ -523,7 +531,7 @@ export class ForeshadowingGestureListener extends GestureListener {
           },
           dimensions: {
             width: Math.abs(startCoordinates.x - endCoordinates.x),
-            height: 0, // THis is ignored and we use the chart height
+            height: this.canvasDimensions.height,
           },
         };
 
@@ -531,7 +539,7 @@ export class ForeshadowingGestureListener extends GestureListener {
           ForeshadowingGestureListener.foreshadowingAreaSubjectKey,
           {
             type: ForeshadowingAreaSubjectType.RANGE,
-            value: foreshadowingArea,
+            area: foreshadowingArea,
           }
         );
       }
@@ -728,118 +736,8 @@ export class ForeshadowingGestureListener extends GestureListener {
     this.renderReferencePoints(true);
     this.publishToSubjectIfExists(
       ForeshadowingGestureListener.foreshadowingAreaSubjectKey,
-      {
-        type: ForeshadowingAreaSubjectType.CLEAR,
-        value: undefined,
-      }
+      undefined
     );
-  }
-
-  renderShapeFingerMarkers(
-    {
-      leftIndex,
-      leftThumb,
-      rightIndex,
-      rightThumb,
-    }: ForeshadowingShapePosition,
-    isRectangle: boolean,
-    isCircle: boolean
-  ) {
-    if (isRectangle) {
-      [leftIndex, leftThumb, rightIndex, rightThumb].forEach(
-        (fingerPosition: Coordinate2D) => {
-          if (this.context) {
-            drawLine({
-              context: this.context,
-              startCoordinates: {
-                x: fingerPosition.x,
-                y: 0,
-              },
-              endCoordinates: {
-                x: fingerPosition.x,
-                y: this.position.y + this.dimensions.height,
-              },
-              strokeStyle: "steelblue",
-              lineWidth: 0.5,
-              opacity: 0.3,
-            });
-            drawLine({
-              context: this.context,
-              startCoordinates: {
-                x: 0,
-                y: fingerPosition.y,
-              },
-              endCoordinates: {
-                x: this.position.x + this.dimensions.width,
-                y: fingerPosition.y,
-              },
-              strokeStyle: "steelblue",
-              lineWidth: 0.5,
-              opacity: 0.3,
-            });
-          }
-        }
-      );
-
-      if (this.context) {
-        this.context.save();
-        drawRect({
-          context: this.context,
-          coordinates: {
-            x: leftThumb.x,
-            y: leftIndex.y,
-          },
-          dimensions: {
-            width: Math.abs(leftThumb.x - rightThumb.x),
-            height: Math.abs(leftIndex.y - rightIndex.y),
-          },
-          clip: true,
-        });
-        this.clearCanvas();
-        drawRect({
-          context: this.context,
-          coordinates: {
-            x: leftThumb.x,
-            y: leftIndex.y,
-          },
-          dimensions: {
-            width: Math.abs(leftThumb.x - rightThumb.x),
-            height: Math.abs(leftIndex.y - rightIndex.y),
-          },
-          fill: true,
-          fillStyle: "red",
-          opacity: 0.3,
-        });
-        this.context.restore();
-      }
-    }
-
-    if (isCircle) {
-      if (this.context) {
-        this.context.save();
-        const circleRadius = (rightThumb.y - rightIndex.y) / 2;
-        const circlePosition = {
-          x: rightIndex.x,
-          y: rightIndex.y + circleRadius,
-        };
-        drawCircle({
-          context: this.context,
-          coordinates: circlePosition,
-          radius: circleRadius,
-          clip: true,
-        });
-        this.clearCanvas();
-        drawCircle({
-          context: this.context,
-          coordinates: circlePosition,
-          radius: circleRadius,
-          fill: true,
-          fillStyle: "red",
-          opacity: 0.3,
-        });
-        this.context.restore();
-      }
-    }
   }
 
   renderReferencePoints(clear = true) {
@@ -847,7 +745,7 @@ export class ForeshadowingGestureListener extends GestureListener {
       if (clear) {
         this.clearCanvas();
       }
-      this.renderBorder();
+      // this.renderBorder();
     }
   }
 

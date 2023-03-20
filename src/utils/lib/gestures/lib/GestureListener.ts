@@ -1,6 +1,5 @@
 import {
-  clearArea,
-  drawRect,
+  DrawingUtils,
   HANDS,
   HAND_LANDMARK_IDS,
   SupportedGestures,
@@ -66,6 +65,8 @@ export abstract class GestureListener {
 
   private gestureSubscription: Subscription | undefined;
 
+  protected drawingUtils?: DrawingUtils;
+
   constructor({
     position,
     dimensions,
@@ -97,6 +98,9 @@ export abstract class GestureListener {
       this.setResetHandler();
     }
     this.context = context;
+    if (context) {
+      this.drawingUtils = new DrawingUtils(context);
+    }
   }
 
   private setResetHandler() {
@@ -194,7 +198,7 @@ export abstract class GestureListener {
 
   protected renderBorder() {
     if (this.context) {
-      drawRect({
+      this.drawingUtils?.drawRect({
         context: this.context,
         coordinates: this.position,
         dimensions: this.dimensions,
@@ -206,8 +210,7 @@ export abstract class GestureListener {
 
   protected clearCanvas() {
     if (this.context) {
-      clearArea({
-        context: this.context,
+      this.drawingUtils?.clearArea({
         coordinates: { x: 0, y: 0 },
         dimensions: this.canvasDimensions,
       });
@@ -216,8 +219,7 @@ export abstract class GestureListener {
 
   protected clearListenerArea() {
     if (this.context) {
-      clearArea({
-        context: this.context,
+      this.drawingUtils?.clearArea({
         coordinates: this.position,
         dimensions: this.dimensions,
       });
@@ -266,6 +268,7 @@ export abstract class GestureListener {
 
   setContext(ctx: CanvasRenderingContext2D) {
     this.context = ctx;
+    this.drawingUtils = new DrawingUtils(ctx);
   }
 
   setCanvasDimensions(dimensions: Dimensions) {

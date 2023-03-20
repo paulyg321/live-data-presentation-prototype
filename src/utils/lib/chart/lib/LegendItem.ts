@@ -9,9 +9,7 @@ import {
   HAND_LANDMARK_IDS,
   startTimeoutInstance,
   type Dimensions,
-  drawText,
-  drawRect,
-  clearArea,
+  DrawingUtils,
 } from "@/utils";
 import type { Subject } from "rxjs";
 
@@ -38,6 +36,7 @@ export class LegendItem {
   private previousHandPositionInRange: boolean | undefined = false;
   private timer: d3.Timer | undefined;
   private context: CanvasRenderingContext2D | undefined;
+  private drawingUtils: DrawingUtils | undefined;
 
   static getPositionFromIndex(
     position: Coordinate2D,
@@ -94,6 +93,7 @@ export class LegendItem {
 
   setContext(ctx: CanvasRenderingContext2D) {
     this.context = ctx;
+    this.drawingUtils = new DrawingUtils(ctx);
   }
 
   updateState({
@@ -189,28 +189,34 @@ export class LegendItem {
 
   drawLegend() {
     if (this.context && this.position) {
-      // clearArea({
-      //   context: this.context,
-      //   coordinates: { x: 0, y: 0 },
-      //   dimensions: this.canvasDimensions,
-      // });
-      drawRect({
-        context: this.context,
-        coordinates: this.position,
-        dimensions: {
-          width: 20,
-          height: 20,
+      this.drawingUtils?.modifyContextStyleAndDraw(
+        {
+          fillStyle: this.color,
         },
-        fill: true,
-        fillStyle: this.color,
-      });
-      drawText({
-        context: this.context,
-        coordinates: { x: this.position.x + 40, y: this.position.y + 17 },
-        text: this.label,
-        fontSize: 20,
-        fillStyle: this.color,
-      });
+        () => {
+          this.drawingUtils?.drawRect({
+            coordinates: this.position!,
+            dimensions: {
+              width: 20,
+              height: 20,
+            },
+            fill: true,
+          });
+        }
+      );
+
+      this.drawingUtils?.modifyContextStyleAndDraw(
+        {
+          fontSize: 20,
+          fillStyle: this.color,
+        },
+        () => {
+          this.drawingUtils?.drawText({
+            coordinates: { x: this.position!.x + 40, y: this.position!.y + 17 },
+            text: this.label,
+          });
+        }
+      );
     }
   }
 
