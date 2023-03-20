@@ -470,7 +470,7 @@ export class LineChart {
     };
   }
 
-  private getDomain(foreshadow?: true): {
+  private getDomain(foreshadow?: boolean): {
     xDomain: [any, any];
     yDomain: [any, any];
   } {

@@ -7,3 +7,4 @@ export * from "./lib/utils";
 export * from "./types";
 export * from "./lib/LineChart";
 export * from "./lib/ScatterPlot";
+export * from "./lib/BarChart";

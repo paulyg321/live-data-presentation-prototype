@@ -30,6 +30,7 @@ export interface ModifyContextStyleArgs {
   opacity?: number;
   lineWidth?: number;
   lineDash?: number[];
+  textAlign?: "left" | "right" | "center";
 }
 
 export interface DrawCircleArgs extends DrawingArgs {
@@ -61,7 +62,7 @@ export interface DrawLineArgs {
 export class DrawingUtils {
   context: CanvasRenderingContext2D;
   constructor(context: CanvasRenderingContext2D) {
-    this.context = context
+    this.context = context;
   }
 
   drawText({
@@ -71,13 +72,17 @@ export class DrawingUtils {
     yScale = defaultScale,
     fill = true,
     stroke = false,
-  }: DrawTextArgs) {  
+  }: DrawTextArgs) {
     if (fill) {
       this.context.fillText(text, xScale(coordinates.x), yScale(coordinates.y));
     }
 
     if (stroke) {
-      this.context.strokeText(text, xScale(coordinates.x), yScale(coordinates.y));
+      this.context.strokeText(
+        text,
+        xScale(coordinates.x),
+        yScale(coordinates.y)
+      );
     }
   }
 
@@ -106,7 +111,7 @@ export class DrawingUtils {
       this.context.clip();
       return;
     }
-  
+
     this.context.beginPath();
     this.context.arc(
       xScale(coordinates.x),
@@ -137,16 +142,16 @@ export class DrawingUtils {
     range,
     xScale = defaultScale,
     yScale = defaultScale,
-  }:{
-    coordinates: { x: any; y: any }[],
-    shape?: LineShape,
-    filterMode?: 'defined' | 'clip'
+  }: {
+    coordinates: { x: any; y: any }[];
+    shape?: LineShape;
+    filterMode?: "defined" | "clip";
     range?: {
-      xRange: [number, number],
-      yRange: [number, number],
-    },
-    xScale?: (value: number) => number,
-    yScale?: (value: number) => number,
+      xRange: [number, number];
+      yRange: [number, number];
+    };
+    xScale?: (value: number) => number;
+    yScale?: (value: number) => number;
   }) {
     if (!this.context) return;
 
@@ -154,7 +159,7 @@ export class DrawingUtils {
       .line<Coordinate2D>()
       .x((d: Coordinate2D) => xScale(d.x))
       .y((d: Coordinate2D) => yScale(d.y));
-      
+
     if (shape === LineShape.CURVED) {
       // https://github.com/d3/d3-shape/blob/main/README.md#curves
       line = line.curve(d3.curveBumpX);
@@ -166,19 +171,23 @@ export class DrawingUtils {
           const d = {
             x: xScale(value.x),
             y: yScale(value.y),
-          }
-          const result = d.x <= range.xRange[1] && d.x >= range.xRange[0] && d.y <= range.yRange[0] && d.y >= range.yRange[1]
+          };
+          const result =
+            d.x <= range.xRange[1] &&
+            d.x >= range.xRange[0] &&
+            d.y <= range.yRange[0] &&
+            d.y >= range.yRange[1];
           return result;
-        })
+        });
       } else if (filterMode === "clip") {
         const dimensions = {
           width: range.xRange[1] - range.xRange[0],
-          height: range.yRange[0] - range.yRange[1]
-        }
+          height: range.yRange[0] - range.yRange[1],
+        };
         const coordinates = {
           x: range.xRange[0],
           y: range.yRange[1],
-        }
+        };
         this.clearAndClipRect({
           dimensions,
           coordinates,
@@ -187,7 +196,7 @@ export class DrawingUtils {
     }
 
     const drawLine = line.context(this.context);
-      
+
     this.context.save();
     this.context?.beginPath();
     drawLine(coordinates);
@@ -215,7 +224,7 @@ export class DrawingUtils {
       this.context.clip();
       return;
     }
-  
+
     if (fill) {
       this.context.fillRect(
         xScale(coordinates.x),
@@ -291,48 +300,53 @@ export class DrawingUtils {
     drawFn: () => void
   ) {
     const {
-      context: contextArg, 
+      context: contextArg,
       fillStyle,
       strokeStyle,
       fontSize,
       opacity,
       lineWidth,
       lineDash,
+      textAlign,
     } = settings;
-  
+
     let context = this.context;
     if (contextArg) {
-      context = contextArg
+      context = contextArg;
     }
 
     context.save();
-  
+
     if (fillStyle) {
       context.fillStyle = fillStyle;
     }
-  
+
     if (strokeStyle) {
       context.strokeStyle = strokeStyle;
     }
-  
+
     if (fontSize) {
       context.font = `${fontSize}px Arial`;
     }
-  
+
     if (opacity) {
       context.globalAlpha = opacity;
     }
-  
+
     if (lineWidth) {
       context.lineWidth = lineWidth;
     }
-  
+
     if (lineDash) {
       context.setLineDash(lineDash);
     }
-  
+
+    if (textAlign) {
+      context.textAlign = textAlign;
+    }
+
     drawFn();
-  
+
     context.restore();
   }
 }

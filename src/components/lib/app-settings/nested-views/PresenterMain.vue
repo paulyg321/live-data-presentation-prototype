@@ -52,7 +52,7 @@ playbackSubject.subscribe({
 // Foreshadowing area
 foreshadowingAreaSubject.subscribe({
   next(foreshadowingAreaValue: any) {
-    ChartSettings.currentChart?.chart?.setForeshadowing(foreshadowingAreaValue)
+    ChartSettings.currentChart?.chart?.setForeshadowing(foreshadowingAreaValue);
   },
 });
 
@@ -66,7 +66,7 @@ watch(
   () => ChartSettings.playbackExtent,
   (newValue) => {
     ChartSettings.currentChart?.chart?.updateState({
-      extent: newValue
+      extent: newValue,
     });
     // ChartSettings.iterateOverChartItems(
     //   (item: AnimatedLine | AnimatedCircle) => {
@@ -96,7 +96,10 @@ watch(
 
 onMounted(() => {
   // Do whatever you need to do with canvasCtx after this
-  ChartSettings.currentChart?.setContext('chart', CanvasSettings.canvasCtx['chart']);
+  ChartSettings.currentChart?.setContext(
+    "chart",
+    CanvasSettings.canvasCtx["chart"]
+  );
   ChartSettings.currentChart?.chart?.draw();
 
   LegendSettings.initializeLegendItems();

@@ -5,6 +5,7 @@ import {
   defaultScale,
   DrawingUtils,
   type DrawCircleArgs,
+  type DrawRectArgs,
   type ModifyContextStyleArgs,
 } from "../../drawing";
 import {
@@ -21,7 +22,7 @@ import type {
 import { NON_FOCUSED_COLOR } from "./Chart";
 import { drawXAxis, drawYAxis } from "./draw-axes";
 
-export interface ScatterPlotConstructorArgs {
+export interface BarChartConstructorArgs {
   items: Record<string, { color: string; states: Coordinate2D[] }>;
   canvasDimensions: Dimensions;
   chartDimensions: Dimensions;
@@ -29,7 +30,7 @@ export interface ScatterPlotConstructorArgs {
   context: CanvasRenderingContext2D;
 }
 
-export class ScatterPlot {
+export class BarChart {
   // CANVAS
   canvasDimensions: Dimensions;
   chartDimensions: Dimensions;
@@ -55,7 +56,7 @@ export class ScatterPlot {
     chartDimensions,
     position,
     context,
-  }: ScatterPlotConstructorArgs) {
+  }: BarChartConstructorArgs) {
     this.items = items;
     this.canvasDimensions = canvasDimensions;
     this.chartDimensions = chartDimensions;
@@ -73,7 +74,7 @@ export class ScatterPlot {
     canvasDimensions,
     context,
     extent,
-  }: Partial<ScatterPlotConstructorArgs> & {
+  }: Partial<BarChartConstructorArgs> & {
     extent?: number;
   }) {
     if (chartDimensions) {
@@ -133,7 +134,7 @@ export class ScatterPlot {
     const { xRange, yRange } = this.getRange();
 
     const xScaleFn: any = d3.scaleLinear;
-    const yScaleFn: any = d3.scaleLinear;
+    const yScaleFn: any = d3.scaleBand;
 
     const scales = {
       xScale: xScaleFn(xDomain, xRange),
@@ -168,17 +169,21 @@ export class ScatterPlot {
     const states: Coordinate2D[][] = _.values(this.items).map(
       (item: { color: string; states: Coordinate2D[] }) => item.states
     );
-    const sampleItem = states.pop();
 
-    if (sampleItem) {
+    let maxStates = 0;
+    const sampleItem = states.forEach(state => {
+        maxStates = Math.max(state.length, maxStates)
+    });
+
+    
       const DEFAULT_FIRST_STATE = 0;
-      const numberOfStates = sampleItem.length;
+      const numberOfStates = maxStates;
 
       this.firstStateIndex = DEFAULT_FIRST_STATE;
       this.lastStateIndex = numberOfStates - 1;
-    } else {
+    // } else {
       // TODO: HANDLE ERROR
-    }
+    // }
   }
 
   setStates(operation: "initialize" | "increment" | "decrement") {
@@ -276,33 +281,18 @@ export class ScatterPlot {
     };
   }
 
-  private getDomain(foreshadow?: boolean): {
+  private getDomain(): {
     xDomain: [any, any];
-    yDomain: [any, any];
+    yDomain: number[];
   } {
-    const { xAccessor, yAccessor } = this.getAccessors();
+    const { xAccessor } = this.getAccessors();
     const states: Coordinate2D[][] = _.values(this.items).map(
       (item: { color: string; states: Coordinate2D[] }) => item.states
     );
-    let flattenedStates = states.flat(1);
-
-    if (foreshadow && this.foreshadowingSettings?.area) {
-      flattenedStates = flattenedStates.filter((value: { x: any; y: any }) => {
-        const isInForeshadowingBounds = isInBound(
-          value,
-          this.foreshadowingSettings?.area as ForeshadowingAreaData,
-          this.xScale,
-          this.yScale
-        );
-        if (isInForeshadowingBounds) {
-          return true;
-        }
-        return false;
-      });
-    }
+    const flattenedStates = states.flat(1);
 
     const xDomain = d3.extent(flattenedStates, xAccessor);
-    const yDomain = d3.extent(flattenedStates, yAccessor);
+    const yDomain = d3.range(1, 6).reverse();
 
     return {
       xDomain,
@@ -310,30 +300,8 @@ export class ScatterPlot {
     };
   }
 
-  private getRange(foreshadowing?: boolean): ChartRangeType {
+  private getRange(): ChartRangeType {
     const chartBounds = this.getBounds();
-
-    if (
-      foreshadowing &&
-      this.foreshadowingSettings?.type ===
-        ForeshadowingAreaSubjectType.RECTANGLE
-    ) {
-      const halfChartWidth = (chartBounds.x.end - chartBounds.x.start) / 2;
-      const halfChartHeight = (chartBounds.y.start - chartBounds.y.end) / 2;
-      const leftMargin = this.chartDimensions.margin?.left ?? 0;
-      const rangeData: ChartRangeType = {
-        xRange: [
-          chartBounds.x.start,
-          chartBounds.x.start + halfChartWidth - leftMargin,
-        ],
-        yRange: [halfChartHeight, chartBounds.y.end],
-        xRangeNext: [
-          chartBounds.x.start + leftMargin + halfChartWidth,
-          chartBounds.x.end,
-        ],
-      };
-      return rangeData;
-    }
 
     return {
       xRange: [chartBounds.x.start, chartBounds.x.end],
@@ -342,22 +310,7 @@ export class ScatterPlot {
     };
   }
 
-  // TODO: Return scales that plot only stuff that falls in the domain - googlw this!
-  private getForeshadowingScales() {
-    const { xDomain, yDomain } = this.getDomain(true);
-    const { xRange, yRange, xRangeNext } = this.getRange(true);
-
-    const xScaleFn: any = d3.scaleLinear;
-    const yScaleFn: any = d3.scaleLinear;
-
-    return {
-      xScale: xScaleFn(xDomain, xRange),
-      yScale: yScaleFn(yDomain, yRange),
-      xScaleNext: xScaleFn(xDomain, xRangeNext),
-    };
-  }
-
-  private getPointSettings({
+  private getRectSettings({
     color,
     isSelected,
     isCurrent,
@@ -365,23 +318,17 @@ export class ScatterPlot {
     color?: string;
     isSelected: boolean;
     isCurrent: boolean;
-  }): ModifyContextStyleArgs &
-    Pick<DrawCircleArgs, "radius" | "fill" | "stroke"> {
+  }): ModifyContextStyleArgs & Pick<DrawRectArgs, "fill" | "stroke"> {
     const settings: ModifyContextStyleArgs &
-      Pick<DrawCircleArgs, "radius" | "fill" | "stroke"> = {
-      radius: 5,
-    };
+      Pick<DrawRectArgs, "fill" | "stroke"> = {};
 
     if (isSelected && isCurrent) {
       settings.fill = true;
-      settings.radius = 7;
 
       settings.fillStyle = color;
       settings.lineWidth = 0;
       settings.opacity = 0.7;
     } else if (!isSelected && isCurrent) {
-      settings.radius = 0;
-
       settings.fillStyle = NON_FOCUSED_COLOR;
       settings.strokeStyle = NON_FOCUSED_COLOR;
       settings.lineWidth = 0;
@@ -404,115 +351,119 @@ export class ScatterPlot {
 
   drawAxes({
     xScale,
-    xScaleNext,
     yScale,
     range,
-    isRectGesture,
   }: {
     xScale: ScaleFn;
-    xScaleNext: ScaleFn;
     yScale: ScaleFn;
     range: ChartRangeType;
-    isRectGesture: boolean;
   }) {
     /**
      * -------------------- DRAW AXES --------------------
      * */
-    drawXAxis(this.context, xScale, range.yRange[0], range.xRange, 12);
-    drawYAxis(this.context, yScale, range.xRange[0], range.yRange, 12);
-
-    // Draw extra axes for small multiple view
-    if (isRectGesture) {
-      drawXAxis(
-        this.context,
-        xScaleNext,
-        range.yRange[0],
-        range.xRangeNext,
-        12
-      );
-      drawYAxis(this.context, yScale, range.xRangeNext[0], range.yRange, 12);
-    }
+    const FONT_SIZE = 12;
+    const TICK_COUNT = 10;
+    drawXAxis(this.context, xScale, range.yRange[0], range.xRange, FONT_SIZE);
+    drawYAxis(
+      this.context,
+      yScale,
+      range.xRange[0],
+      range.yRange,
+      FONT_SIZE,
+      TICK_COUNT,
+      true
+    );
   }
 
-  drawPoints({
-    pointsData,
+  drawRects({
+    rectData,
     xScale,
     yScale,
     isSelected,
     isCurrent,
     range,
   }: {
-    pointsData: {
+    rectData: {
+      label: string;
       coordinates: Coordinate2D;
       color: string;
     }[];
     isSelected: boolean;
     isCurrent: boolean;
     xScale: ScaleFn;
-    yScale: ScaleFn;
+    yScale: any;
     range?: {
       xRange: [number, number];
       yRange: [number, number];
     };
   }) {
-    pointsData.forEach(
+    rectData.forEach(
       ({
+        label,
         color,
         coordinates,
       }: {
+        label: string;
         color: string;
         coordinates: Coordinate2D;
       }) => {
-        const { fill, radius, stroke, ...settings } = this.getPointSettings({
+        const { fill, stroke, ...settings } = this.getRectSettings({
           isSelected,
           isCurrent,
           color,
         });
         this.drawingUtils.modifyContextStyleAndDraw(settings, () => {
-          if (range !== undefined) {
-            const dimensions = {
-              width: range.xRange[1] - range.xRange[0],
-              height: range.yRange[0] - range.yRange[1],
-            };
-            const coordinates = {
-              x: range.xRange[0],
-              y: range.yRange[1],
-            };
-            this.drawingUtils.clearAndClipRect({
-              dimensions,
-              coordinates,
-            });
-          }
-          this.drawingUtils.drawCircle({
-            coordinates: coordinates,
+          this.drawingUtils.drawRect({
+            coordinates: {
+              x: 0,
+              y: coordinates.y,
+            },
             xScale,
             yScale,
-            radius,
+            dimensions: {
+              width:
+                (this.chartDimensions.margin?.left ?? 0) +
+                xScale(coordinates.x),
+              height: yScale.bandwidth(),
+            },
             fill,
             stroke,
           });
         });
+        this.drawingUtils.modifyContextStyleAndDraw(
+          {
+            fillStyle: "black",
+            fontSize: 12,
+            opacity: 1,
+            textAlign: "left",
+          },
+          () => {
+            this.drawingUtils.drawText({
+              coordinates: {
+                x: xScale(coordinates.x),
+                y: yScale(coordinates.y) + yScale.bandwidth() / 2 + 5,
+              },
+              text: label,
+            });
+          }
+        );
       }
     );
   }
 
-  drawSelectedPoints({
+  drawSelectedRects({
     keys,
     xScale,
-    xScaleNext,
     yScale,
     range,
     isForeshadowing,
-    isRangeGesture,
     isRectGesture,
   }: {
     keys: string[];
     xScale: ScaleFn;
-    xScaleNext: ScaleFn;
     yScale: ScaleFn;
     range: ChartRangeType;
     isForeshadowing: boolean;
-    isRangeGesture: boolean;
     isRectGesture: boolean;
   }) {
     const isSelected = true;
@@ -521,21 +472,12 @@ export class ScatterPlot {
     let hasNextState = false;
 
     let currentStateRange: ChartRangeType | undefined;
-    let foreshadowingRange: ChartRangeType | undefined;
-
-    if (range) {
-      currentStateRange = range;
-      foreshadowingRange = {
-        ...range,
-        xRange: range.xRangeNext,
-      };
-    }
 
     const extent = this.getExtentBasedOnInterpolateStrategy();
 
     const pointsToDraw = Object.entries(selectedItems).map(
       (selectedItem: [string, { color: string; states: Coordinate2D[] }]) => {
-        const [_, { color, states: coordinates }] = selectedItem;
+        const [label, { color, states: coordinates }] = selectedItem;
         const currentStateData = coordinates[this.currentStateIndex];
         let nextStateData: Coordinate2D | undefined;
 
@@ -550,19 +492,26 @@ export class ScatterPlot {
           nextState: nextStateData,
         });
 
+        // console.log({
+        //     coordinates,
+        //     next: this.nextStateIndex
+        // })
+
         return {
           currentStateData,
           nextStateData,
           interpolatedData,
           color,
+          label,
         };
       }
     );
 
     // ------------- DRAW NORMAL ----------------------
-    this.drawPoints({
+    this.drawRects({
       // If we're foreshadowing we want to see the currentState not interpolated state
-      pointsData: pointsToDraw.map((points) => ({
+      rectData: pointsToDraw.map((points) => ({
+        label: points.label,
         color: points.color,
         coordinates: points.interpolatedData,
       })),
@@ -574,38 +523,31 @@ export class ScatterPlot {
     });
 
     // ------------- DRAW NEXT STATE ----------------------
-    if (isForeshadowing && hasNextState) {
-      this.drawPoints({
-        pointsData: pointsToDraw.map((points) => ({
-          color: points.color,
-          coordinates: points.nextStateData as Coordinate2D,
-        })),
-        xScale: xScaleNext,
-        yScale,
-        isSelected,
-        isCurrent: false,
-        range: foreshadowingRange,
-      });
-    }
+    // if (isForeshadowing && hasNextState) {
+    //   this.drawRects({
+    //     rectData: pointsToDraw.map((points) => ({
+    //       color: points.color,
+    //       coordinates: points.nextStateData as Coordinate2D,
+    //     })),
+    //     xScale: xScaleNext,
+    //     yScale,
+    //     isSelected,
+    //     isCurrent: false,
+    //     range: foreshadowingRange,
+    //   });
+    // }
   }
 
   draw() {
     this.context.save();
     const { selectedItemsKeys, unselectedItemsKeys } = this.getItemKeys();
     const foreshadowing = this.foreshadowingSettings;
-    const range = this.getRange(!!foreshadowing);
+    const range = this.getRange();
     const isRectGesture =
       foreshadowing?.type === ForeshadowingAreaSubjectType.RECTANGLE;
-    const isRangeGesture =
-      foreshadowing?.type === ForeshadowingAreaSubjectType.RANGE;
 
-    let xScale = this.xScale;
-    let yScale = this.yScale;
-    let xScaleNext = this.xScale;
-
-    if (isRectGesture) {
-      ({ xScale, yScale, xScaleNext } = this.getForeshadowingScales());
-    }
+    const xScale = this.xScale;
+    const yScale = this.yScale;
 
     this.drawingUtils.clearArea({
       coordinates: {
@@ -618,27 +560,16 @@ export class ScatterPlot {
     this.drawAxes({
       xScale,
       yScale,
-      xScaleNext,
-      isRectGesture,
       range,
     });
 
-    if (isRangeGesture) {
-      this.drawingUtils.clearAndClipRect({
-        dimensions: foreshadowing.area.dimensions ?? { width: 0, height: 0 },
-        coordinates: foreshadowing.area.position,
-      });
-    }
-
-    // Draw Points
-    this.drawSelectedPoints({
+    // Draw Rects
+    this.drawSelectedRects({
       keys: selectedItemsKeys,
       xScale,
       yScale,
-      xScaleNext,
       range,
       isForeshadowing: !!foreshadowing,
-      isRangeGesture,
       isRectGesture,
     });
 

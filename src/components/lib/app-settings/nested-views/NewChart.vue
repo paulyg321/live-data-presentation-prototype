@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import * as monaco from "monaco-editor";
-import { Chart, ChartTypeValue, gestureSubject, playbackSubject, type ChartType } from "@/utils";
+import { Chart, ChartTypeValue, type ChartType } from "@/utils";
 import _ from "lodash";
 import { CanvasSettings, ChartSettings } from "../settings-state";
 
@@ -113,7 +113,10 @@ async function handleNext() {
           alert("ERROR - LINE data accessor and x/y fields not set ");
         }
       }
-      if (newChartType.value?.value === "scatter") {
+      if (
+        newChartType.value?.value === "scatter" ||
+        newChartType.value?.value === "bar"
+      ) {
         if (xField.value && yField.value) {
           if (
             chartData.value[0][xField.value] !== undefined &&

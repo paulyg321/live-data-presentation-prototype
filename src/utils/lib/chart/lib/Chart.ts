@@ -9,6 +9,7 @@ import {
 import _ from "lodash";
 import { LineChart, type LineItemStates } from "./LineChart";
 import { ScatterPlot } from "./ScatterPlot";
+import { BarChart } from "./BarChart";
 
 export enum Effect {
   DEFAULT = "default",
@@ -39,6 +40,10 @@ type LineChartItemTypes = Record<
   { color: string; states: LineItemStates }
 >;
 type ScatterPlotItemTypes = Record<
+  string,
+  { color: string; states: Coordinate2D[] }
+>;
+type BarChartItemTypes = Record<
   string,
   { color: string; states: Coordinate2D[] }
 >;
@@ -92,7 +97,7 @@ export class Chart {
   dimensions: Dimensions;
   canvasDimensions: Dimensions;
 
-  chart: LineChart | ScatterPlot | undefined;
+  chart: LineChart | ScatterPlot | BarChart | undefined;
   legendItems: LegendItem[] | undefined;
 
   xDomain: [any, any] | undefined;
@@ -153,46 +158,82 @@ export class Chart {
   }
 
   private groupDataIntoKeyFrames() {
-    const groupedData = this.data.reduce(
-      (chartItems: any, currentData: any) => {
-        const fieldVal = currentData[this.field];
-        const keyVal = currentData[this.key];
+    let data = this.data;
+    if (this.type.value === ChartTypeValue.BAR) {
+      const groupedByKey = d3.group(this.data, (d: any) => d[this.field]);
 
-        const exists = chartItems[keyVal];
-        // TODO: sort data by the keyframe
+      const rankedData: any[] = [];
 
-        let keyFrame;
-        if (this.type.value === ChartTypeValue.LINE && this.dataAccessor) {
-          keyFrame = {
-            keyframe: fieldVal,
-            data: currentData[this.dataAccessor].map((datum: any) => {
-              return {
-                x: datum[this.xField],
-                y: datum[this.yField],
-              };
-            }),
-          };
-        } else {
-          keyFrame = {
-            keyframe: fieldVal,
-            ...(this.zField ? { group: currentData[this.zField] } : {}),
-            data: {
-              x: currentData[this.xField],
-              y: currentData[this.yField],
-            },
-          };
-        }
+      groupedByKey.forEach((frame: any) => {
+        const currentFrame = [...frame];
+        currentFrame.sort((a, b) => {
+          const aVal = a[this.xField];
+          const bVal = b[this.xField];
 
-        // Each line is an array of its different states/keyframes
-        if (exists) {
-          chartItems[keyVal] = [...chartItems[keyVal], keyFrame];
-        } else {
-          chartItems[keyVal] = [keyFrame];
-        }
-        return chartItems;
-      },
-      {}
-    );
+          if (aVal > bVal) {
+            return -1;
+          }
+          if (aVal < bVal) {
+            return 1;
+          }
+          return 0;
+        });
+        currentFrame.forEach((item: any, index: number) => {
+          rankedData.push({
+            ...item,
+            rank: index,
+          });
+        });
+      });
+
+      data = rankedData;
+    }
+    const groupedData = data.reduce((chartItems: any, currentData: any) => {
+      const fieldVal = currentData[this.field];
+      const keyVal = currentData[this.key];
+
+      const exists = chartItems[keyVal];
+      // TODO: sort data by the keyframe
+
+      let keyFrame;
+      if (this.type.value === ChartTypeValue.LINE && this.dataAccessor) {
+        keyFrame = {
+          keyframe: fieldVal,
+          data: currentData[this.dataAccessor].map((datum: any) => {
+            return {
+              x: datum[this.xField],
+              y: datum[this.yField],
+            };
+          }),
+        };
+      } else if (this.type.value === ChartTypeValue.SCATTER) {
+        keyFrame = {
+          keyframe: fieldVal,
+          ...(this.zField ? { group: currentData[this.zField] } : {}),
+          data: {
+            x: currentData[this.xField],
+            y: currentData[this.yField],
+          },
+        };
+      } else {
+        keyFrame = {
+          keyframe: fieldVal,
+          ...(this.zField ? { group: currentData[this.zField] } : {}),
+          data: {
+            x: currentData[this.xField],
+            y: currentData.rank,
+          },
+        };
+      }
+
+      // Each line is an array of its different states/keyframes
+      if (exists) {
+        chartItems[keyVal] = [...chartItems[keyVal], keyFrame];
+      } else {
+        chartItems[keyVal] = [keyFrame];
+      }
+      return chartItems;
+    }, {});
 
     /**
      * The data will look somewhat like this
@@ -215,59 +256,32 @@ export class Chart {
      * SCATTER PLOT:
      *
      * {
-     *        [key]: [
+     *     [key]: [
      *         {
      *              keyframe: 2000,
+     *              group: Africa
      *              data: { x: 0, y: 21 }
      *         },
+     *      ]
+     * }
+     *
+     * BAR CHART:
+     *
+     * {
+     *     [key]: [
      *         {
-     *              keyframe: 2001,
-     *              data: { x: 22, y: 99 }
+     *              keyframe: 2000,
+     *              group: Africa,
+     *              rank: 1,
+     *              data: { x: 0, y: 21 }
      *         },
-     *     ]
+     *      ]
      * }
      *
      */
+
     this.keyframeData = groupedData;
   }
-
-  // private setOrUpdateAnimatedCircles() {
-  //   if (this.animatedItems === undefined) {
-  //     this.animatedItems = _.slice(
-  //       Object.entries(this.keyframeData),
-  //       0,
-  //       20
-  //     ).map(([key, value]: [string, any]) => {
-  //       let item_group = key;
-  //       if (this.useGroups) {
-  //         item_group = value[0].group;
-  //       }
-  //       const states = value.map(({ data }: any) => {
-  //         return data;
-  //       });
-
-  //       return new AnimatedCircle({
-  //         states,
-  //         getScales: () => this.getScales(),
-  //         chartDimensions: this.getDimensions(),
-  //         canvasDimensions: this.canvasDimensions,
-  //         duration: 1000,
-  //         key,
-  //         group: item_group,
-  //         color: gapMinderColorFn(item_group) as string,
-  //         dataType: this.dataType,
-  //       });
-  //     });
-  //   } else {
-  //     this.animatedItems.forEach((circle: AnimatedCircle | AnimatedLine) => {
-  //       circle.updateState({
-  //         getScales: () => this.getScales(),
-  //         chartDimensions: this.getDimensions(),
-  //         canvasDimensions: this.canvasDimensions,
-  //       });
-  //     }, {});
-  //   }
-  // }
 
   private setOrUpdateLineChart(context?: CanvasRenderingContext2D) {
     if (this.chart === undefined && context) {
@@ -352,9 +366,52 @@ export class Chart {
     }
   }
 
+  private setOrUpdateBarChart(context?: CanvasRenderingContext2D) {
+    if (this.chart === undefined && context) {
+      const items = Object.entries(this.keyframeData).reduce(
+        (chartMap: BarChartItemTypes, [key, value]: [string, any]) => {
+          const item_group = key;
+          // if (this.useGroups) {
+          //   item_group = value[0].group;
+          // }
+          const states = value.map(({ data }: any) => {
+            return data;
+          });
+
+          return {
+            ...chartMap,
+            [key]: {
+              states,
+              color: gapMinderColorFn(item_group) as string,
+              group: item_group,
+            },
+          };
+        },
+        {} as BarChartItemTypes
+      );
+
+      this.chart = new BarChart({
+        items,
+        canvasDimensions: this.canvasDimensions,
+        chartDimensions: this.dimensions,
+        position: this.position,
+        context,
+      });
+    } else {
+      this.chart?.updateState({
+        chartDimensions: this.dimensions,
+        canvasDimensions: this.canvasDimensions,
+        context,
+      });
+    }
+  }
+
   setLegendItems(items: any) {
     const groupItems = this.useGroups;
     const existingKeys: Record<string, boolean> = {};
+
+    if (this.type.value === ChartTypeValue.BAR) return;
+
     this.legendItems = Object.entries(items).reduce<LegendItem[]>(
       (legendItems: LegendItem[], [key, value]: any) => {
         let item_group = key;
@@ -414,6 +471,10 @@ export class Chart {
       }
       case ChartTypeValue.SCATTER: {
         this.setOrUpdateScatterPlot(context);
+        break;
+      }
+      case ChartTypeValue.BAR: {
+        this.setOrUpdateBarChart(context);
         break;
       }
       default:

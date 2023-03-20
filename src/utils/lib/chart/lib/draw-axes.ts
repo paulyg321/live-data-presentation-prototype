@@ -8,10 +8,11 @@ export function drawXAxis(
   range: number[],
   fontSize: number,
   tickCount?: number,
-  rotate?: boolean
+  rotateLabels?: boolean
 ) {
   const [startX, endX] = range;
-  const tickSize = 6,
+  const tickPadding = 3,
+    tickSize = 6,
     xTicks = xScale.ticks(tickCount), // You may choose tick counts. ex: xScale.ticks(20)
     xTickFormat = xScale.tickFormat(); // you may choose the format. ex: xScale.tickFormat(tickCount, ".0s")
 
@@ -63,10 +64,10 @@ export function drawXAxis(
   xTicks.forEach((d: any) => {
     const label = xTickFormat(d);
     const xPos = xScale(d);
-    const yPos = Y + tickSize + 3;
+    const yPos = Y + tickSize + tickPadding;
 
     // rotate if there's overlaps
-    if (overlap) {
+    if (overlap || rotateLabels) {
       context.save();
       context.textAlign = "right";
       // https://stackoverflow.com/questions/3167928/drawing-rotated-text-on-a-html5-canvas
@@ -88,13 +89,21 @@ export function drawYAxis(
   yScale: any,
   X: number,
   range: number[],
-  fontSize: number
+  fontSize: number,
+  tickCount?: number,
+  scaleBand?: boolean
 ) {
   const [startY, endY] = range;
   const tickPadding = 3,
-    tickSize = 6,
-    yTicks = yScale.ticks(10),
+    tickSize = 6;
+
+  let yTickFormat = (input: any) => input;
+  let yTicks = yScale.domain();
+
+  if (!scaleBand) {
     yTickFormat = yScale.tickFormat();
+    yTicks = yScale.ticks(tickCount);
+  }
 
   context.strokeStyle = AXES_COLOR;
   context.beginPath();
@@ -114,9 +123,26 @@ export function drawYAxis(
   context.textAlign = "right";
   context.textBaseline = "middle";
   context.fillStyle = AXES_COLOR;
+
+  let labelAdjustment = 0;
+
+  if (scaleBand) {
+    const [firstLabel, secondLabel] = yTicks;
+
+    const distanceBetweenTicks = Math.abs(
+      yScale(firstLabel) - yScale(secondLabel)
+    );
+
+    labelAdjustment = distanceBetweenTicks / 2;
+  }
+
   yTicks.forEach((d: any) => {
     context.beginPath();
     context.font = `${fontSize}px Arial`;
-    context.fillText(yTickFormat(d), X - tickSize - tickPadding, yScale(d));
+    context.fillText(
+      yTickFormat(d),
+      X - tickSize - tickPadding,
+      yScale(d) + labelAdjustment
+    );
   });
 }
