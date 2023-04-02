@@ -84,7 +84,9 @@ function getChartColor(type: string) {
       <v-card :color="getChartColor(chart.type.value)" dark>
         <div class="d-flex flex-no-wrap justify-space-between align-center">
           <div>
-            <v-card-title class="text-h6">{{ `${chart.title.substring(0, 10)}...` }}</v-card-title>
+            <v-card-title class="text-h6">{{
+              `${chart.title.substring(0, 10)}...`
+            }}</v-card-title>
 
             <v-card-subtitle>{{ chart.type.title }}</v-card-subtitle>
 
@@ -103,7 +105,7 @@ function getChartColor(type: string) {
             </v-card-actions>
           </div>
 
-          <v-avatar class="ma-3 pa-5" :size="80" tile>
+          <v-avatar class="ma-3 pa-5" size="100" tile>
             <v-img :src="getChartImage(chart.type.value)"></v-img>
           </v-avatar>
         </div>

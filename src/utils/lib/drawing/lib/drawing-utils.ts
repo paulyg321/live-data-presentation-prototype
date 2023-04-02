@@ -297,7 +297,7 @@ export class DrawingUtils {
 
   modifyContextStyleAndDraw(
     settings: ModifyContextStyleArgs,
-    drawFn: () => void
+    drawFn: (context: CanvasRenderingContext2D) => void
   ) {
     const {
       context: contextArg,
@@ -345,7 +345,7 @@ export class DrawingUtils {
       context.textAlign = textAlign;
     }
 
-    drawFn();
+    drawFn(this.context);
 
     context.restore();
   }

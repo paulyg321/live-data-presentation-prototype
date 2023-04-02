@@ -1,6 +1,7 @@
 import * as d3 from "d3";
-import { reactive, ref } from "vue";
+import { reactive } from "vue";
 import {
+  Affect,
   // AnimatedCircle,
   // AnimatedLine,
   Chart,
@@ -10,10 +11,14 @@ import {
   type Coordinate2D,
   type Dimensions,
   type PartialCoordinate2D,
-  ChartTypeValue,
 } from "@/utils";
 
 const initialChartWidth = 400;
+
+export enum PlaybackType {
+  NEXT = "next",
+  ALL = "all",
+}
 
 export const ChartSettings = reactive<{
   dimensions: Dimensions;
@@ -29,13 +34,21 @@ export const ChartSettings = reactive<{
   setCanvasKeys: () => void;
   // animationMode: DrawingMode;
   // setAnimationMode: (mode: DrawingMode) => void;
-  handlePlay: (type: string, callbackFn?: any) => void;
+  handlePlay: (
+    type: string,
+    callbackFn?: any,
+    affect?: Affect,
+    duration?: number
+  ) => void;
   selectedChartItems: string[];
   addSelectedChartItem: (itemKey: string) => void;
   removeSelectedChartItem: (itemKey: string) => void;
   // isItemSelected: (itemKey: AnimatedCircle | AnimatedLine | string) => boolean;
   playbackExtent: number;
   setPlaybackExtent: (value: number) => void;
+  playbackTimer?: d3.Timer;
+  resetTimer: () => void;
+  playbackType: PlaybackType;
 }>({
   canvasKeys: [],
   setCanvasKeys() {
@@ -122,7 +135,7 @@ export const ChartSettings = reactive<{
     const currentChart = new Chart({
       ...this.charts[index],
     });
-    
+
     this.currentChart = currentChart;
 
     // Effects
@@ -133,33 +146,65 @@ export const ChartSettings = reactive<{
   // setAnimationMode(mode: DrawingMode) {
   //   this.animationMode = mode;
   // },
-  handlePlay(type: string, callbackFn?: any) {
-    const duration = 3000;
+  handlePlay(
+    type: string,
+    callbackFn?: any,
+    affect?: Affect,
+    duration?: number
+  ) {
+    const playbackDuration = duration ?? 3000;
+
+    if (affect) {
+      this.currentChart?.chart?.updateState({
+        affect,
+      });
+    }
+
+    this.resetTimer();
+    const play = (timestep: number) => {
+      this.setPlaybackExtent(timestep);
+      this.currentChart?.chart?.updateState({
+        extent: timestep,
+      });
+      if (callbackFn) {
+        callbackFn(timestep);
+      }
+    };
+
     if (type === "prev") {
       /**
        * TODO: Determine if it makes sense to animate to previouss state
-       * this might be a rewind or something 
+       * this might be a rewind or something
        * (starting from 1 and going to 0 - then decrementing state)
-       * */ 
-    } else if (type === "next") {
-      const timer = d3.timer((elapsed: number) => {
-        const boundedTimeStep = Math.min(elapsed / duration, 1);
-        this.currentChart?.chart?.updateState({
-          extent: boundedTimeStep,
-        })
-
+       * */
+    } else if (type === PlaybackType.NEXT) {
+      this.playbackTimer = d3.timer((elapsed: number) => {
+        const startingPoint = Math.max(
+          this.playbackExtent,
+          elapsed / playbackDuration
+        );
+        const boundedTimeStep = Math.min(startingPoint, 1);
+        play(boundedTimeStep);
         if (boundedTimeStep === 1) {
           this.currentChart?.chart?.setStates("increment");
-          timer.stop();
+          this.setPlaybackExtent(0);
+          this.resetTimer();
         }
-      })
-    } else if (type === "all") {
-      // item.animateToNextState({
-      //   playRemainingStates: true,
-      //   transitionFunction,
-      //   mode: this.animationMode,
-      //   callbackFn,
-      // });
+      });
+    } else if (type === PlaybackType.ALL) {
+      this.playbackTimer = d3.timer((elapsed: number) => {
+        const startingPoint = Math.max(
+          this.playbackExtent,
+          elapsed / playbackDuration
+        );
+        const boundedTimeStep = Math.min(startingPoint, 1);
+        play(boundedTimeStep);
+        if (boundedTimeStep === 1) {
+          this.currentChart?.chart?.setStates("increment");
+          this.setPlaybackExtent(0);
+          this.handlePlay("all", callbackFn);
+        }
+      });
     }
   },
   selectedChartItems: [],
@@ -171,7 +216,7 @@ export const ChartSettings = reactive<{
   addSelectedChartItem(itemKey: string) {
     this.selectedChartItems = [...this.selectedChartItems, itemKey];
   },
-  playbackExtent: 1,
+  playbackExtent: 0,
   setPlaybackExtent(value: number) {
     if (value > 1 || value < 0) {
       return;
@@ -179,7 +224,15 @@ export const ChartSettings = reactive<{
 
     this.currentChart?.chart?.updateState({
       extent: value,
-    })
+    });
     this.playbackExtent = value;
   },
+  playbackTimer: undefined,
+  resetTimer() {
+    if (this.playbackTimer) {
+      this.playbackTimer.stop();
+      this.playbackTimer = undefined;
+    }
+  },
+  playbackType: PlaybackType.NEXT,
 });

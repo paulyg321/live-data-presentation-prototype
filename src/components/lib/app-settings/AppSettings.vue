@@ -113,7 +113,7 @@ onMounted(() => {
         </v-list>
       </v-navigation-drawer>
 
-      <v-navigation-drawer permanent width="300">
+      <v-navigation-drawer permanent width="450">
         <!-- Chart Settings -->
         <div class="form-row" v-if="currentTab === SettingsTab.CHART_SETTINGS">
           <ChartSettingsTab />
@@ -142,7 +142,7 @@ onMounted(() => {
       :handle-close="() => PortalState.handleAudiencePortalClose()"
     />
     <video
-      :ref="(el) => CameraSettings.setVideo(el as HTMLVideoElement)"
+      :ref="(el) => CameraSettings.setVideo(el)"
       autoplay="true"
       :srcObject="CameraSettings.stream"
       @loadeddata="runDetection"

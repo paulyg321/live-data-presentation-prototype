@@ -13,9 +13,9 @@ import {
 import { onMounted, watch } from "vue";
 import { useRoute } from "vue-router";
 import CanvasWrapper from "../../CanvasWrapper.vue";
-// import ChartAxes from "../../axes/ChartAxes.vue";
 import {
   ChartSettings,
+  PlaybackType,
   CanvasSettings,
   radialPlaybackTracker,
   foreshadowingTracker,
@@ -37,6 +37,13 @@ emphasisSubject.subscribe({
 // PLAYBACK CONTROLS
 playbackSubject.subscribe({
   next(playbackValue: any) {
+    if (!playbackValue) {
+      if (ChartSettings.playbackTimer) {
+        ChartSettings.resetTimer()
+      }
+      return;
+    }
+
     const { type, value } = playbackValue;
 
     if (type === PlaybackSubjectType.DISCRETE) {
@@ -44,7 +51,10 @@ playbackSubject.subscribe({
     }
 
     if (type === PlaybackSubjectType.CONTINUOUS) {
-      ChartSettings.handlePlay("next");
+      // USE CHECKBOX TO CHANGE ALL TO NEXT AND VICE VERSA
+      const affect = playbackValue.affect;
+      const duration = playbackValue.duration;
+      ChartSettings.handlePlay(ChartSettings.playbackType, value, affect, duration);
     }
   },
 });
@@ -68,29 +78,6 @@ watch(
     ChartSettings.currentChart?.chart?.updateState({
       extent: newValue,
     });
-    // ChartSettings.iterateOverChartItems(
-    //   (item: AnimatedLine | AnimatedCircle) => {
-    //     const isSelected =
-    //       ChartSettings.isItemSelected(item.key) ||
-    //       ChartSettings.isItemSelected(item.group);
-
-    //     if (ChartSettings.selectedChartItems.length === 0) {
-    //       item.drawState({
-    //         bounds: {
-    //           start: oldValue,
-    //           end: newValue,
-    //         }
-    //       });
-    //     } else if (isSelected) {
-    //       item.drawState({
-    //         bounds: {
-    //           start: oldValue,
-    //           end: newValue,
-    //         }
-    //       });
-    //     }
-    //   }
-    // );
   }
 );
 
@@ -136,6 +123,27 @@ onMounted(() => {
       ></v-slider>
     </v-col>
   </v-row>
+  <v-row class="justify-center">
+    <v-col lg="3">
+      <v-btn
+        icon="mdi-skip-backward"
+        @click="() => ChartSettings.handlePlay(PlaybackType.NEXT)"
+      ></v-btn>
+    </v-col>
+    <v-col lg="3">
+      <v-btn
+        icon="mdi-play"
+        color="primary"
+        @click="() => ChartSettings.handlePlay(PlaybackType.ALL)"
+      ></v-btn>
+    </v-col>
+    <v-col lg="3">
+      <v-btn
+        icon="mdi-skip-forward"
+        @click="() => ChartSettings.handlePlay(PlaybackType.NEXT)"
+      ></v-btn>
+    </v-col>
+  </v-row>
   <!-- <v-row>
     <v-col lg="12">
       <div class="text-h6">
@@ -146,6 +154,14 @@ onMounted(() => {
       </div>
     </v-col>
   </v-row> -->
+  <v-row>
+    <v-col lg="12">
+      <v-radio-group label="Playback Type" inline v-model="ChartSettings.playbackType">
+        <v-radio :label="PlaybackType.ALL" :value="PlaybackType.ALL"></v-radio>
+        <v-radio :label="PlaybackType.NEXT" :value="PlaybackType.NEXT"></v-radio>
+      </v-radio-group>
+    </v-col>
+  </v-row>
   <v-row class="mt-10">
     <v-col lg="12">
       <CanvasWrapper
@@ -154,7 +170,6 @@ onMounted(() => {
         v-slot="{ className }"
       >
         <VideoViews :className="className" />
-        <!-- <ChartAxes :className="className" /> -->
         <canvas
           v-for="key in [...gestureCanvasKeys, ...ChartSettings.canvasKeys]"
           v-bind:key="key"

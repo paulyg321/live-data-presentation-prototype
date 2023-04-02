@@ -32,6 +32,18 @@ export interface BezierCoordinate {
   cpRight?: Coordinate2D;
 }
 
+export type ForeshadowingAreaData =
+  | {
+      position: Coordinate2D;
+      dimensions: Dimensions;
+      radius?: number;
+    }
+  | {
+      position: Coordinate2D;
+      radius: number;
+      dimensions?: Dimensions;
+    };
+
 export interface ForeshadowingSettings {
   area: ForeshadowingAreaData;
   type: ForeshadowingAreaSubjectType;

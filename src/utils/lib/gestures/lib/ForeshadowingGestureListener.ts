@@ -34,18 +34,6 @@ export interface ForeshadowingGestureListenerConstructorArgs
 
 type ForeshadowingResetKeys = "KeyC" | "KeyA" | "KeyE";
 
-export type ForeshadowingAreaData =
-  | {
-      position: Coordinate2D;
-      dimensions: Dimensions;
-      radius?: number;
-    }
-  | {
-      position: Coordinate2D;
-      radius: number;
-      dimensions?: Dimensions;
-    };
-
 export enum ForeshadowingType {
   SHAPE = "shape",
   RANGE = "range",
@@ -132,23 +120,21 @@ export class ForeshadowingGestureListener extends GestureListener {
     this.setModeSwitcher();
   }
 
-  private keyToModeMap: Record<ForeshadowingResetKeys, ForeshadowingShapes> =
-    {
-      KeyC: ForeshadowingShapes.CIRCLE,
-      KeyA: ForeshadowingShapes.RANGE,
-      KeyE: ForeshadowingShapes.RECTANGLE,
-    };
+  private keyToModeMap: Record<ForeshadowingResetKeys, ForeshadowingShapes> = {
+    KeyC: ForeshadowingShapes.CIRCLE,
+    KeyA: ForeshadowingShapes.RANGE,
+    KeyE: ForeshadowingShapes.RECTANGLE,
+  };
 
   private setModeSwitcher() {
-    Object.keys(this.keyToModeMap)?.forEach(
-      (modeSwitchKey: string) => {
-        document.addEventListener("keypress", (event) => {
-          if (event.code === modeSwitchKey) {
-            this.mode = this.keyToModeMap[modeSwitchKey as ForeshadowingResetKeys];
-          }
-        });
-      }
-    );
+    Object.keys(this.keyToModeMap)?.forEach((modeSwitchKey: string) => {
+      document.addEventListener("keypress", (event) => {
+        if (event.code === modeSwitchKey) {
+          this.mode =
+            this.keyToModeMap[modeSwitchKey as ForeshadowingResetKeys];
+        }
+      });
+    });
   }
 
   private verifyGesturesMatch({
@@ -316,6 +302,16 @@ export class ForeshadowingGestureListener extends GestureListener {
     this.emphasisController?.resetHandler();
   }
 
+  private resetPlaybackController() {
+    this.playbackController?.updateState({
+      dimensions: {
+        width: 0,
+        height: 0,
+      },
+    });
+    this.playbackController?.resetHandler();
+  }
+
   private isCircleShape({
     leftIndex,
     leftThumb,
@@ -450,16 +446,19 @@ export class ForeshadowingGestureListener extends GestureListener {
         if (!rectData) return;
 
         const { coordinates, dimensions } = rectData;
-        this.drawingUtils?.modifyContextStyleAndDraw({
-          fillStyle,
-          opacity,
-        }, () => {
-          this.drawingUtils?.drawRect({
-            coordinates,
-            dimensions,
-            fill: true,
-          });
-        })
+        this.drawingUtils?.modifyContextStyleAndDraw(
+          {
+            fillStyle,
+            opacity,
+          },
+          () => {
+            this.drawingUtils?.drawRect({
+              coordinates,
+              dimensions,
+              fill: true,
+            });
+          }
+        );
 
         const foreshadowingArea = {
           position: coordinates,
@@ -469,7 +468,7 @@ export class ForeshadowingGestureListener extends GestureListener {
           ForeshadowingGestureListener.foreshadowingAreaSubjectKey,
           {
             type: ForeshadowingAreaSubjectType.RECTANGLE,
-            area: foreshadowingArea, 
+            area: foreshadowingArea,
           }
         );
       }
@@ -479,16 +478,19 @@ export class ForeshadowingGestureListener extends GestureListener {
         if (!circleData) return;
 
         const { radius, coordinates } = circleData;
-        this.drawingUtils?.modifyContextStyleAndDraw({
-          fillStyle,
-          opacity,
-        }, () => {
-          this.drawingUtils?.drawCircle({
-            radius,
-            coordinates,
-            fill: true,
-          });
-        })
+        this.drawingUtils?.modifyContextStyleAndDraw(
+          {
+            fillStyle,
+            opacity,
+          },
+          () => {
+            this.drawingUtils?.drawCircle({
+              radius,
+              coordinates,
+              fill: true,
+            });
+          }
+        );
         const foreshadowingArea = {
           position: coordinates,
           radius,
@@ -510,19 +512,19 @@ export class ForeshadowingGestureListener extends GestureListener {
 
         const { startCoordinates, endCoordinates } = rangeData;
 
-        this.drawingUtils?.modifyContextStyleAndDraw({
-          lineWidth,
-          strokeStyle: "red",
-          opacity,
-        }, () => {
-          this.drawingUtils?.drawLine({
-            coordinates: [
-              startCoordinates,
-              endCoordinates
-            ],
-            shape: LineShape.SHARP
-          });
-        })
+        this.drawingUtils?.modifyContextStyleAndDraw(
+          {
+            lineWidth,
+            strokeStyle: "red",
+            opacity,
+          },
+          () => {
+            this.drawingUtils?.drawLine({
+              coordinates: [startCoordinates, endCoordinates],
+              shape: LineShape.SHARP,
+            });
+          }
+        );
 
         const foreshadowingArea = {
           position: {
@@ -752,7 +754,7 @@ export class ForeshadowingGestureListener extends GestureListener {
   resetHandler(): void {
     this.resetRangeGestureState();
     this.resetShapeGestureState();
-    // this.resetPlaybackController();
+    this.resetPlaybackController();
     this.resetEmphasisController();
     this.clearAllVisualIndicators();
   }

@@ -21,7 +21,7 @@ export const PlaybackComponentSettings = reactive<{
     };
   },
   position: {
-    x: initialCanvasWidth - initialPlaybackComponentWidth - 30,
+    x: initialCanvasWidth - initialPlaybackComponentWidth,
     y: initialCanvasWidth * (3 / 4) - initialPlaybackComponentWidth - 50,
   },
   changePosition(coords: PartialCoordinate2D) {

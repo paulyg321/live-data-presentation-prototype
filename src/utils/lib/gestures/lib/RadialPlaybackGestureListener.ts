@@ -1,6 +1,11 @@
-import { PlaybackSubjectType, startTimeoutInstance } from "@/utils";
+import {
+  calculateDistance,
+  PlaybackSubjectType,
+  startTimeoutInstance,
+  startTimerInstance,
+} from "@/utils";
 import _ from "lodash";
-import type { Coordinate2D } from "../../chart";
+import { Affect, type Coordinate2D } from "../../chart";
 import { HANDS } from "./gesture-utils";
 import {
   GestureListener,
@@ -25,6 +30,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
   private rotations = 0;
   private angleStack: number[] = [];
   private mode: RadialTrackerMode = RadialTrackerMode.NORMAL;
+  private fingerDistance = 0;
 
   constructor({
     position,
@@ -57,6 +63,12 @@ export class RadialPlaybackGestureListener extends GestureListener {
     });
 
     this.mode = mode;
+  }
+
+  private convertDistanceToAffect(distance: number) {
+    if (distance <= 40) return Affect.TENDERNESS;
+    if (distance > 40 && distance < 100) return Affect.EXCITEMENT;
+    return Affect.JOY;
   }
 
   private getCenterPoint(): Coordinate2D {
@@ -103,7 +115,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
     }
   }
 
-  private renderCurrentState(fingerPosition: Coordinate2D, angle: number) {
+  private renderCurrentState(angle: number) {
     const centerPoint = this.getCenterPoint();
     const endAngle = this.angleStack.length > 0 ? angle * (Math.PI / 180) : 0;
     if (this.context) {
@@ -156,7 +168,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
     }
   }
 
-  private handleNewAngle(theta: number) {
+  private handleNewAngle(theta: number, distanceBetweenFingers: number) {
     if (this.rotations >= 1 && this.mode === RadialTrackerMode.TRACKING) {
       this.publishToSubjectIfExists(
         RadialPlaybackGestureListener.playbackSubjectKey,
@@ -178,6 +190,12 @@ export class RadialPlaybackGestureListener extends GestureListener {
         const isFirstRotation = this.rotations === 0;
 
         const executeAfterTimerEnds = () => {
+          let duration = 8000;
+          if (this.rotations === 2) {
+            duration = 4000;
+          } else if (this.rotations === 3) {
+            duration = 2000;
+          }
           if (this.rotations >= 1 && this.mode === RadialTrackerMode.NORMAL) {
             this.publishToSubjectIfExists(
               RadialPlaybackGestureListener.playbackSubjectKey,
@@ -185,15 +203,39 @@ export class RadialPlaybackGestureListener extends GestureListener {
                 type: PlaybackSubjectType.CONTINUOUS,
                 value: (percentComplete: number) =>
                   this.renderAnimationContext(percentComplete),
+                affect: this.convertDistanceToAffect(this.fingerDistance),
+                duration,
               }
             );
             this.resetAngleState();
           }
+          this.timer?.stop();
           this.timer = undefined;
         };
 
         if (isFirstRotation) {
-          this.timer = startTimeoutInstance({
+          this.timer?.stop();
+          this.timer = undefined;
+          this.timer = startTimerInstance({
+            // onTick: (timestep?: number) => {
+            //   if (!timestep) return;
+            //   this.renderCurrentState(theta);
+            //   const centerPoint = this.getCenterPoint();
+            //   this.drawingUtils?.modifyContextStyleAndDraw(
+            //     {
+            //       fillStyle: "red",
+            //       opacity: 0.1,
+            //     },
+            //     () => {
+            //       this.drawingUtils?.drawCircle({
+            //         context: this.context,
+            //         coordinates: centerPoint,
+            //         radius: (this.dimensions.width / 2) * timestep,
+            //         fill: true,
+            //       });
+            //     }
+            //   );
+            // },
             onCompletion: executeAfterTimerEnds,
             timeout: 3000,
           });
@@ -205,6 +247,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
       this.angleStack.push(theta);
     } else if (theta <= 360 && theta > 270 && this.angleStack.length === 3) {
       this.angleStack.push(theta);
+      this.fingerDistance = distanceBetweenFingers;
     }
   }
 
@@ -261,6 +304,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
     handCount: number
   ): void {
     const dominantHand = fingerData[this.handsToTrack.dominant];
+    let distanceBetweenFingers = 0;
     // const nonDominantHand = fingerData[this.handsToTrack.nonDominant];
 
     // Don't want non dominant hand in the frame
@@ -268,24 +312,42 @@ export class RadialPlaybackGestureListener extends GestureListener {
       return;
     }
 
-    const [fingerToTrack] = dominantHand.fingersToTrack;
-    const fingerPosition = dominantHand.fingerPositions[
-      fingerToTrack
+    const [indexFinger, thumb] = dominantHand.fingersToTrack;
+    const indexFingerPosition = dominantHand.fingerPositions[
+      indexFinger
     ] as Coordinate2D;
+    const thumbPosition = dominantHand.fingerPositions[thumb] as Coordinate2D;
 
-    if (fingerPosition.x === undefined || fingerPosition.y === undefined) {
+    if (
+      indexFingerPosition.x === undefined ||
+      indexFingerPosition.y === undefined
+    ) {
       return;
     }
 
-    const canEmit = this.isWithinObjectBounds(fingerPosition);
+    if (thumbPosition) {
+      ({ euclideanDistance: distanceBetweenFingers } = calculateDistance(
+        indexFingerPosition,
+        thumbPosition
+      ));
+
+      this.convertDistanceToAffect(distanceBetweenFingers);
+    }
+
+    const canEmit = this.isWithinObjectBounds(indexFingerPosition);
 
     if (canEmit) {
-      const angle = this.calculateAngleFromCenter(fingerPosition);
-      this.handleNewAngle(angle);
-      this.renderCurrentState(fingerPosition, angle);
-    } else {
-      this.resetAngleState();
-      this.clearAllVisualIndicators();
+      this.publishToSubjectIfExists(
+        RadialPlaybackGestureListener.playbackSubjectKey,
+        undefined
+      );
+      const angle = this.calculateAngleFromCenter(indexFingerPosition);
+      this.handleNewAngle(angle, distanceBetweenFingers);
+      this.renderCurrentState(angle);
     }
+    // else {
+    //   this.resetAngleState();
+    //   this.clearAllVisualIndicators();
+    // }
   }
 }

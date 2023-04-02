@@ -8,8 +8,14 @@ import {
 // import { AnimatedCircle } from "./AnimatedCircle";
 import _ from "lodash";
 import { LineChart, type LineItemStates } from "./LineChart";
-import { ScatterPlot } from "./ScatterPlot";
-import { BarChart } from "./BarChart";
+import { ScatterPlot, type ScatterPlotItemState } from "./ScatterPlot";
+import { BarChart, type BarChartItemState } from "./BarChart";
+
+export enum Affect {
+  JOY = "joy",
+  TENDERNESS = "tenderness",
+  EXCITEMENT = "excitement",
+}
 
 export enum Effect {
   DEFAULT = "default",
@@ -41,11 +47,11 @@ type LineChartItemTypes = Record<
 >;
 type ScatterPlotItemTypes = Record<
   string,
-  { color: string; states: Coordinate2D[] }
+  { color: string; states: ScatterPlotItemState[] }
 >;
 type BarChartItemTypes = Record<
   string,
-  { color: string; states: Coordinate2D[] }
+  { color: string; states: BarChartItemState[] }
 >;
 
 export interface NewChartArgs {
@@ -109,6 +115,7 @@ export class Chart {
     | undefined;
   yDomain: [any, any] | undefined;
   keyframeData: any;
+  keyframes: string[] = [];
 
   /**
    * @param type the chart type
@@ -160,28 +167,19 @@ export class Chart {
   private groupDataIntoKeyFrames() {
     let data = this.data;
     if (this.type.value === ChartTypeValue.BAR) {
-      const groupedByKey = d3.group(this.data, (d: any) => d[this.field]);
-
+      const groupedByKeyFrame = d3.group(this.data, (d: any) => d[this.field]);
       const rankedData: any[] = [];
 
-      groupedByKey.forEach((frame: any) => {
+      groupedByKeyFrame.forEach((frame: any, keyframe: string) => {
+        this.keyframes.push(keyframe);
         const currentFrame = [...frame];
-        currentFrame.sort((a, b) => {
-          const aVal = a[this.xField];
-          const bVal = b[this.xField];
-
-          if (aVal > bVal) {
-            return -1;
-          }
-          if (aVal < bVal) {
-            return 1;
-          }
-          return 0;
-        });
+        currentFrame.sort((a, b) =>
+          d3.descending(a[this.xField], b[this.xField])
+        );
         currentFrame.forEach((item: any, index: number) => {
           rankedData.push({
             ...item,
-            rank: index,
+            rank: index + 1,
           });
         });
       });
@@ -190,6 +188,8 @@ export class Chart {
     }
     const groupedData = data.reduce((chartItems: any, currentData: any) => {
       const fieldVal = currentData[this.field];
+      this.keyframes.push(fieldVal);
+
       const keyVal = currentData[this.key];
 
       const exists = chartItems[keyVal];
@@ -279,7 +279,6 @@ export class Chart {
      * }
      *
      */
-
     this.keyframeData = groupedData;
   }
 
@@ -326,14 +325,14 @@ export class Chart {
 
   private setOrUpdateScatterPlot(context?: CanvasRenderingContext2D) {
     if (this.chart === undefined && context) {
-      const items = _.slice(Object.entries(this.keyframeData), 0, 20).reduce(
+      const items = _.slice(Object.entries(this.keyframeData)).reduce(
         (chartMap: ScatterPlotItemTypes, [key, value]: [string, any]) => {
           let item_group = key;
           if (this.useGroups) {
             item_group = value[0].group;
           }
-          const states = value.map(({ data }: any) => {
-            return data;
+          const states = value.map(({ data, keyframe }: any) => {
+            return { data, keyframe };
           });
 
           return {
@@ -354,6 +353,7 @@ export class Chart {
         chartDimensions: this.dimensions,
         position: this.position,
         context,
+        keyframes: this.keyframes,
       });
 
       this.setLegendItems(items);
@@ -368,14 +368,15 @@ export class Chart {
 
   private setOrUpdateBarChart(context?: CanvasRenderingContext2D) {
     if (this.chart === undefined && context) {
-      const items = Object.entries(this.keyframeData).reduce(
-        (chartMap: BarChartItemTypes, [key, value]: [string, any]) => {
+      const items = Object.entries(this.keyframeData)
+        .slice(0, 10)
+        .reduce((chartMap: BarChartItemTypes, [key, value]: [string, any]) => {
           const item_group = key;
           // if (this.useGroups) {
           //   item_group = value[0].group;
           // }
-          const states = value.map(({ data }: any) => {
-            return data;
+          const states = value.map(({ data, keyframe }: any) => {
+            return { data, keyframe };
           });
 
           return {
@@ -386,9 +387,7 @@ export class Chart {
               group: item_group,
             },
           };
-        },
-        {} as BarChartItemTypes
-      );
+        }, {} as BarChartItemTypes);
 
       this.chart = new BarChart({
         items,
@@ -396,6 +395,7 @@ export class Chart {
         chartDimensions: this.dimensions,
         position: this.position,
         context,
+        keyframes: this.keyframes,
       });
     } else {
       this.chart?.updateState({

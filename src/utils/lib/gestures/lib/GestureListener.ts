@@ -125,7 +125,12 @@ export abstract class GestureListener {
     let fingersToTrack = [HAND_LANDMARK_IDS.index_finger_tip];
 
     if (gestureType === SupportedGestures.POINTING) {
-      fingersToTrack = [HAND_LANDMARK_IDS.index_finger_tip];
+      /**
+       * TODO: make fingerstotrack a field variable for the class and make this method non-static 
+       * - this allows the gesture listener to decide itself on the fingers it wants to track
+       * we also won't need to pass fingersToTrack with the object
+       *  */ 
+      fingersToTrack = [HAND_LANDMARK_IDS.index_finger_tip, HAND_LANDMARK_IDS.thumb_tip];
     } else if (gestureType === SupportedGestures.OPEN_HAND) {
       fingersToTrack = [HAND_LANDMARK_IDS.middle_finger_tip];
     } else if (

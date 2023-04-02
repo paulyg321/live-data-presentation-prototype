@@ -7,26 +7,31 @@ import {
   type DrawCircleArgs,
   type ModifyContextStyleArgs,
 } from "../../drawing";
-import {
-  ForeshadowingAreaSubjectType,
-  type ForeshadowingAreaData,
-} from "../../gestures";
+import { ForeshadowingAreaSubjectType } from "../../gestures";
 import type {
   ChartRangeType,
   Coordinate2D,
   Dimensions,
   ForeshadowingSettings,
   ScaleFn,
+  ForeshadowingAreaData,
 } from "../types";
-import { NON_FOCUSED_COLOR } from "./Chart";
+import { Affect, NON_FOCUSED_COLOR } from "./Chart";
 import { drawXAxis, drawYAxis } from "./draw-axes";
 
+export interface ScatterPlotItemState {
+  keyframe: string;
+  data: Coordinate2D;
+}
+
 export interface ScatterPlotConstructorArgs {
-  items: Record<string, { color: string; states: Coordinate2D[] }>;
+  items: Record<string, { color: string; states: ScatterPlotItemState[] }>;
   canvasDimensions: Dimensions;
   chartDimensions: Dimensions;
   position: Coordinate2D;
   context: CanvasRenderingContext2D;
+  keyframes: string[];
+  affect?: Affect;
 }
 
 export class ScatterPlot {
@@ -37,17 +42,21 @@ export class ScatterPlot {
   context: CanvasRenderingContext2D;
   drawingUtils: DrawingUtils;
 
-  items: Record<string, { color: string; states: Coordinate2D[] }>;
+  items: Record<string, { color: string; states: ScatterPlotItemState[] }>;
   currentStateIndex = 0;
   lastStateIndex = 0;
   firstStateIndex = 0;
   nextStateIndex: number | undefined;
+
   animationExtent = 0;
+  affect?: Affect;
 
   foreshadowingSettings: ForeshadowingSettings | undefined;
   selectedItems: string[] = [];
   xScale: ScaleFn = defaultScale;
   yScale: ScaleFn = defaultScale;
+
+  keyframes: string[];
 
   constructor({
     items,
@@ -55,6 +64,7 @@ export class ScatterPlot {
     chartDimensions,
     position,
     context,
+    keyframes,
   }: ScatterPlotConstructorArgs) {
     this.items = items;
     this.canvasDimensions = canvasDimensions;
@@ -62,6 +72,7 @@ export class ScatterPlot {
     this.position = position;
     this.context = context;
     this.drawingUtils = new DrawingUtils(this.context);
+    this.keyframes = keyframes;
     this.setStateCount();
     this.setStates("initialize");
     this.setScales();
@@ -73,6 +84,7 @@ export class ScatterPlot {
     canvasDimensions,
     context,
     extent,
+    affect,
   }: Partial<ScatterPlotConstructorArgs> & {
     extent?: number;
   }) {
@@ -89,6 +101,9 @@ export class ScatterPlot {
     }
     if (extent) {
       this.animationExtent = extent;
+    }
+    if (affect) {
+      this.affect = affect;
     }
   }
 
@@ -165,8 +180,8 @@ export class ScatterPlot {
   }
 
   private setStateCount() {
-    const states: Coordinate2D[][] = _.values(this.items).map(
-      (item: { color: string; states: Coordinate2D[] }) => item.states
+    const states: ScatterPlotItemState[][] = _.values(this.items).map(
+      (item: { color: string; states: ScatterPlotItemState[] }) => item.states
     );
     const sampleItem = states.pop();
 
@@ -192,7 +207,6 @@ export class ScatterPlot {
         } else {
           this.nextStateIndex = undefined;
         }
-        this.animationExtent = 1;
         break;
       }
       case "increment": {
@@ -267,8 +281,8 @@ export class ScatterPlot {
   }
 
   private getAccessors() {
-    const xAccessor = (data: any) => data.x;
-    const yAccessor = (data: any) => data.y;
+    const xAccessor = (d: any) => d.data.x;
+    const yAccessor = (d: any) => d.data.y;
 
     return {
       xAccessor,
@@ -281,24 +295,26 @@ export class ScatterPlot {
     yDomain: [any, any];
   } {
     const { xAccessor, yAccessor } = this.getAccessors();
-    const states: Coordinate2D[][] = _.values(this.items).map(
-      (item: { color: string; states: Coordinate2D[] }) => item.states
+    const states: ScatterPlotItemState[][] = _.values(this.items).map(
+      (item: { color: string; states: ScatterPlotItemState[] }) => item.states
     );
     let flattenedStates = states.flat(1);
 
     if (foreshadow && this.foreshadowingSettings?.area) {
-      flattenedStates = flattenedStates.filter((value: { x: any; y: any }) => {
-        const isInForeshadowingBounds = isInBound(
-          value,
-          this.foreshadowingSettings?.area as ForeshadowingAreaData,
-          this.xScale,
-          this.yScale
-        );
-        if (isInForeshadowingBounds) {
-          return true;
+      flattenedStates = flattenedStates.filter(
+        (value: { keyframe: string; data: { x: any; y: any } }) => {
+          const isInForeshadowingBounds = isInBound(
+            value.data,
+            this.foreshadowingSettings?.area as ForeshadowingAreaData,
+            this.xScale,
+            this.yScale
+          );
+          if (isInForeshadowingBounds) {
+            return true;
+          }
+          return false;
         }
-        return false;
-      });
+      );
     }
 
     const xDomain = d3.extent(flattenedStates, xAccessor);
@@ -369,12 +385,12 @@ export class ScatterPlot {
     Pick<DrawCircleArgs, "radius" | "fill" | "stroke"> {
     const settings: ModifyContextStyleArgs &
       Pick<DrawCircleArgs, "radius" | "fill" | "stroke"> = {
-      radius: 5,
+      radius: this.chartDimensions.width * 0.015,
     };
 
     if (isSelected && isCurrent) {
       settings.fill = true;
-      settings.radius = 7;
+      settings.radius = this.chartDimensions.width * 0.02;
 
       settings.fillStyle = color;
       settings.lineWidth = 0;
@@ -398,8 +414,17 @@ export class ScatterPlot {
     return settings;
   }
 
-  getExtentBasedOnInterpolateStrategy() {
-    return this.animationExtent;
+  getExtentBasedOnAffect() {
+    switch (this.affect) {
+      case Affect.JOY:
+        return d3.easeBounce(this.animationExtent);
+      case Affect.EXCITEMENT:
+        return d3.easeBounce(this.animationExtent);
+      case Affect.TENDERNESS:
+        return d3.easeLinear(this.animationExtent);
+      default:
+        return this.animationExtent;
+    }
   }
 
   drawAxes({
@@ -522,6 +547,7 @@ export class ScatterPlot {
 
     let currentStateRange: ChartRangeType | undefined;
     let foreshadowingRange: ChartRangeType | undefined;
+    let keyframe: string | undefined;
 
     if (range) {
       currentStateRange = range;
@@ -531,40 +557,56 @@ export class ScatterPlot {
       };
     }
 
-    const extent = this.getExtentBasedOnInterpolateStrategy();
+    const extent = this.getExtentBasedOnAffect();
 
-    const pointsToDraw = Object.entries(selectedItems).map(
-      (selectedItem: [string, { color: string; states: Coordinate2D[] }]) => {
-        const [_, { color, states: coordinates }] = selectedItem;
-        const currentStateData = coordinates[this.currentStateIndex];
-        let nextStateData: Coordinate2D | undefined;
+    const pointsToDraw = Object.entries(selectedItems)
+      .map(
+        (
+          selectedItem: [
+            string,
+            { color: string; states: ScatterPlotItemState[] }
+          ]
+        ) => {
+          const [_, { color, states }] = selectedItem;
+          const currentKeyframe = this.keyframes.at(this.currentStateIndex);
+          const currentState = states.find(
+            (state: ScatterPlotItemState) => state.keyframe === currentKeyframe
+          );
 
-        if (this.nextStateIndex) {
-          nextStateData = coordinates[this.nextStateIndex];
-          hasNextState = true;
+          if (!currentState) return;
+
+          let nextState: ScatterPlotItemState | undefined;
+
+          if (this.nextStateIndex) {
+            const nextKeyframe = this.keyframes.at(this.nextStateIndex);
+            nextState = states.find(
+              (state: ScatterPlotItemState) => state.keyframe === nextKeyframe
+            );
+            hasNextState = true;
+          }
+
+          const interpolatedData = this.interpolateBetweenStates({
+            interpolateStep: extent,
+            currentState: currentState.data,
+            nextState: nextState?.data,
+          });
+
+          return {
+            currentStateData: currentState.data,
+            nextStateData: nextState?.data,
+            interpolatedData,
+            color,
+          };
         }
-
-        const interpolatedData = this.interpolateBetweenStates({
-          interpolateStep: extent,
-          currentState: currentStateData,
-          nextState: nextStateData,
-        });
-
-        return {
-          currentStateData,
-          nextStateData,
-          interpolatedData,
-          color,
-        };
-      }
-    );
+      )
+      .filter((point) => point !== undefined);
 
     // ------------- DRAW NORMAL ----------------------
     this.drawPoints({
       // If we're foreshadowing we want to see the currentState not interpolated state
       pointsData: pointsToDraw.map((points) => ({
-        color: points.color,
-        coordinates: points.interpolatedData,
+        color: points!.color,
+        coordinates: points!.interpolatedData,
       })),
       xScale,
       yScale,
@@ -577,8 +619,8 @@ export class ScatterPlot {
     if (isForeshadowing && hasNextState) {
       this.drawPoints({
         pointsData: pointsToDraw.map((points) => ({
-          color: points.color,
-          coordinates: points.nextStateData as Coordinate2D,
+          color: points!.color,
+          coordinates: points!.nextStateData as Coordinate2D,
         })),
         xScale: xScaleNext,
         yScale,
@@ -586,6 +628,34 @@ export class ScatterPlot {
         isCurrent: false,
         range: foreshadowingRange,
       });
+    }
+
+    return keyframe;
+  }
+
+  drawKeyframeValue() {
+    const keyframe = this.keyframes.at(this.currentStateIndex);
+    if (keyframe) {
+      this.drawingUtils.modifyContextStyleAndDraw(
+        {
+          fontSize: this.chartDimensions.width * 0.25,
+          opacity: 0.2,
+          fillStyle: "red",
+        },
+        (ctx: CanvasRenderingContext2D) => {
+          const { width } = ctx.measureText(keyframe);
+          this.drawingUtils.drawText({
+            text: keyframe,
+            coordinates: {
+              x:
+                this.position.x +
+                this.chartDimensions.width * 0.5 -
+                width * 0.5,
+              y: this.position.y + this.chartDimensions.height * 0.6,
+            },
+          });
+        }
+      );
     }
   }
 
@@ -643,6 +713,9 @@ export class ScatterPlot {
     });
 
     this.context.restore();
+
+    this.drawKeyframeValue();
+
     requestAnimationFrame(() => this.draw());
   }
 }

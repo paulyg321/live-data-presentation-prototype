@@ -10,12 +10,12 @@ import {
 } from "../../drawing";
 import {
   ForeshadowingAreaSubjectType,
-  type ForeshadowingAreaData,
 } from "../../gestures";
 import type {
   ChartRangeType,
   Coordinate2D,
   Dimensions,
+  ForeshadowingAreaData,
   ForeshadowingSettings,
   ScaleFn,
 } from "../types";
@@ -67,7 +67,7 @@ export class LineChart {
   foreshadowingSettings: ForeshadowingSettings | undefined;
   selectedItems: string[] = [];
   interpolateStrategy: LineInterpolateStrategy =
-    LineInterpolateStrategy.BASELINE;
+    LineInterpolateStrategy.BASIC;
   dataType:
     | {
         xType: "number" | "date" | undefined;
@@ -285,7 +285,6 @@ export class LineChart {
         } else {
           this.nextStateIndex = undefined;
         }
-        this.animationExtent = 1;
         break;
       }
       case "increment": {
@@ -812,7 +811,7 @@ export class LineChart {
 
           const extent = this.getExtentBasedOnInterpolateStrategy().at(-1) ?? 1;
           // TODO: Decide how to turn this on & off
-          const LIMIT_EXTENT_TO_STATES = true;
+          const LIMIT_EXTENT_TO_STATES = false;
 
           let currentBaselineXRange: [number, number] = [
             range.xRange[0],
