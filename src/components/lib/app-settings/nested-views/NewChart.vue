@@ -209,7 +209,7 @@ onMounted(() => {
               ></v-select>
             </v-col>
             <v-col lg="12">
-              <p class="text-body-1 mb-3">Chart Data</p>
+              <!-- <p class="text-body-1 mb-3">Chart Data</p> -->
               <v-card class="json-container">
                 <div ref="dataInput" class="h-100"></div>
               </v-card>

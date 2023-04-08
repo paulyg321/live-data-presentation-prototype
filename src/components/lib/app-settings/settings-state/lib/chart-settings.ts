@@ -1,6 +1,6 @@
 import * as d3 from "d3";
 import { reactive } from "vue";
-import {
+import type {
   Affect,
   // AnimatedCircle,
   // AnimatedLine,
@@ -8,12 +8,23 @@ import {
   // DrawingMode,
   // AnimatedLineDrawingModeToEaseFunctionMap,
   // AnimatedCircleDrawingModeToEaseFunctionMap,
-  type Coordinate2D,
-  type Dimensions,
-  type PartialCoordinate2D,
+   Coordinate2D,
+   Dimensions,
+   PartialCoordinate2D,
 } from "@/utils";
+import { StorySettings } from "./stories-settings";
 
-const initialChartWidth = 400;
+export const initialChartWidth = 400;
+export const initialChartDimensions = {
+  width: initialChartWidth,
+  height: initialChartWidth * (3 / 4),
+  margin: {
+    left: 30,
+    right: 30,
+    top: 30,
+    bottom: 30,
+  },
+};
 
 export enum PlaybackType {
   NEXT = "next",
@@ -27,7 +38,7 @@ export const ChartSettings = reactive<{
   changePosition: (coord: PartialCoordinate2D) => void;
   charts: Chart[];
   currentChart?: Chart;
-  setCurrentChart: (index: number) => void;
+  setCurrentChart: () => void;
   addChart: (newChart: Chart) => void;
   changeMargins: (margin: number) => void;
   canvasKeys: string[];
@@ -60,16 +71,7 @@ export const ChartSettings = reactive<{
      */
     this.canvasKeys = ["chart", "legend"];
   },
-  dimensions: {
-    width: initialChartWidth,
-    height: initialChartWidth * (3 / 4),
-    margin: {
-      left: 30,
-      right: 30,
-      top: 30,
-      bottom: 30,
-    },
-  },
+  dimensions: initialChartDimensions,
   changeDimensions(width: number) {
     const newDimensions = {
       ...this.dimensions,
@@ -128,18 +130,15 @@ export const ChartSettings = reactive<{
     : [],
   currentChart: undefined,
   addChart(newChart: Chart) {
-    this.charts = [...this.charts, newChart];
-    localStorage.setItem("charts", JSON.stringify(this.charts));
+    StorySettings.currentStory?.addChart(newChart);
+    // this.charts = [...this.charts, newChart];
+    // localStorage.setItem("charts", JSON.stringify(this.charts));
   },
-  setCurrentChart(index: number) {
-    const currentChart = new Chart({
-      ...this.charts[index],
-    });
-
-    this.currentChart = currentChart;
+  setCurrentChart() {
+    this.currentChart = StorySettings.currentStory?.getChart();
 
     // Effects
-    this.setCanvasKeys();
+    // this.setCanvasKeys();
   },
   // States for drawing
   // animationMode: DrawingMode.BASELINE_ANIMATION,
@@ -179,10 +178,13 @@ export const ChartSettings = reactive<{
        * */
     } else if (type === PlaybackType.NEXT) {
       this.playbackTimer = d3.timer((elapsed: number) => {
+        // TODO_Paul - Try this!
+        // const startingPoint = this.playbackExtent + elapsed / playbackDuration;
         const startingPoint = Math.max(
           this.playbackExtent,
           elapsed / playbackDuration
         );
+
         const boundedTimeStep = Math.min(startingPoint, 1);
         play(boundedTimeStep);
         if (boundedTimeStep === 1) {

@@ -85,11 +85,16 @@ export class ScatterPlot {
     context,
     extent,
     affect,
+    position
   }: Partial<ScatterPlotConstructorArgs> & {
     extent?: number;
   }) {
     if (chartDimensions) {
       this.chartDimensions = chartDimensions;
+      this.setScales();
+    }
+    if (position) {
+      this.position = position;
       this.setScales();
     }
     if (canvasDimensions) {
@@ -715,7 +720,5 @@ export class ScatterPlot {
     this.context.restore();
 
     this.drawKeyframeValue();
-
-    requestAnimationFrame(() => this.draw());
   }
 }

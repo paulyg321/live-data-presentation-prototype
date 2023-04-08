@@ -24,6 +24,11 @@ export interface RadialPlaybackGestureListenerConstructorArgs
   mode: RadialTrackerMode;
 }
 
+export interface AnimationState {
+  extent: number;
+  isPlaying: boolean;
+}
+
 export class RadialPlaybackGestureListener extends GestureListener {
   static playbackSubjectKey = "playbackSubject";
 
@@ -31,6 +36,11 @@ export class RadialPlaybackGestureListener extends GestureListener {
   private angleStack: number[] = [];
   private mode: RadialTrackerMode = RadialTrackerMode.NORMAL;
   private fingerDistance = 0;
+  animationState: AnimationState = {
+    extent: 0,
+    isPlaying: false,
+  };
+  private currentAngle = 0;
 
   constructor({
     position,
@@ -50,19 +60,41 @@ export class RadialPlaybackGestureListener extends GestureListener {
     mode,
     resetKeys,
     subjects,
+    eventContext,
   }: RadialPlaybackGestureListenerConstructorArgs) {
     super({
       position,
-      dimensions,
+      dimensions: {
+        width: dimensions.width,
+        height: dimensions.width,
+      },
       handsToTrack,
       gestureTypes,
       gestureSubject,
       canvasDimensions,
       resetKeys,
       subjects,
+      eventContext,
     });
 
     this.mode = mode;
+  }
+
+  updateState(
+    args: Partial<GestureListenerConstructorArgs> & {
+      animationState?: AnimationState;
+      currentAngle?: number;
+    }
+  ) {
+    const { animationState, currentAngle } = args;
+    super.updateState(args);
+
+    if (animationState) {
+      this.animationState = animationState;
+    }
+    if (currentAngle) {
+      this.currentAngle = currentAngle;
+    }
   }
 
   private convertDistanceToAffect(distance: number) {
@@ -74,7 +106,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
   private getCenterPoint(): Coordinate2D {
     return {
       x: this.position.x + this.dimensions.width / 2,
-      y: this.position.y + this.dimensions.height / 2,
+      y: this.position.y + this.dimensions.width / 2,
     };
   }
 
@@ -91,35 +123,36 @@ export class RadialPlaybackGestureListener extends GestureListener {
   }
 
   private renderCenterPoint() {
+    if (this.animationState.isPlaying) return;
+
     const centerPoint = this.getCenterPoint();
     const fontSize = 40;
-    if (this.context) {
-      this.drawingUtils?.modifyContextStyleAndDraw(
-        {
-          fillStyle: "skyblue",
-          fontSize,
-        },
-        () => {
-          this.drawingUtils?.drawText({
-            coordinates: centerPoint,
-            text: this.rotations.toString(),
-            xScale: (value: number) => {
-              return value - fontSize / 4;
-            },
-            yScale: (value: number) => {
-              return value + fontSize / 4;
-            },
-          });
-        }
-      );
-    }
+    this.drawingUtils?.modifyContextStyleAndDraw(
+      {
+        fillStyle: "skyblue",
+        fontSize,
+      },
+      () => {
+        this.drawingUtils?.drawText({
+          coordinates: centerPoint,
+          text: this.rotations.toString(),
+          xScale: (value: number) => {
+            return value - fontSize / 4;
+          },
+          yScale: (value: number) => {
+            return value + fontSize / 4;
+          },
+        });
+      }
+    );
   }
 
-  private renderCurrentState(angle: number) {
+  private renderCurrentState() {
+    if (this.animationState.isPlaying) return;
+    const angle = this.currentAngle;
     const centerPoint = this.getCenterPoint();
     const endAngle = this.angleStack.length > 0 ? angle * (Math.PI / 180) : 0;
     if (this.context) {
-      this.renderReferencePoints();
       this.drawingUtils?.modifyContextStyleAndDraw(
         {
           fillStyle: "#90EE90",
@@ -139,33 +172,27 @@ export class RadialPlaybackGestureListener extends GestureListener {
     }
   }
 
-  private renderAnimationContext(percentComplete: number) {
+  private renderAnimationContext() {
+    if (!this.animationState.isPlaying) return;
     const centerPoint = this.getCenterPoint();
-    const endAngle = 2 * Math.PI * percentComplete;
-    if (this.context) {
-      if (percentComplete === 1) {
-        this.renderReferencePoints();
-      } else {
-        this.clearCanvas();
-        this.drawingUtils?.modifyContextStyleAndDraw(
-          {
-            strokeStyle: "#90EE90",
-            opacity: 0.3,
-            lineWidth: 10,
-          },
-          () => {
-            this.drawingUtils?.drawCircle({
-              coordinates: centerPoint,
-              radius: this.dimensions.width / 2,
-              startAngle: 0,
-              endAngle,
-              stroke: true,
-              drawLineToCenter: true,
-            });
-          }
-        );
+    const endAngle = 2 * Math.PI * this.animationState.extent;
+    this.drawingUtils?.modifyContextStyleAndDraw(
+      {
+        strokeStyle: "#90EE90",
+        opacity: 0.3,
+        lineWidth: 10,
+      },
+      () => {
+        this.drawingUtils?.drawCircle({
+          coordinates: centerPoint,
+          radius: this.dimensions.width / 2,
+          startAngle: 0,
+          endAngle,
+          stroke: true,
+          drawLineToCenter: true,
+        });
       }
-    }
+    );
   }
 
   private handleNewAngle(theta: number, distanceBetweenFingers: number) {
@@ -202,13 +229,18 @@ export class RadialPlaybackGestureListener extends GestureListener {
               {
                 type: PlaybackSubjectType.CONTINUOUS,
                 value: (percentComplete: number) =>
-                  this.renderAnimationContext(percentComplete),
+                  this.updateState({
+                    animationState: {
+                      isPlaying: true,
+                      extent: percentComplete,
+                    },
+                  }),
                 affect: this.convertDistanceToAffect(this.fingerDistance),
                 duration,
               }
             );
-            this.resetAngleState();
           }
+          this.resetAngleState();
           this.timer?.stop();
           this.timer = undefined;
         };
@@ -217,25 +249,6 @@ export class RadialPlaybackGestureListener extends GestureListener {
           this.timer?.stop();
           this.timer = undefined;
           this.timer = startTimerInstance({
-            // onTick: (timestep?: number) => {
-            //   if (!timestep) return;
-            //   this.renderCurrentState(theta);
-            //   const centerPoint = this.getCenterPoint();
-            //   this.drawingUtils?.modifyContextStyleAndDraw(
-            //     {
-            //       fillStyle: "red",
-            //       opacity: 0.1,
-            //     },
-            //     () => {
-            //       this.drawingUtils?.drawCircle({
-            //         context: this.context,
-            //         coordinates: centerPoint,
-            //         radius: (this.dimensions.width / 2) * timestep,
-            //         fill: true,
-            //       });
-            //     }
-            //   );
-            // },
             onCompletion: executeAfterTimerEnds,
             timeout: 3000,
           });
@@ -256,46 +269,31 @@ export class RadialPlaybackGestureListener extends GestureListener {
     this.angleStack = [];
   }
 
-  private clearAllVisualIndicators() {
-    this.renderReferencePoints(true);
-  }
-
   setTrackingMode(mode: RadialTrackerMode) {
     this.mode = mode;
   }
 
   renderBorder() {
-    const centerPoint = this.getCenterPoint();
-    if (this.context) {
-      this.drawingUtils?.modifyContextStyleAndDraw(
-        {
-          strokeStyle: "skyblue",
-        },
-        () => {
-          this.drawingUtils?.drawCircle({
-            context: this.context,
-            coordinates: centerPoint,
-            radius: this.dimensions.width / 2,
-            stroke: true,
-          });
-        }
-      );
-    }
-  }
+    if (this.animationState.isPlaying) return;
 
-  renderReferencePoints(clear = true) {
-    if (this.context) {
-      if (clear) {
-        this.clearCanvas();
+    const centerPoint = this.getCenterPoint();
+    this.drawingUtils?.modifyContextStyleAndDraw(
+      {
+        strokeStyle: "skyblue",
+      },
+      () => {
+        this.drawingUtils?.drawCircle({
+          context: this.context,
+          coordinates: centerPoint,
+          radius: this.dimensions.width / 2,
+          stroke: true,
+        });
       }
-      this.renderCenterPoint();
-      this.renderBorder();
-    }
+    );
   }
 
   resetHandler(): void {
     this.resetAngleState();
-    this.renderReferencePoints(true);
   }
 
   // Implemented to only track one finger and one hand
@@ -337,17 +335,39 @@ export class RadialPlaybackGestureListener extends GestureListener {
     const canEmit = this.isWithinObjectBounds(indexFingerPosition);
 
     if (canEmit) {
-      this.publishToSubjectIfExists(
-        RadialPlaybackGestureListener.playbackSubjectKey,
-        undefined
-      );
+      // CANCEL THE ANIMATION
+
       const angle = this.calculateAngleFromCenter(indexFingerPosition);
+      this.currentAngle = angle;
       this.handleNewAngle(angle, distanceBetweenFingers);
-      this.renderCurrentState(angle);
     }
     // else {
     //   this.resetAngleState();
     //   this.clearAllVisualIndicators();
     // }
+  }
+
+  cancelAnimation() {
+    this.publishToSubjectIfExists(
+      RadialPlaybackGestureListener.playbackSubjectKey,
+      undefined
+    );
+    this.updateState({
+      animationState: {
+        isPlaying: false,
+        extent: 0,
+      },
+    });
+  }
+
+  draw() {
+    if (!this.context) return;
+
+    this.clearCanvas();
+    this.renderCenterPoint();
+    this.renderCurrentState();
+    this.renderBorder();
+    this.renderAnimationContext();
+    this.canvasListener?.draw();
   }
 }

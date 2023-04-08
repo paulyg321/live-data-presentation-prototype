@@ -99,6 +99,7 @@ export class EmphasisGestureListener extends GestureListener {
     subjects,
     resetKeys,
     context,
+    eventContext,
   }: EmphasisGestureListenerConstructorArgs) {
     super({
       position,
@@ -109,6 +110,7 @@ export class EmphasisGestureListener extends GestureListener {
       resetKeys,
       subjects,
       context,
+      eventContext,
     });
 
     this.gestureTypes = gestureTypes;
@@ -130,12 +132,8 @@ export class EmphasisGestureListener extends GestureListener {
     );
   }
 
-  private clearAllVisualIndicators() {
-    this.renderReferencePoints(true);
-  }
 
   private onLevelIncrement() {
-    this.renderVisualIndicators();
     const currentDrawingMode = this.getAnimationBasedOnEmphasisLevel();
     this.publishToSubjectIfExists(
       EmphasisGestureListener.emphasisSubjectKey,
@@ -144,8 +142,6 @@ export class EmphasisGestureListener extends GestureListener {
   }
 
   private onLevelDecrement() {
-    this.renderVisualIndicators();
-
     if (
       EmphasisGestureListener.rangeValuesToEmit.includes(this.emphasisLevel)
     ) {
@@ -165,7 +161,6 @@ export class EmphasisGestureListener extends GestureListener {
 
   resetHandler(): void {
     this.resetStateValues();
-    this.clearAllVisualIndicators();
   }
 
   startDecrementTimer() {
@@ -199,21 +194,14 @@ export class EmphasisGestureListener extends GestureListener {
   }
 
   renderVisualIndicators() {
-    this.clearCanvas();
     this.emphasisMeter?.valueHandler(this.emphasisLevel);
-    this.renderReferencePoints(false);
   }
 
-  renderReferencePoints(clear = true) {
-    if (!this.context) {
-      return;
-    }
-
-    if (clear) {
-      this.clearCanvas();
-    }
-
-    this.renderBorder();
+  draw() {
+    if (!this.context) return;
+    this.clearCanvas();
+    this.renderVisualIndicators();
+    this.canvasListener?.draw();
   }
 
   protected handleNewData(

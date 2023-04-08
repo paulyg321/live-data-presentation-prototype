@@ -16,15 +16,8 @@ export function calculateDistance(pointA: Coordinate2D, pointB: Coordinate2D) {
   const verticalDistance = pointA.y - pointB.y;
   const horizontalDistance = pointA.x - pointB.x;
   return {
-    horizontalDistance: {
-      order:
-        horizontalDistance < 0 ? HORIZONTAL_ORDER.LEFT : HORIZONTAL_ORDER.RIGHT,
-      value: Math.abs(horizontalDistance),
-    },
-    verticalDistance: {
-      order: verticalDistance < 0 ? VERTICAL_ORDER.ABOVE : VERTICAL_ORDER.BELOW,
-      value: Math.abs(verticalDistance),
-    },
+    horizontalDistance,
+    verticalDistance,
     euclideanDistance: Math.sqrt(
       Math.pow(pointA.x - pointB.x, 2) + Math.pow(pointA.y - pointB.y, 2)
     ),

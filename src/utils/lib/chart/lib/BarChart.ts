@@ -80,11 +80,16 @@ export class BarChart {
     canvasDimensions,
     context,
     extent,
+    position,
   }: Partial<BarChartConstructorArgs> & {
     extent?: number;
   }) {
     if (chartDimensions) {
       this.chartDimensions = chartDimensions;
+      this.setScales();
+    }
+    if (position) {
+      this.position = position;
       this.setScales();
     }
     if (canvasDimensions) {
@@ -192,7 +197,6 @@ export class BarChart {
       }
       case "increment": {
         const increment = this.currentStateIndex + 1;
-        console.log(increment);
         if (increment <= this.lastStateIndex) {
           this.currentStateIndex = increment;
 
@@ -727,6 +731,5 @@ export class BarChart {
 
     this.context.restore();
     this.drawKeyframeValue();
-    requestAnimationFrame(() => this.draw());
   }
 }

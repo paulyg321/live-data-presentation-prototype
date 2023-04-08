@@ -1,4 +1,5 @@
 import {
+  CanvasElementListener,
   DrawingUtils,
   HANDS,
   HAND_LANDMARK_IDS,
@@ -9,6 +10,12 @@ import {
 import type { Timer } from "d3";
 import type { Subject, Subscription } from "rxjs";
 import type { Coordinate2D, Dimensions } from "../../chart";
+
+export enum ListenerType {
+  TEMPORAL = "temporal",
+  RADIAL = "radial",
+  FORESHADOWING = "foreshadowing",
+}
 
 export type ListenerProcessedFingerData = Record<
   HANDS,
@@ -32,6 +39,7 @@ export interface GestureListenerConstructorArgs {
   resetKeys?: Set<string>;
   subjects?: GestureListenerSubjectMap;
   context?: CanvasRenderingContext2D;
+  eventContext?: CanvasRenderingContext2D;
 }
 
 export type GestureListenerSubjectMap = { [key: string]: Subject<any> };
@@ -43,6 +51,7 @@ export interface ProcessedGestureListenerFingerData {
 }
 
 export abstract class GestureListener {
+  canvasListener?: CanvasElementListener;
   position: Coordinate2D;
   dimensions: Dimensions;
   subjects: GestureListenerSubjectMap | undefined;
@@ -81,9 +90,19 @@ export abstract class GestureListener {
     // ACCEPTED VALUES - https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_code_values
     resetKeys,
     context,
+    eventContext,
   }: GestureListenerConstructorArgs) {
     this.position = position;
     this.dimensions = dimensions;
+    if (eventContext) {
+      this.canvasListener = new CanvasElementListener({
+        position: this.position,
+        dimensions: this.dimensions,
+        isCircle: false,
+        canvasElement: this,
+        context: eventContext,
+      });
+    }
     this.handsToTrack = handsToTrack;
     this.gestureTypes = gestureTypes;
     // Set up listener for gesture subject
@@ -173,8 +192,8 @@ export abstract class GestureListener {
     return undefined;
   }
 
-  abstract renderReferencePoints(clearCanvas?: boolean): void;
   abstract resetHandler(): void;
+  abstract draw(): void;
 
   protected abstract handleNewData(
     fingerData: ListenerProcessedFingerData,
@@ -256,7 +275,7 @@ export abstract class GestureListener {
     dimensions,
     handsToTrack,
     canvasDimensions,
-  }: Partial<GestureListenerConstructorArgs>) {
+  }: Partial<GestureListenerConstructorArgs> | any) {
     if (position) {
       this.position = position;
     }

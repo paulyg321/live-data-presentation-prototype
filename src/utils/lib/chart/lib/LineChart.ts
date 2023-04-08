@@ -8,9 +8,7 @@ import {
   type DrawCircleArgs,
   type ModifyContextStyleArgs,
 } from "../../drawing";
-import {
-  ForeshadowingAreaSubjectType,
-} from "../../gestures";
+import { ForeshadowingAreaSubjectType } from "../../gestures";
 import type {
   ChartRangeType,
   Coordinate2D,
@@ -23,11 +21,6 @@ import { NON_FOCUSED_COLOR } from "./Chart";
 import { drawXAxis, drawYAxis } from "./draw-axes";
 
 const parseTime = d3.timeParse("%Y-%m-%d");
-
-export enum LineShape {
-  CURVED = "curved",
-  SHARP = "sharp",
-}
 
 export enum LineInterpolateStrategy {
   DROP = "drop", // current state will always start off chart at the top
@@ -66,8 +59,7 @@ export class LineChart {
 
   foreshadowingSettings: ForeshadowingSettings | undefined;
   selectedItems: string[] = [];
-  interpolateStrategy: LineInterpolateStrategy =
-    LineInterpolateStrategy.BASIC;
+  interpolateStrategy: LineInterpolateStrategy = LineInterpolateStrategy.BASIC;
   dataType:
     | {
         xType: "number" | "date" | undefined;
@@ -101,11 +93,16 @@ export class LineChart {
     canvasDimensions,
     context,
     extent,
+    position,
   }: Partial<LineChartConstructorArgs> & {
     extent?: number;
   }) {
     if (chartDimensions) {
       this.chartDimensions = chartDimensions;
+      this.setScales();
+    }
+    if (position) {
+      this.position = position;
       this.setScales();
     }
     if (canvasDimensions) {
@@ -510,14 +507,12 @@ export class LineChart {
     };
   }
 
-  private getRange(foreshadowing?: boolean): ChartRangeType {
+  private getRange(
+    type: "default" | "small-multiple" | "foreshadow-range" = "default",
+  ): ChartRangeType {
     const chartBounds = this.getBounds();
 
-    if (
-      foreshadowing &&
-      this.foreshadowingSettings?.type ===
-        ForeshadowingAreaSubjectType.RECTANGLE
-    ) {
+    if (type === "small-multiple") {
       const halfChartWidth = (chartBounds.x.end - chartBounds.x.start) / 2;
       const halfChartHeight = (chartBounds.y.start - chartBounds.y.end) / 2;
       const leftMargin = this.chartDimensions.margin?.left ?? 0;
@@ -535,6 +530,22 @@ export class LineChart {
       return rangeData;
     }
 
+    if (type === "foreshadow-range" && this.foreshadowingSettings) {
+      return {
+        xRange: [
+          this.foreshadowingSettings.area.position.x,
+          this.foreshadowingSettings.area.position.x +
+            (this.foreshadowingSettings.area.dimensions?.width ?? 0),
+        ],
+        yRange: [chartBounds.y.start, chartBounds.y.end],
+        xRangeNext: [
+          this.foreshadowingSettings.area.position.x,
+          this.foreshadowingSettings.area.position.x +
+            (this.foreshadowingSettings.area.dimensions?.width ?? 0),
+        ],
+      };
+    }
+
     return {
       xRange: [chartBounds.x.start, chartBounds.x.end],
       xRangeNext: [chartBounds.x.start, chartBounds.x.end],
@@ -545,7 +556,10 @@ export class LineChart {
   // TODO: Return scales that plot only stuff that falls in the domain - googlw this!
   private getForeshadowingScales() {
     const { xDomain, yDomain } = this.getDomain(true);
-    const { xRange, yRange, xRangeNext } = this.getRange(true);
+    const isRectGesture = this.foreshadowingSettings?.type ===
+      ForeshadowingAreaSubjectType.RECTANGLE
+    const rangeArg = isRectGesture ? "small-multiple" : "default";
+    const { xRange, yRange, xRangeNext } = this.getRange(rangeArg);
 
     let xScaleFn: any = d3.scaleLinear;
     let yScaleFn: any = d3.scaleLinear;
@@ -823,6 +837,11 @@ export class LineChart {
             range.xRangeNext[1],
           ];
 
+          /**
+           * Because on small multiple view (when we have isRectGesture as true,
+           * we have separate charts we only adjust our foreshadowing clip range 
+           * by the extent for other scenarios
+           */
           if (!isRectGesture) {
             foreshadowingBaselineXRange = [
               range.xRangeNext[1] * extent,
@@ -1124,7 +1143,6 @@ export class LineChart {
     this.context.save();
     const { selectedItemsKeys, unselectedItemsKeys } = this.getItemKeys();
     const foreshadowing = this.foreshadowingSettings;
-    const range = this.getRange(!!foreshadowing);
     const isRectGesture =
       foreshadowing?.type === ForeshadowingAreaSubjectType.RECTANGLE;
     const isRangeGesture =
@@ -1146,28 +1164,28 @@ export class LineChart {
       dimensions: this.canvasDimensions,
     });
 
+    const axesRangeArg = isRectGesture ? "small-multiple" : "default";
+    const axesRange = this.getRange(axesRangeArg);
     this.drawAxes({
       xScale,
       yScale,
       xScaleNext,
       isRectGesture,
-      range,
+      range: axesRange,
     });
 
-    if (isRangeGesture) {
-      this.drawingUtils.clearAndClipRect({
-        dimensions: foreshadowing.area.dimensions ?? { width: 0, height: 0 },
-        coordinates: foreshadowing.area.position,
-      });
-    }
-
     // Draw Lines
+    let lineRangeArg: "default" | "small-multiple" | "foreshadow-range" = "default";
+    if (isRectGesture) lineRangeArg = "small-multiple";
+    if (isRangeGesture) lineRangeArg = "foreshadow-range";
+    const lineRange = this.getRange(lineRangeArg);
+
     this.drawSelectedLineItems({
       keys: selectedItemsKeys,
       xScale,
       yScale,
       xScaleNext,
-      range,
+      range: lineRange,
       isForeshadowing: !!foreshadowing,
       isRangeGesture,
       isRectGesture,
@@ -1181,6 +1199,5 @@ export class LineChart {
     }
 
     this.context.restore();
-    requestAnimationFrame(() => this.draw());
   }
 }

@@ -1,5 +1,6 @@
 import _ from "lodash";
 import type { Coordinate2D } from "../../chart";
+import type { CanvasElementListener } from "../../interactions";
 import { HANDS } from "./gesture-utils";
 import {
   GestureListener,
@@ -46,6 +47,7 @@ export class LinearPlaybackGestureListener extends GestureListener {
     emitRange,
     resetKeys,
     subjects,
+    eventContext,
   }: LinearPlaybackGestureListenerConstructorArgs) {
     super({
       position,
@@ -56,6 +58,7 @@ export class LinearPlaybackGestureListener extends GestureListener {
       canvasDimensions,
       resetKeys,
       subjects,
+      eventContext,
     });
 
     this.emitRange = emitRange;
@@ -101,13 +104,6 @@ export class LinearPlaybackGestureListener extends GestureListener {
 
     if (emitRange) {
       this.emitRange = emitRange;
-    }
-  }
-
-  renderReferencePoints() {
-    if (this.context) {
-      this.clearCanvas();
-      this.renderBorder();
     }
   }
 
@@ -160,5 +156,11 @@ export class LinearPlaybackGestureListener extends GestureListener {
       LinearPlaybackGestureListener.playbackSubjectKey,
       { type: PlaybackSubjectType.DISCRETE, value: trackingValue }
     );
+  }
+
+  draw() {
+    this.clearCanvas();
+    this.renderBorder();
+    this.canvasListener?.draw();
   }
 }

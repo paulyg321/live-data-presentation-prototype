@@ -3,6 +3,10 @@ import { reactive } from "vue";
 import { CameraSettings } from "./camera-settings";
 
 export const initialCanvasWidth = 640;
+export const initialCanvasDimensions = {
+  width: initialCanvasWidth,
+  height: initialCanvasWidth * (3 / 4),
+};
 
 export const CanvasSettings = reactive<{
   dimensions: Dimensions;
@@ -16,10 +20,7 @@ export const CanvasSettings = reactive<{
   ) => void;
   setCanvasCtx: (key: string) => void;
 }>({
-  dimensions: {
-    width: initialCanvasWidth,
-    height: initialCanvasWidth * (3 / 4),
-  },
+  dimensions: initialCanvasDimensions,
   setCanvasDimensions(width: number) {
     this.dimensions = {
       width,

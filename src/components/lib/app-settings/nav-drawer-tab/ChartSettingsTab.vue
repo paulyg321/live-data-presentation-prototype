@@ -1,126 +1,50 @@
 <script lang="ts" setup>
-import { ChartSettings, LegendSettings } from "../settings-state";
-import lineChartPng from "@/assets/line-chart.png";
-import barChartPng from "@/assets/bar-chart.png";
-import scatterPlotPng from "@/assets/scatter-plot.png";
+import ChartSettingsData from "./chart-settings/ChartSettingsData.vue";
+import ChartSettingsPosition from "./chart-settings/ChartSettingsPosition.vue";
+import { ref } from "vue";
+import type { ChartType } from "@/utils";
+import { ChartSettings } from "../settings-state";
 
-const imageSize = 100;
+type ChartSettingProps = {
+  type?: ChartType;
+};
+const props = defineProps<ChartSettingProps>();
 
-function getChartImage(type: string) {
-  switch (type) {
-    case "line":
-      return lineChartPng;
-    case "bar":
-      return barChartPng;
-    case "scatter":
-    default:
-      return scatterPlotPng;
-  }
+enum ChartSettingsTabs {
+  DATA = "data",
+  POSITION = "position",
 }
 
-function getChartColor(type: string) {
-  switch (type) {
-    case "line":
-      return "purple";
-    case "bar":
-      return "green";
-    case "scatter":
-    default:
-      return "red";
-  }
+const tab = ref<ChartSettingsTabs>(ChartSettingsTabs.DATA);
+function handleNext() {
+  tab.value = ChartSettingsTabs.POSITION;
+  // Allows us to view the chart after saving new chart
+  ChartSettings.setCurrentChart();
 }
 </script>
 <template>
-  <v-row>
-    <v-col lg="12">
-      <div class="text-caption">Width</div>
-      <v-slider
-        :min="0"
-        :max="1000"
-        :step="1"
-        :model-value="ChartSettings.dimensions.width"
-        @update:modelValue="(value: number) => ChartSettings.changeDimensions(value)"
-        track-color="grey"
-        thumb-label
-      ></v-slider>
-      <div class="text-caption">X Position</div>
-      <v-slider
-        :min="0"
-        :max="1000"
-        :step="1"
-        :model-value="ChartSettings.position.x"
-        @update:modelValue="(value: number) => ChartSettings.changePosition({ x: value })"
-        track-color="grey"
-        thumb-label
-      ></v-slider>
-      <div class="text-caption">Y Position</div>
-      <v-slider
-        :min="0"
-        :max="1000"
-        :step="1"
-        :model-value="ChartSettings.position.y"
-        @update:modelValue="(value: number) => ChartSettings.changePosition({ y: value })"
-        track-color="grey"
-        thumb-label
-      ></v-slider>
-    </v-col>
-  </v-row>
-  <v-row>
-    <v-col lg="12">
-      <v-text-field
-        label="Legend Page"
-        :value="LegendSettings.page"
-        @input="(event: any) => LegendSettings.changePage(event.target.value)"
-        type="number"
-      ></v-text-field>
-    </v-col>
-  </v-row>
-  <v-row>
-    <v-col
-      cols="12"
-      v-for="(chart, index) in ChartSettings.charts"
-      :key="chart.title"
-    >
-      <v-card :color="getChartColor(chart.type.value)" dark>
-        <div class="d-flex flex-no-wrap justify-space-between align-center">
-          <div>
-            <v-card-title class="text-h6">{{
-              `${chart.title.substring(0, 10)}...`
-            }}</v-card-title>
-
-            <v-card-subtitle>{{ chart.type.title }}</v-card-subtitle>
-
-            <v-card-actions>
-              <v-btn
-                class="ml-2 mt-3"
-                fab
-                icon
-                height="40px"
-                right
-                width="40px"
-                :href="`/present/${index}`"
-              >
-                <v-icon>mdi-play</v-icon>
-              </v-btn>
-            </v-card-actions>
-          </div>
-
-          <v-avatar class="ma-3 pa-5" size="100" tile>
-            <v-img :src="getChartImage(chart.type.value)"></v-img>
-          </v-avatar>
-        </div>
-      </v-card>
-    </v-col>
-  </v-row>
-  <v-row>
-    <v-col>
-      <v-btn
-        color="success"
-        icon="mdi-plus"
-        size="x-large"
-        href="/add-chart"
-      ></v-btn>
-    </v-col>
-  </v-row>
+  <!-- <v-container>
+    <v-row>
+      <v-col lg="12">
+        <div class="text-h6">Chart Settings</div>
+      </v-col>
+    </v-row>
+  </v-container> -->
+  <v-tabs v-model="tab" color="primary" fixed-tabs>
+    <v-tab :value="ChartSettingsTabs.DATA">Data</v-tab>
+    <v-tab :value="ChartSettingsTabs.POSITION">Position</v-tab>
+  </v-tabs>
+  <v-window v-model="tab" :show-arrows="false">
+    <v-window-item :value="ChartSettingsTabs.DATA">
+      <ChartSettingsData
+        :handleNext="handleNext"
+        :type="props.type"
+        :tab="tab"
+      />
+    </v-window-item>
+    <v-window-item :value="ChartSettingsTabs.POSITION">
+      <ChartSettingsPosition />
+    </v-window-item>
+  </v-window>
 </template>
 <style></style>

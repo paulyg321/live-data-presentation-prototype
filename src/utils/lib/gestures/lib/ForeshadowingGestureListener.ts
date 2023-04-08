@@ -1,6 +1,7 @@
 import {
   EmphasisGestureListener,
   ForeshadowingAreaSubjectType,
+  LineShape,
   startTimeoutInstance,
   type EmphasisGestureListenerConstructorArgs,
 } from "@/utils";
@@ -8,12 +9,7 @@ import {
   calculateDistance,
   containsValueLargerThanMax,
 } from "../../calculations";
-import {
-  distanceBetweenPoints,
-  type Coordinate2D,
-  type Dimensions,
-} from "../../chart";
-import { LineShape } from "../../chart/lib/LineChart";
+import { distanceBetweenPoints, type Coordinate2D } from "../../chart";
 import { HANDS } from "./gesture-utils";
 import {
   GestureListener,
@@ -75,6 +71,7 @@ export class ForeshadowingGestureListener extends GestureListener {
 
   private playbackController: LinearPlaybackGestureListener | undefined;
   private playbackControllerType: "relative" | "absolute" | undefined;
+  private showVisualIndicators = false;
 
   constructor({
     position,
@@ -103,6 +100,7 @@ export class ForeshadowingGestureListener extends GestureListener {
     subjects,
     mode = ForeshadowingShapes.RANGE,
     playbackControllerType,
+    eventContext,
   }: ForeshadowingGestureListenerConstructorArgs) {
     super({
       position,
@@ -112,6 +110,7 @@ export class ForeshadowingGestureListener extends GestureListener {
       canvasDimensions,
       resetKeys,
       subjects,
+      eventContext,
     });
 
     this.gestureTypes = gestureTypes;
@@ -430,123 +429,120 @@ export class ForeshadowingGestureListener extends GestureListener {
     return undefined;
   }
 
-  private renderVisualIndicators(shape: ForeshadowingShapes) {
-    if (this.context) {
-      const fillStyle = "black";
-      const opacity = 0.2;
+  private renderVisualIndicators() {
+    if (!this.showVisualIndicators) return;
 
-      this.clearCanvas();
 
-      if (
-        shape === ForeshadowingShapes.RECTANGLE &&
-        this.recentShapePositions
-      ) {
-        const rectData = this.getRectDataFromState();
+    const shape = this.currentShape;
+    const fillStyle = "black";
+    const opacity = 0.2;
 
-        if (!rectData) return;
+    this.clearCanvas();
 
-        const { coordinates, dimensions } = rectData;
-        this.drawingUtils?.modifyContextStyleAndDraw(
-          {
-            fillStyle,
-            opacity,
-          },
-          () => {
-            this.drawingUtils?.drawRect({
-              coordinates,
-              dimensions,
-              fill: true,
-            });
-          }
-        );
+    if (shape === ForeshadowingShapes.RECTANGLE && this.recentShapePositions) {
+      const rectData = this.getRectDataFromState();
 
-        const foreshadowingArea = {
-          position: coordinates,
-          dimensions: dimensions,
-        };
-        this.publishToSubjectIfExists(
-          ForeshadowingGestureListener.foreshadowingAreaSubjectKey,
-          {
-            type: ForeshadowingAreaSubjectType.RECTANGLE,
-            area: foreshadowingArea,
-          }
-        );
-      }
-      if (shape === ForeshadowingShapes.CIRCLE && this.recentShapePositions) {
-        const circleData = this.getCircleDataFromState();
+      if (!rectData) return;
 
-        if (!circleData) return;
+      const { coordinates, dimensions } = rectData;
+      this.drawingUtils?.modifyContextStyleAndDraw(
+        {
+          fillStyle,
+          opacity,
+        },
+        () => {
+          this.drawingUtils?.drawRect({
+            coordinates,
+            dimensions,
+            fill: true,
+          });
+        }
+      );
 
-        const { radius, coordinates } = circleData;
-        this.drawingUtils?.modifyContextStyleAndDraw(
-          {
-            fillStyle,
-            opacity,
-          },
-          () => {
-            this.drawingUtils?.drawCircle({
-              radius,
-              coordinates,
-              fill: true,
-            });
-          }
-        );
-        const foreshadowingArea = {
-          position: coordinates,
-          radius,
-        };
-        this.publishToSubjectIfExists(
-          ForeshadowingGestureListener.foreshadowingAreaSubjectKey,
-          {
-            type: ForeshadowingAreaSubjectType.CIRCLE,
-            area: foreshadowingArea,
-          }
-        );
-      }
+      const foreshadowingArea = {
+        position: coordinates,
+        dimensions: dimensions,
+      };
+      this.publishToSubjectIfExists(
+        ForeshadowingGestureListener.foreshadowingAreaSubjectKey,
+        {
+          type: ForeshadowingAreaSubjectType.RECTANGLE,
+          area: foreshadowingArea,
+        }
+      );
+    }
+    if (shape === ForeshadowingShapes.CIRCLE && this.recentShapePositions) {
+      const circleData = this.getCircleDataFromState();
 
-      if (shape === ForeshadowingShapes.RANGE && this.recentRangePositions) {
-        const lineWidth = 15;
-        const rangeData = this.getRangeDataFromState();
+      if (!circleData) return;
 
-        if (!rangeData) return;
+      const { radius, coordinates } = circleData;
+      this.drawingUtils?.modifyContextStyleAndDraw(
+        {
+          fillStyle,
+          opacity,
+        },
+        () => {
+          this.drawingUtils?.drawCircle({
+            radius,
+            coordinates,
+            fill: true,
+          });
+        }
+      );
+      const foreshadowingArea = {
+        position: coordinates,
+        radius,
+      };
+      this.publishToSubjectIfExists(
+        ForeshadowingGestureListener.foreshadowingAreaSubjectKey,
+        {
+          type: ForeshadowingAreaSubjectType.CIRCLE,
+          area: foreshadowingArea,
+        }
+      );
+    }
 
-        const { startCoordinates, endCoordinates } = rangeData;
+    if (shape === ForeshadowingShapes.RANGE && this.recentRangePositions) {
+      const lineWidth = 15;
+      const rangeData = this.getRangeDataFromState();
 
-        this.drawingUtils?.modifyContextStyleAndDraw(
-          {
-            lineWidth,
-            strokeStyle: "red",
-            opacity,
-          },
-          () => {
-            this.drawingUtils?.drawLine({
-              coordinates: [startCoordinates, endCoordinates],
-              shape: LineShape.SHARP,
-            });
-          }
-        );
+      if (!rangeData) return;
 
-        const foreshadowingArea = {
-          position: {
-            x: startCoordinates.x,
-            y: 0,
-          },
-          dimensions: {
-            width: Math.abs(startCoordinates.x - endCoordinates.x),
-            height: this.canvasDimensions.height,
-          },
-        };
+      const { startCoordinates, endCoordinates } = rangeData;
 
-        this.publishToSubjectIfExists(
-          ForeshadowingGestureListener.foreshadowingAreaSubjectKey,
-          {
-            type: ForeshadowingAreaSubjectType.RANGE,
-            area: foreshadowingArea,
-          }
-        );
-      }
+      this.drawingUtils?.modifyContextStyleAndDraw(
+        {
+          lineWidth,
+          strokeStyle: "red",
+          opacity,
+        },
+        () => {
+          this.drawingUtils?.drawLine({
+            coordinates: [startCoordinates, endCoordinates],
+            shape: LineShape.SHARP,
+          });
+        }
+      );
 
-      this.renderReferencePoints(false);
+      const foreshadowingArea = {
+        position: {
+          x: startCoordinates.x,
+          y: 0,
+        },
+        dimensions: {
+          width: Math.abs(startCoordinates.x - endCoordinates.x),
+          height: this.canvasDimensions.height,
+        },
+      };
+
+      this.publishToSubjectIfExists(
+        ForeshadowingGestureListener.foreshadowingAreaSubjectKey,
+        {
+          type: ForeshadowingAreaSubjectType.RANGE,
+          area: foreshadowingArea,
+        }
+      );
     }
   }
 
@@ -607,8 +603,7 @@ export class ForeshadowingGestureListener extends GestureListener {
                 if (this.context) {
                   if (this.currentShape === ForeshadowingShapes.RANGE) {
                     if (this.currentShape) {
-                      // this.renderReferencePoints();
-                      this.renderVisualIndicators(this.currentShape);
+                      this.showVisualIndicators = true;
                       this.placeListenerInPosition(this.currentShape);
                     }
                   }
@@ -719,7 +714,7 @@ export class ForeshadowingGestureListener extends GestureListener {
 
               if (!containsValueLargerThanMax(diffs, 30)) {
                 if (this.currentShape) {
-                  this.renderVisualIndicators(this.currentShape);
+                  this.showVisualIndicators = true;
                   this.placeListenerInPosition(this.currentShape);
                 }
               }
@@ -735,20 +730,19 @@ export class ForeshadowingGestureListener extends GestureListener {
   }
 
   private clearAllVisualIndicators() {
-    this.renderReferencePoints(true);
+    this.showVisualIndicators = false;
     this.publishToSubjectIfExists(
       ForeshadowingGestureListener.foreshadowingAreaSubjectKey,
       undefined
     );
   }
 
-  renderReferencePoints(clear = true) {
-    if (this.context) {
-      if (clear) {
-        this.clearCanvas();
-      }
-      // this.renderBorder();
-    }
+  draw() {
+    if (!this.context) return;
+    this.clearCanvas();
+    this.renderBorder();
+    this.renderVisualIndicators();
+    this.canvasListener?.draw();
   }
 
   resetHandler(): void {

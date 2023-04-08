@@ -1,5 +1,6 @@
 import * as d3 from "d3";
 import {
+  CanvasElementListener,
   // AnimatedLine,
   LegendItem,
   type Coordinate2D,
@@ -60,7 +61,6 @@ export interface NewChartArgs {
   data: any;
   field: string;
   key: string;
-  step: number;
   dataAccessor?: string;
   xField: string;
   yField: string;
@@ -70,6 +70,7 @@ export interface NewChartArgs {
   position: Coordinate2D;
   dimensions: Dimensions;
   canvasDimensions: Dimensions;
+  eventContext?: CanvasRenderingContext2D;
 }
 
 const colorArray = d3["schemeCategory10"];
@@ -89,10 +90,10 @@ const defaultMargins = 30;
 export class Chart {
   title: string;
   type: ChartType;
+  canvasListener?: CanvasElementListener;
   data: any;
   field: string;
   key: string;
-  step: number;
   dataAccessor: string | undefined;
   xField: string;
   yField: string;
@@ -134,7 +135,6 @@ export class Chart {
     data = [],
     field,
     key,
-    step,
     dataAccessor,
     xField,
     yField,
@@ -143,13 +143,13 @@ export class Chart {
     canvasDimensions,
     dimensions,
     useGroups,
+    eventContext,
   }: NewChartArgs) {
     this.title = title;
     this.type = type;
     this.data = data;
     this.field = field;
     this.key = key;
-    this.step = step;
     this.dataAccessor = dataAccessor;
     this.xField = xField;
     this.yField = yField;
@@ -158,6 +158,15 @@ export class Chart {
 
     this.position = position;
     this.dimensions = dimensions;
+    if (eventContext) {
+      this.canvasListener = new CanvasElementListener({
+        position: this.position,
+        dimensions: this.dimensions,
+        isCircle: false,
+        canvasElement: this,
+        context: eventContext,
+      });
+    }
     this.canvasDimensions = canvasDimensions;
 
     this.groupDataIntoKeyFrames();
@@ -318,6 +327,7 @@ export class Chart {
       this.chart?.updateState({
         chartDimensions: this.dimensions,
         canvasDimensions: this.canvasDimensions,
+        position: this.position,
         context,
       });
     }
@@ -361,6 +371,7 @@ export class Chart {
       this.chart?.updateState({
         chartDimensions: this.dimensions,
         canvasDimensions: this.canvasDimensions,
+        position: this.position,
         context,
       });
     }
@@ -401,6 +412,7 @@ export class Chart {
       this.chart?.updateState({
         chartDimensions: this.dimensions,
         canvasDimensions: this.canvasDimensions,
+        position: this.position,
         context,
       });
     }

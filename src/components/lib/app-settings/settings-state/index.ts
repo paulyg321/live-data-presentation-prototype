@@ -5,3 +5,4 @@ export * from "./lib/camera-settings";
 export * from "./lib/playback-component-settings";
 export * from "./lib/gesture-settings";
 export * from "./lib/legend-settings";
+export * from "./lib/stories-settings";
