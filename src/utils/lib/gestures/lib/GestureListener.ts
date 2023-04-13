@@ -38,8 +38,7 @@ export interface GestureListenerConstructorArgs {
   }[];
   resetKeys?: Set<string>;
   subjects?: GestureListenerSubjectMap;
-  context?: CanvasRenderingContext2D;
-  eventContext?: CanvasRenderingContext2D;
+  drawingUtils: DrawingUtils;
 }
 
 export type GestureListenerSubjectMap = { [key: string]: Subject<any> };
@@ -56,7 +55,6 @@ export abstract class GestureListener {
   dimensions: Dimensions;
   subjects: GestureListenerSubjectMap | undefined;
   timer: Timer | undefined;
-  context: CanvasRenderingContext2D | undefined;
   canvasDimensions: Dimensions;
   // Ordered from most dominant to least dominant
   gestureSubject: Subject<any>;
@@ -74,7 +72,7 @@ export abstract class GestureListener {
 
   private gestureSubscription: Subscription | undefined;
 
-  protected drawingUtils?: DrawingUtils;
+  protected drawingUtils: DrawingUtils;
 
   constructor({
     position,
@@ -89,20 +87,17 @@ export abstract class GestureListener {
     subjects,
     // ACCEPTED VALUES - https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_code_values
     resetKeys,
-    context,
-    eventContext,
+    drawingUtils,
   }: GestureListenerConstructorArgs) {
     this.position = position;
     this.dimensions = dimensions;
-    if (eventContext) {
-      this.canvasListener = new CanvasElementListener({
-        position: this.position,
-        dimensions: this.dimensions,
-        isCircle: false,
-        canvasElement: this,
-        context: eventContext,
-      });
-    }
+    this.canvasListener = new CanvasElementListener({
+      position: this.position,
+      dimensions: this.dimensions,
+      isCircle: false,
+      canvasElement: this,
+      drawingUtils,
+    });
     this.handsToTrack = handsToTrack;
     this.gestureTypes = gestureTypes;
     // Set up listener for gesture subject
@@ -116,10 +111,7 @@ export abstract class GestureListener {
       this.resetKeys = resetKeys;
       this.setResetHandler();
     }
-    this.context = context;
-    if (context) {
-      this.drawingUtils = new DrawingUtils(context);
-    }
+    this.drawingUtils = drawingUtils;
   }
 
   private setResetHandler() {
@@ -145,11 +137,14 @@ export abstract class GestureListener {
 
     if (gestureType === SupportedGestures.POINTING) {
       /**
-       * TODO: make fingerstotrack a field variable for the class and make this method non-static 
+       * TODO: make fingerstotrack a field variable for the class and make this method non-static
        * - this allows the gesture listener to decide itself on the fingers it wants to track
        * we also won't need to pass fingersToTrack with the object
-       *  */ 
-      fingersToTrack = [HAND_LANDMARK_IDS.index_finger_tip, HAND_LANDMARK_IDS.thumb_tip];
+       *  */
+      fingersToTrack = [
+        HAND_LANDMARK_IDS.index_finger_tip,
+        HAND_LANDMARK_IDS.thumb_tip,
+      ];
     } else if (gestureType === SupportedGestures.OPEN_HAND) {
       fingersToTrack = [HAND_LANDMARK_IDS.middle_finger_tip];
     } else if (
@@ -221,34 +216,34 @@ export abstract class GestureListener {
   }
 
   protected renderBorder() {
-    if (this.context) {
-      this.drawingUtils?.drawRect({
-        context: this.context,
-        coordinates: this.position,
-        dimensions: this.dimensions,
-        stroke: true,
+    this.drawingUtils?.modifyContextStyleAndDraw(
+      {
         strokeStyle: "skyblue",
-      });
-    }
+      },
+      (context) => {
+        this.drawingUtils?.drawRect({
+          coordinates: this.position,
+          dimensions: this.dimensions,
+          stroke: true,
+          context
+        });
+      }
+    );
   }
 
-  protected clearCanvas() {
-    if (this.context) {
-      this.drawingUtils?.clearArea({
-        coordinates: { x: 0, y: 0 },
-        dimensions: this.canvasDimensions,
-      });
-    }
-  }
+  // protected clearCanvas() {
+  //   this.drawingUtils?.clearArea({
+  //     coordinates: { x: 0, y: 0 },
+  //     dimensions: this.canvasDimensions,
+  //   });
+  // }
 
-  protected clearListenerArea() {
-    if (this.context) {
-      this.drawingUtils?.clearArea({
-        coordinates: this.position,
-        dimensions: this.dimensions,
-      });
-    }
-  }
+  // protected clearListenerArea() {
+  //   this.drawingUtils?.clearArea({
+  //     coordinates: this.position,
+  //     dimensions: this.dimensions,
+  //   });
+  // }
 
   // Add method to linearListener called "canEmit" that checks if limit field variable is set
   // if its set then we compare positions to the limit to see if we're good to emit.
@@ -288,11 +283,6 @@ export abstract class GestureListener {
     if (handsToTrack) {
       this.handsToTrack = handsToTrack;
     }
-  }
-
-  setContext(ctx: CanvasRenderingContext2D) {
-    this.context = ctx;
-    this.drawingUtils = new DrawingUtils(ctx);
   }
 
   setCanvasDimensions(dimensions: Dimensions) {

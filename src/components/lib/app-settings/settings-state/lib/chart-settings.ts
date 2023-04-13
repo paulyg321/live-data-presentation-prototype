@@ -39,7 +39,6 @@ export const ChartSettings = reactive<{
   charts: Chart[];
   currentChart?: Chart;
   setCurrentChart: () => void;
-  addChart: (newChart: Chart) => void;
   changeMargins: (margin: number) => void;
   canvasKeys: string[];
   setCanvasKeys: () => void;
@@ -69,7 +68,7 @@ export const ChartSettings = reactive<{
      *
      * the keys are used to access the canvas Contexts using CanvasSettings.canvasCtx[<key>]
      */
-    this.canvasKeys = ["chart", "legend"];
+    this.canvasKeys = ["preview", "legend"];
   },
   dimensions: initialChartDimensions,
   changeDimensions(width: number) {
@@ -129,11 +128,6 @@ export const ChartSettings = reactive<{
     ? JSON.parse(localStorage.getItem("charts") || "")
     : [],
   currentChart: undefined,
-  addChart(newChart: Chart) {
-    StorySettings.currentStory?.addChart(newChart);
-    // this.charts = [...this.charts, newChart];
-    // localStorage.setItem("charts", JSON.stringify(this.charts));
-  },
   setCurrentChart() {
     this.currentChart = StorySettings.currentStory?.getChart();
 

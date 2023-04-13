@@ -98,8 +98,7 @@ export class EmphasisGestureListener extends GestureListener {
     canvasDimensions,
     subjects,
     resetKeys,
-    context,
-    eventContext,
+    drawingUtils,
   }: EmphasisGestureListenerConstructorArgs) {
     super({
       position,
@@ -109,13 +108,12 @@ export class EmphasisGestureListener extends GestureListener {
       canvasDimensions,
       resetKeys,
       subjects,
-      context,
-      eventContext,
+      drawingUtils,
     });
 
     this.gestureTypes = gestureTypes;
     this.emphasisMeter = new EmphasisMeter({
-      context,
+      drawingUtils,
       canvasDimensions,
     });
   }
@@ -184,24 +182,13 @@ export class EmphasisGestureListener extends GestureListener {
     }
   }
 
-  setContext(ctx: CanvasRenderingContext2D): void {
-    this.context = ctx;
-    if (this.canvasDimensions) {
-      this.emphasisMeter.updateState({
-        context: ctx,
-      });
-    }
-  }
-
   renderVisualIndicators() {
     this.emphasisMeter?.valueHandler(this.emphasisLevel);
   }
 
   draw() {
-    if (!this.context) return;
     this.clearCanvas();
     this.renderVisualIndicators();
-    this.canvasListener?.draw();
   }
 
   protected handleNewData(

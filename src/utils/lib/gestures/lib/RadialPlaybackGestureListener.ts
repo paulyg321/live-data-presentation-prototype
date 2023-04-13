@@ -60,7 +60,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
     mode,
     resetKeys,
     subjects,
-    eventContext,
+    drawingUtils
   }: RadialPlaybackGestureListenerConstructorArgs) {
     super({
       position,
@@ -74,7 +74,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
       canvasDimensions,
       resetKeys,
       subjects,
-      eventContext,
+      drawingUtils,
     });
 
     this.mode = mode;
@@ -132,7 +132,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
         fillStyle: "skyblue",
         fontSize,
       },
-      () => {
+      (context) => {
         this.drawingUtils?.drawText({
           coordinates: centerPoint,
           text: this.rotations.toString(),
@@ -142,6 +142,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
           yScale: (value: number) => {
             return value + fontSize / 4;
           },
+          context
         });
       }
     );
@@ -152,24 +153,23 @@ export class RadialPlaybackGestureListener extends GestureListener {
     const angle = this.currentAngle;
     const centerPoint = this.getCenterPoint();
     const endAngle = this.angleStack.length > 0 ? angle * (Math.PI / 180) : 0;
-    if (this.context) {
-      this.drawingUtils?.modifyContextStyleAndDraw(
-        {
-          fillStyle: "#90EE90",
-          opacity: 0.3,
-        },
-        () => {
-          this.drawingUtils?.drawCircle({
-            coordinates: centerPoint,
-            radius: this.dimensions.width / 2,
-            startAngle: 0,
-            endAngle,
-            fill: true,
-            drawLineToCenter: true,
-          });
-        }
-      );
-    }
+    this.drawingUtils?.modifyContextStyleAndDraw(
+      {
+        fillStyle: "#90EE90",
+        opacity: 0.3,
+      },
+      (context) => {
+        this.drawingUtils?.drawCircle({
+          coordinates: centerPoint,
+          radius: this.dimensions.width / 2,
+          startAngle: 0,
+          endAngle,
+          fill: true,
+          drawLineToCenter: true,
+          context
+        });
+      }
+    );
   }
 
   private renderAnimationContext() {
@@ -182,7 +182,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
         opacity: 0.3,
         lineWidth: 10,
       },
-      () => {
+      (context) => {
         this.drawingUtils?.drawCircle({
           coordinates: centerPoint,
           radius: this.dimensions.width / 2,
@@ -190,6 +190,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
           endAngle,
           stroke: true,
           drawLineToCenter: true,
+          context
         });
       }
     );
@@ -281,12 +282,12 @@ export class RadialPlaybackGestureListener extends GestureListener {
       {
         strokeStyle: "skyblue",
       },
-      () => {
+      (context) => {
         this.drawingUtils?.drawCircle({
-          context: this.context,
           coordinates: centerPoint,
           radius: this.dimensions.width / 2,
           stroke: true,
+          context
         });
       }
     );
@@ -361,13 +362,9 @@ export class RadialPlaybackGestureListener extends GestureListener {
   }
 
   draw() {
-    if (!this.context) return;
-
-    this.clearCanvas();
     this.renderCenterPoint();
     this.renderCurrentState();
     this.renderBorder();
     this.renderAnimationContext();
-    this.canvasListener?.draw();
   }
 }

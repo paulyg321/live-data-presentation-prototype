@@ -1,6 +1,26 @@
-import { Story } from "@/utils";
+import { ChartTypeValue, ListenerType, Story } from "@/utils";
 import { reactive } from "vue";
 import { ChartSettings } from "./chart-settings";
+
+export const widgetIconMap = {
+  [ChartTypeValue.BAR]: "mdi-chart-bar",
+  [ChartTypeValue.LINE]: "mdi-chart-line",
+  [ChartTypeValue.SCATTER]: "mdi-chart-scatter-plot",
+  [ListenerType.TEMPORAL]: "mdi-play-box",
+  [ListenerType.RADIAL]: "mdi-play-circle",
+  [ListenerType.FORESHADOWING]: "mdi-crystal-ball",
+};
+
+function getStoredStories() {
+  // TODO: Store story details in local storage. Like the LAYERS using the key of the story and retrieve existing layers using key as well.
+  // if (localStorage.getItem("stories")) {
+  //   return (JSON.parse(localStorage.getItem("stories") ?? "[]") as any[]).map(
+  //     (story) => new Story(story)
+  //   );
+  // }
+
+  return [];
+}
 
 export const StorySettings = reactive<{
   stories: Story[];
@@ -9,7 +29,7 @@ export const StorySettings = reactive<{
   addNewStory: (title: string) => number;
   setCurrentStory: (index: number) => void;
 }>({
-  stories: [],
+  stories: getStoredStories(),
   currentStory: undefined,
   currentStoryIndex: undefined,
   setCurrentStory(index: number) {
@@ -24,6 +44,7 @@ export const StorySettings = reactive<{
         title,
       }),
     ];
+    // localStorage.setItem("stories", JSON.stringify(this.stories));
     const newStoryIndex = this.stories.length - 1;
     this.setCurrentStory(newStoryIndex);
     return newStoryIndex;

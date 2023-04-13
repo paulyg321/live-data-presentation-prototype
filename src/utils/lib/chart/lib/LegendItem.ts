@@ -91,11 +91,6 @@ export class LegendItem {
     this.legendSubject = legendSubject;
   }
 
-  setContext(ctx: CanvasRenderingContext2D) {
-    this.context = ctx;
-    this.drawingUtils = new DrawingUtils(ctx);
-  }
-
   updateState({
     position,
     color,
@@ -193,7 +188,7 @@ export class LegendItem {
         {
           fillStyle: this.color,
         },
-        () => {
+        (context) => {
           this.drawingUtils?.drawRect({
             coordinates: this.position!,
             dimensions: {
@@ -201,6 +196,7 @@ export class LegendItem {
               height: 20,
             },
             fill: true,
+            context
           });
         }
       );
@@ -210,10 +206,11 @@ export class LegendItem {
           fontSize: 20,
           fillStyle: this.color,
         },
-        () => {
+        (context) => {
           this.drawingUtils?.drawText({
             coordinates: { x: this.position!.x + 40, y: this.position!.y + 17 },
             text: this.label,
+            context
           });
         }
       );

@@ -29,7 +29,7 @@ export interface ScatterPlotConstructorArgs {
   canvasDimensions: Dimensions;
   chartDimensions: Dimensions;
   position: Coordinate2D;
-  context: CanvasRenderingContext2D;
+  drawingUtils: DrawingUtils;
   keyframes: string[];
   affect?: Affect;
 }
@@ -39,7 +39,6 @@ export class ScatterPlot {
   canvasDimensions: Dimensions;
   chartDimensions: Dimensions;
   position: Coordinate2D;
-  context: CanvasRenderingContext2D;
   drawingUtils: DrawingUtils;
 
   items: Record<string, { color: string; states: ScatterPlotItemState[] }>;
@@ -63,15 +62,14 @@ export class ScatterPlot {
     canvasDimensions,
     chartDimensions,
     position,
-    context,
+    drawingUtils,
     keyframes,
   }: ScatterPlotConstructorArgs) {
     this.items = items;
     this.canvasDimensions = canvasDimensions;
     this.chartDimensions = chartDimensions;
     this.position = position;
-    this.context = context;
-    this.drawingUtils = new DrawingUtils(this.context);
+    this.drawingUtils = drawingUtils;
     this.keyframes = keyframes;
     this.setStateCount();
     this.setStates("initialize");
@@ -82,15 +80,18 @@ export class ScatterPlot {
   updateState({
     chartDimensions,
     canvasDimensions,
-    context,
+    drawingUtils,
     extent,
     affect,
-    position
+    position,
   }: Partial<ScatterPlotConstructorArgs> & {
     extent?: number;
   }) {
     if (chartDimensions) {
-      this.chartDimensions = chartDimensions;
+      this.chartDimensions = {
+        ...this.canvasDimensions,
+        ...chartDimensions,
+      };
       this.setScales();
     }
     if (position) {
@@ -100,9 +101,8 @@ export class ScatterPlot {
     if (canvasDimensions) {
       this.canvasDimensions = canvasDimensions;
     }
-    if (context) {
-      this.context = context;
-      this.drawingUtils = new DrawingUtils(this.context);
+    if (drawingUtils) {
+      this.drawingUtils = drawingUtils;
     }
     if (extent) {
       this.animationExtent = extent;
@@ -448,19 +448,25 @@ export class ScatterPlot {
     /**
      * -------------------- DRAW AXES --------------------
      * */
-    drawXAxis(this.context, xScale, range.yRange[0], range.xRange, 12);
-    drawYAxis(this.context, yScale, range.xRange[0], range.yRange, 12);
+    drawXAxis(this.drawingUtils, xScale, range.yRange[0], range.xRange, 10, 4);
+    drawYAxis(this.drawingUtils, yScale, range.xRange[0], range.yRange, 12, 5);
 
     // Draw extra axes for small multiple view
     if (isRectGesture) {
       drawXAxis(
-        this.context,
+        this.drawingUtils,
         xScaleNext,
         range.yRange[0],
         range.xRangeNext,
         12
       );
-      drawYAxis(this.context, yScale, range.xRangeNext[0], range.yRange, 12);
+      drawYAxis(
+        this.drawingUtils,
+        yScale,
+        range.xRangeNext[0],
+        range.yRange,
+        12
+      );
     }
   }
 
@@ -498,7 +504,7 @@ export class ScatterPlot {
           isCurrent,
           color,
         });
-        this.drawingUtils.modifyContextStyleAndDraw(settings, () => {
+        this.drawingUtils.modifyContextStyleAndDraw(settings, (context) => {
           if (range !== undefined) {
             const dimensions = {
               width: range.xRange[1] - range.xRange[0],
@@ -508,9 +514,10 @@ export class ScatterPlot {
               x: range.xRange[0],
               y: range.yRange[1],
             };
-            this.drawingUtils.clearAndClipRect({
+            this.drawingUtils.clipRect({
               dimensions,
               coordinates,
+              context,
             });
           }
           this.drawingUtils.drawCircle({
@@ -520,6 +527,7 @@ export class ScatterPlot {
             radius,
             fill,
             stroke,
+            context,
           });
         });
       }
@@ -658,6 +666,7 @@ export class ScatterPlot {
                 width * 0.5,
               y: this.position.y + this.chartDimensions.height * 0.6,
             },
+            context: ctx
           });
         }
       );
@@ -665,7 +674,6 @@ export class ScatterPlot {
   }
 
   draw() {
-    this.context.save();
     const { selectedItemsKeys, unselectedItemsKeys } = this.getItemKeys();
     const foreshadowing = this.foreshadowingSettings;
     const range = this.getRange(!!foreshadowing);
@@ -682,14 +690,6 @@ export class ScatterPlot {
       ({ xScale, yScale, xScaleNext } = this.getForeshadowingScales());
     }
 
-    this.drawingUtils.clearArea({
-      coordinates: {
-        x: 0,
-        y: 0,
-      },
-      dimensions: this.canvasDimensions,
-    });
-
     this.drawAxes({
       xScale,
       yScale,
@@ -699,10 +699,13 @@ export class ScatterPlot {
     });
 
     if (isRangeGesture) {
-      this.drawingUtils.clearAndClipRect({
-        dimensions: foreshadowing.area.dimensions ?? { width: 0, height: 0 },
-        coordinates: foreshadowing.area.position,
-      });
+      this.drawingUtils.drawInContext((context) => {
+        this.drawingUtils.clipRect({
+          dimensions: foreshadowing.area.dimensions ?? { width: 0, height: 0 },
+          coordinates: foreshadowing.area.position,
+          context,
+        });
+      })
     }
 
     // Draw Points
@@ -716,8 +719,6 @@ export class ScatterPlot {
       isRangeGesture,
       isRectGesture,
     });
-
-    this.context.restore();
 
     this.drawKeyframeValue();
   }

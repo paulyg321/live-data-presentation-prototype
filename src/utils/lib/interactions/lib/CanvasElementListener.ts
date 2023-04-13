@@ -1,6 +1,6 @@
 import { calculateDistance, isInBound } from "../../calculations";
 import type { Chart, Coordinate2D, Dimensions } from "../../chart";
-import { DrawingUtils } from "../../drawing";
+import type { DrawingUtils } from "../../drawing";
 import type {
   EmphasisGestureListener,
   ForeshadowingGestureListener,
@@ -13,6 +13,7 @@ export enum CanvasEvent {
   MOUSE_DOWN = "mousedown",
   MOUSE_UP = "mouseup",
   MOUSE_MOVE = "mousemove",
+  CLICK = "click",
 }
 
 export interface AnchorData {
@@ -23,7 +24,6 @@ export interface AnchorData {
 export class CanvasElementListener {
   private position: Coordinate2D;
   private dimensions: Dimensions;
-  // private eventHandlers?: Record<CanvasEvent, (val?: any) => void>;
   private isCircle: boolean;
   private canvasElement:
     | LinearPlaybackGestureListener
@@ -41,12 +41,6 @@ export class CanvasElementListener {
     lastPosition: { x: 0, y: 0 },
   };
   private drawingUtils: DrawingUtils;
-  // private resizeAnchor: AnchorData;
-  // private deleteAnchor: AnchorData;
-  // private dragRegion: {
-  //   position: Coordinate2D;
-  //   dimensions: Dimensions;
-  // };
   private anchorPadding: number;
 
   constructor({
@@ -54,7 +48,7 @@ export class CanvasElementListener {
     dimensions,
     isCircle,
     canvasElement,
-    context,
+    drawingUtils,
   }: {
     position: Coordinate2D;
     dimensions: Dimensions;
@@ -66,14 +60,14 @@ export class CanvasElementListener {
       | ForeshadowingGestureListener
       | GestureListener
       | EmphasisGestureListener;
-    context: CanvasRenderingContext2D;
+      drawingUtils: DrawingUtils;
   }) {
     this.position = position;
     this.dimensions = dimensions;
     this.isCircle = isCircle;
     this.canvasElement = canvasElement;
     this.anchorPadding = 10;
-    this.drawingUtils = new DrawingUtils(context);
+    this.drawingUtils = drawingUtils;
   }
 
   updateState({
@@ -231,20 +225,17 @@ export class CanvasElementListener {
   }
 
   draw() {
-    this.drawingUtils.clearArea({
-      coordinates: { x: 0, y: 0 },
-      dimensions: this.canvasElement.canvasDimensions,
-    });
     this.drawingUtils.modifyContextStyleAndDraw(
       {
         lineDash: [3, 3],
         strokeStyle: "steelblue",
       },
-      () => {
+      (context) => {
         this.drawingUtils.drawRect({
           coordinates: this.position,
           dimensions: this.dimensions,
           stroke: true,
+          context
         });
       }
     );
@@ -252,11 +243,12 @@ export class CanvasElementListener {
       {
         fillStyle: "grey",
       },
-      () => {
+      (context) => {
         this.drawingUtils.drawCircle({
           coordinates: this.getResizeAnchorData().position,
           radius: this.getResizeAnchorData().radius,
           fill: true,
+          context
         });
       }
     );
@@ -264,11 +256,12 @@ export class CanvasElementListener {
       {
         fillStyle: "red",
       },
-      () => {
+      (context) => {
         this.drawingUtils.drawCircle({
           coordinates: this.getDeleteAnchorData().position,
           radius: this.getDeleteAnchorData().radius,
           fill: true,
+          context
         });
       }
     );

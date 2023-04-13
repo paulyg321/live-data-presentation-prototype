@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import * as monaco from "monaco-editor";
-import { Chart, ChartTypeValue, type ChartType } from "@/utils";
+import { Chart, ChartTypeValue, DrawingUtils, type ChartType } from "@/utils";
 import _ from "lodash";
 import {
   CanvasSettings,
@@ -13,8 +13,8 @@ import {
 
 type ChartSettingProps = {
   type?: ChartType;
+  handleNext?: () => void;
   tab?: string;
-  handleNext: () => void;
 };
 const props = defineProps<ChartSettingProps>();
 
@@ -56,7 +56,11 @@ function createChart() {
     xField.value &&
     yField.value
   ) {
-    StorySettings.currentStory.addChart(
+    const drawingUtils = CanvasSettings.generalDrawingUtils;
+    if (!drawingUtils) return;
+
+    StorySettings.currentStory.addLayer(
+      chartType.value.value,
       new Chart({
         title: StorySettings.currentStory?.title,
         type: chartType.value,
@@ -71,7 +75,7 @@ function createChart() {
         dimensions: initialChartDimensions,
         canvasDimensions: initialCanvasDimensions,
         useGroups: useGroups.value,
-        eventContext: CanvasSettings.canvasCtx["events"] ?? undefined,
+        drawingUtils,
       })
     );
     resetForm();
@@ -112,7 +116,9 @@ async function handleSave() {
 
   if (hasRequiredFields) {
     createChart();
-    props.handleNext();
+    if (props.handleNext) {
+      props.handleNext();
+    }
   }
 }
 
@@ -146,22 +152,27 @@ function setJsonEditor() {
   }
 }
 
-watch([() => StorySettings.currentStory, () => props.tab], () => {
-  const existingChart = StorySettings.currentStory?.getChart();
-  if (existingChart) {
-    ChartSettings.setCurrentChart();
-    monacoEditor.setValue(JSON.stringify(existingChart.data, null, 2));
-    chartData.value = existingChart.data;
-    chartType.value = existingChart.type;
-    keyframe_field.value = existingChart.field;
-    unique_key.value = existingChart.key;
-    dataAccessor.value = existingChart.dataAccessor;
-    xField.value = existingChart.xField;
-    yField.value = existingChart.yField;
-    zField.value = existingChart.zField;
-    useGroups.value = existingChart.useGroups;
+watch(
+  () => props.tab,
+  () => {
+    if (props.tab) {
+      const existingChart = StorySettings.currentStory?.getChart();
+      if (existingChart) {
+        ChartSettings.setCurrentChart();
+        monacoEditor.setValue(JSON.stringify(existingChart.data, null, 2));
+        chartData.value = existingChart.data;
+        chartType.value = existingChart.type;
+        keyframe_field.value = existingChart.field;
+        unique_key.value = existingChart.key;
+        dataAccessor.value = existingChart.dataAccessor;
+        xField.value = existingChart.xField;
+        yField.value = existingChart.yField;
+        zField.value = existingChart.zField;
+        useGroups.value = existingChart.useGroups;
+      }
+    }
   }
-});
+);
 
 watch(
   () => props.type,
@@ -172,68 +183,86 @@ watch(
 
 onMounted(() => {
   setJsonEditor();
+  if (props.tab) {
+    const existingChart = StorySettings.currentStory?.getChart();
+    if (existingChart) {
+      ChartSettings.setCurrentChart();
+      monacoEditor.setValue(JSON.stringify(existingChart.data, null, 2));
+      chartData.value = existingChart.data;
+      chartType.value = existingChart.type;
+      keyframe_field.value = existingChart.field;
+      unique_key.value = existingChart.key;
+      dataAccessor.value = existingChart.dataAccessor;
+      xField.value = existingChart.xField;
+      yField.value = existingChart.yField;
+      zField.value = existingChart.zField;
+      useGroups.value = existingChart.useGroups;
+    }
+  }
 });
 </script>
 <!---------------------------------------------------------------------------------------------------------->
 <template>
   <div class="text-body pl-5 pt-5">Please provide chart data</div>
   <v-card color="lighten-1">
-    <v-container class="mb-5">
-      <v-row align="start">
-        <v-col lg="12">
-          <!-- <p class="text-body-1 mb-3">Chart Data</p> -->
-          <v-card class="json-container">
-            <div ref="dataInput" class="h-100"></div>
-          </v-card>
-        </v-col>
-        <v-col lg="12">
-          <v-select
-            label="Keyframe Field"
-            :items="columnOptions"
-            v-model="keyframe_field"
-          ></v-select>
-        </v-col>
-        <v-col lg="12">
-          <v-select
-            label="Unique Key Field"
-            :items="columnOptions"
-            v-model="unique_key"
-          ></v-select>
-        </v-col>
-        <v-col lg="12">
-          <v-select
-            v-if="chartType?.value === ChartTypeValue.LINE"
-            label="Data Accessor"
-            :hint="`${dataAccessor}`"
-            :items="columnOptions"
-            v-model="dataAccessor"
-          ></v-select>
-        </v-col>
-        <v-col lg="12">
-          <v-text-field label="X Field" v-model="xField"></v-text-field>
-        </v-col>
-        <v-col lg="12">
-          <v-text-field label="Y Field" v-model="yField"></v-text-field>
-        </v-col>
-        <v-col lg="12">
-          <v-text-field
-            v-if="chartType?.value === ChartTypeValue.SCATTER"
-            label="Z Field"
-            v-model="zField"
-          ></v-text-field>
-        </v-col>
-        <v-col lg="12" v-if="zField !== undefined">
-          <input type="checkbox" id="checkbox" v-model="useGroups" />
-          <label for="checkbox">Group Items by Z Field</label>
-        </v-col>
-      </v-row>
-      <v-row>
-        <v-spacer></v-spacer>
-        <v-col lg="3">
-          <v-btn @click="handleSave" color="primary"> Save </v-btn>
-        </v-col>
-      </v-row>
-    </v-container>
+    <form @submit.prevent="handleSave">
+      <v-container class="mb-5">
+        <v-row align="start">
+          <v-col lg="12">
+            <!-- <p class="text-body-1 mb-3">Chart Data</p> -->
+            <v-card class="json-container">
+              <div ref="dataInput" class="h-100"></div>
+            </v-card>
+          </v-col>
+          <v-col lg="12">
+            <v-select
+              label="Keyframe Field"
+              :items="columnOptions"
+              v-model="keyframe_field"
+            ></v-select>
+          </v-col>
+          <v-col lg="12">
+            <v-select
+              label="Unique Key Field"
+              :items="columnOptions"
+              v-model="unique_key"
+            ></v-select>
+          </v-col>
+          <v-col lg="12">
+            <v-select
+              v-if="chartType?.value === ChartTypeValue.LINE"
+              label="Data Accessor"
+              :hint="`${dataAccessor}`"
+              :items="columnOptions"
+              v-model="dataAccessor"
+            ></v-select>
+          </v-col>
+          <v-col lg="12">
+            <v-text-field label="X Field" v-model="xField"></v-text-field>
+          </v-col>
+          <v-col lg="12">
+            <v-text-field label="Y Field" v-model="yField"></v-text-field>
+          </v-col>
+          <v-col lg="12">
+            <v-text-field
+              v-if="chartType?.value === ChartTypeValue.SCATTER"
+              label="Z Field"
+              v-model="zField"
+            ></v-text-field>
+          </v-col>
+          <v-col lg="12" v-if="zField !== undefined">
+            <input type="checkbox" id="checkbox" v-model="useGroups" />
+            <label for="checkbox">Group Items by Z Field</label>
+          </v-col>
+        </v-row>
+        <v-row v-if="!props.tab">
+          <v-spacer></v-spacer>
+          <v-col lg="3">
+            <v-btn type="submit" color="primary"> Save </v-btn>
+          </v-col>
+        </v-row>
+      </v-container>
+    </form>
   </v-card>
 </template>
 <!---------------------------------------------------------------------------------------------------------->

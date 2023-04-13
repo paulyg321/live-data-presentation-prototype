@@ -47,7 +47,7 @@ export class LinearPlaybackGestureListener extends GestureListener {
     emitRange,
     resetKeys,
     subjects,
-    eventContext,
+    drawingUtils,
   }: LinearPlaybackGestureListenerConstructorArgs) {
     super({
       position,
@@ -58,7 +58,7 @@ export class LinearPlaybackGestureListener extends GestureListener {
       canvasDimensions,
       resetKeys,
       subjects,
-      eventContext,
+      drawingUtils,
     });
 
     this.emitRange = emitRange;
@@ -159,8 +159,6 @@ export class LinearPlaybackGestureListener extends GestureListener {
   }
 
   draw() {
-    this.clearCanvas();
     this.renderBorder();
-    this.canvasListener?.draw();
   }
 }

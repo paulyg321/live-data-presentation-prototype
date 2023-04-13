@@ -4,7 +4,7 @@ import { isInBound } from "../../calculations";
 import {
   defaultScale,
   DrawingUtils,
-  type DrawCircleArgs,
+  LineShape,
   type DrawRectArgs,
   type ModifyContextStyleArgs,
 } from "../../drawing";
@@ -17,7 +17,12 @@ import type {
   ScaleFn,
 } from "../types";
 import { NON_FOCUSED_COLOR } from "./Chart";
-import { drawXAxis, drawYAxis } from "./draw-axes";
+import { drawXAxis } from "./draw-axes";
+
+// excluded
+const MAX_DOMAIN_Y = 6;
+// included
+const MIN_DOMAIN_Y = 1;
 
 export interface BarChartItemState {
   data: Coordinate2D;
@@ -29,7 +34,7 @@ export interface BarChartConstructorArgs {
   canvasDimensions: Dimensions;
   chartDimensions: Dimensions;
   position: Coordinate2D;
-  context: CanvasRenderingContext2D;
+  drawingUtils: DrawingUtils;
   keyframes: string[];
 }
 
@@ -38,7 +43,6 @@ export class BarChart {
   canvasDimensions: Dimensions;
   chartDimensions: Dimensions;
   position: Coordinate2D;
-  context: CanvasRenderingContext2D;
   drawingUtils: DrawingUtils;
 
   items: Record<string, { color: string; states: BarChartItemState[] }>;
@@ -59,15 +63,14 @@ export class BarChart {
     canvasDimensions,
     chartDimensions,
     position,
-    context,
     keyframes,
+    drawingUtils,
   }: BarChartConstructorArgs) {
     this.items = items;
     this.canvasDimensions = canvasDimensions;
     this.chartDimensions = chartDimensions;
     this.position = position;
-    this.context = context;
-    this.drawingUtils = new DrawingUtils(this.context);
+    this.drawingUtils = drawingUtils;
     this.keyframes = keyframes;
     this.setStateCount();
     this.setStates("initialize");
@@ -78,14 +81,17 @@ export class BarChart {
   updateState({
     chartDimensions,
     canvasDimensions,
-    context,
+    drawingUtils,
     extent,
     position,
   }: Partial<BarChartConstructorArgs> & {
     extent?: number;
   }) {
     if (chartDimensions) {
-      this.chartDimensions = chartDimensions;
+      this.chartDimensions = {
+        ...this.canvasDimensions,
+        ...chartDimensions,
+      };
       this.setScales();
     }
     if (position) {
@@ -95,9 +101,8 @@ export class BarChart {
     if (canvasDimensions) {
       this.canvasDimensions = canvasDimensions;
     }
-    if (context) {
-      this.context = context;
-      this.drawingUtils = new DrawingUtils(this.context);
+    if (drawingUtils) {
+      this.drawingUtils = drawingUtils;
     }
     if (extent) {
       this.animationExtent = extent;
@@ -106,6 +111,31 @@ export class BarChart {
 
   setForeshadowing(foreshadowingSettings?: ForeshadowingSettings) {
     this.foreshadowingSettings = foreshadowingSettings;
+  }
+
+  getForeshadowingInfo() {
+    const isRectGesture =
+      this.foreshadowingSettings?.type ===
+      ForeshadowingAreaSubjectType.RECTANGLE;
+    const isRangeGesture =
+      this.foreshadowingSettings?.type === ForeshadowingAreaSubjectType.RANGE;
+    const isCircleGesture =
+      this.foreshadowingSettings?.type === ForeshadowingAreaSubjectType.CIRCLE;
+
+    const bounds = this.foreshadowingSettings?.area;
+
+    const info = {
+      bounds,
+      isRangeGesture,
+      isRectGesture,
+      isCircleGesture,
+      isInBound: (coordinate: Coordinate2D) => {
+        if (!bounds) return false;
+        return isInBound(coordinate, bounds);
+      },
+    };
+
+    return info;
   }
 
   toggleSelection(key: string) {
@@ -124,14 +154,8 @@ export class BarChart {
     nextState,
   }: {
     interpolateStep: number;
-    currentState: {
-      x: any;
-      y: any;
-    };
-    nextState?: {
-      x: any;
-      y: any;
-    };
+    currentState: Coordinate2D;
+    nextState?: Coordinate2D;
   }) {
     if (!nextState) return currentState;
     return {
@@ -260,8 +284,8 @@ export class BarChart {
         end: position.x + (dimensions.width - dimensions.margin.right),
       },
       y: {
-        start: position.y + dimensions.height - dimensions.margin.bottom,
-        end: position.y + dimensions.margin.top,
+        end: position.y + dimensions.height - dimensions.margin.bottom,
+        start: position.y + dimensions.margin.top,
       },
     };
   }
@@ -288,7 +312,8 @@ export class BarChart {
     const flattenedStates = states.flat(1);
 
     const xDomain = d3.extent(flattenedStates, xAccessor);
-    const yDomain = [5, 0];
+    // Adjust based on where you want to start and end;
+    const yDomain = [MIN_DOMAIN_Y, MAX_DOMAIN_Y];
 
     return {
       xDomain,
@@ -320,7 +345,6 @@ export class BarChart {
 
     if (isSelected && isCurrent) {
       settings.fill = true;
-
       settings.fillStyle = color;
       settings.lineWidth = 0;
       settings.opacity = 0.7;
@@ -357,141 +381,308 @@ export class BarChart {
      * -------------------- DRAW AXES --------------------
      * */
     const FONT_SIZE = 12;
-    drawXAxis(this.context, xScale, range.yRange[0], range.xRange, FONT_SIZE);
+    drawXAxis(
+      this.drawingUtils,
+      xScale,
+      range.yRange[1],
+      range.xRange,
+      FONT_SIZE
+    );
   }
 
-  drawRects({
+  createRectDataFromCoordinate({
+    coordinate,
+    yScale = defaultScale,
+    xScale = defaultScale,
+  }: {
+    coordinate: Coordinate2D;
+    xScale?: (value: number) => number;
+    yScale?: (value: number) => number;
+  }) {
+    const margin = 5;
+    const nextRectPosition = {
+      y: coordinate.y + 1,
+    };
+
+    const top = yScale(coordinate.y);
+    const bottom = yScale(nextRectPosition.y) - margin;
+    const left = xScale(0);
+    const right = xScale(coordinate.x);
+
+    const topLeft = {
+      x: left,
+      y: top,
+    };
+
+    const topRight = {
+      x: right,
+      y: top,
+    };
+    const bottomLeft = {
+      x: left,
+      y: bottom,
+    };
+    const bottomRight = {
+      x: right,
+      y: bottom,
+    };
+
+    const rectDimensions = {
+      height: yScale(nextRectPosition.y) - yScale(coordinate.y) - margin,
+      width: xScale(coordinate.x) - xScale(0),
+    };
+
+    return {
+      rectDimensions,
+      topLeft,
+      topRight,
+      bottomLeft,
+      bottomRight,
+    };
+  }
+
+  drawBars({
     rectData,
     xScale,
     yScale,
     isSelected,
-    isCurrent,
-    range,
   }: {
     rectData: {
       label: string;
-      coordinates: Coordinate2D;
+      currentState: Coordinate2D;
       color: string;
-      currentState?: Coordinate2D;
+      nextState?: Coordinate2D;
+      isForeshadowed: boolean;
     }[];
     isSelected: boolean;
-    isCurrent: boolean;
     xScale: ScaleFn;
     yScale: any;
-    range?: {
-      xRange: [number, number];
-      yRange: [number, number];
-    };
   }) {
     rectData.forEach(
       ({
         label,
         color,
-        coordinates,
-        currentState
+        nextState,
+        currentState,
+        isForeshadowed,
       }: {
         label: string;
         color: string;
-        coordinates: Coordinate2D;
-        currentState?: Coordinate2D;
+        nextState?: Coordinate2D;
+        currentState: Coordinate2D;
+        isForeshadowed: boolean;
       }) => {
-        if (coordinates) {
-          const rectDimensions = {
-            height: yScale(coordinates.y) - yScale(coordinates.y + 1) + 5,
-            width: xScale(coordinates.x),
-          };
+        const { fill, stroke, ...settings } = this.getRectSettings({
+          isSelected,
+          isCurrent: true,
+          color,
+        });
 
-          const { fill, stroke, ...settings } = this.getRectSettings({
-            isSelected,
-            isCurrent,
-            color,
-          });
-          this.drawingUtils.modifyContextStyleAndDraw(settings, () => {
+        const currentRank = currentState.y;
+        const nextRank = nextState?.y;
+        const isSamePosition =
+          Math.floor(nextRank ?? -1) === Math.floor(currentRank);
+        const {
+          rectDimensions: currentRectDimensions,
+          topLeft: currentTopLeft,
+          topRight: currentTopRight,
+          bottomRight: currentBottomRight,
+        } = this.createRectDataFromCoordinate({
+          coordinate: currentState,
+          xScale,
+          yScale,
+        });
+
+        this.drawingUtils.modifyContextStyleAndDraw(
+          settings,
+          (context, key) => {
+            this.clipDrawingArea(context);
             this.drawingUtils.drawRect({
-              coordinates: {
-                x: 0,
-                y: coordinates.y,
-              },
-              xScale,
-              yScale,
-              dimensions: rectDimensions,
+              coordinates: currentTopLeft,
+              dimensions: currentRectDimensions,
               fill,
               stroke,
+              context,
+              key,
             });
+          },
+          ["preview"]
+        );
+
+        const textPosition = {
+          x: currentTopLeft.x + currentRectDimensions.height * 1.25,
+          y: currentTopLeft.y + currentRectDimensions.height * 0.625,
+        };
+
+        this.drawingUtils.modifyContextStyleAndDraw(
+          {
+            fillStyle: "white",
+            fontSize: this.chartDimensions.width * 0.04,
+            opacity: 1,
+            textAlign: "left",
+          },
+          (context) => {
+            this.clipDrawingArea(context);
+            this.drawingUtils.drawText({
+              coordinates: textPosition,
+              text: label,
+              context,
+            });
+          }
+        );
+
+        const circleRadius = currentRectDimensions.height * 0.325;
+        const rankLabelPosition = {
+          x: currentTopLeft.x + circleRadius * 2 + 5,
+          y: currentTopLeft.y + currentRectDimensions.height * 0.625,
+        };
+
+        this.drawingUtils.modifyContextStyleAndDraw(
+          {
+            fillStyle: "white",
+            opacity: 1,
+          },
+          (context) => {
+            this.clipDrawingArea(context);
+            this.drawingUtils.drawCircle({
+              coordinates: {
+                ...rankLabelPosition,
+                y: currentTopLeft.y + 5 + currentRectDimensions.height * 0.4,
+              },
+              radius: circleRadius,
+              fill: true,
+              context,
+            });
+          }
+        );
+
+        this.drawingUtils.modifyContextStyleAndDraw(
+          {
+            fillStyle: color,
+            fontSize: this.chartDimensions.width * 0.04,
+            opacity: 1,
+            textAlign: "center",
+          },
+          (context) => {
+            this.clipDrawingArea(context);
+            const drawTextData = {
+              coordinates: rankLabelPosition,
+              text: Math.floor(currentRank).toString(),
+              context,
+            };
+
+            this.drawingUtils.drawText(drawTextData);
+          }
+        );
+
+        if (isForeshadowed && nextState && nextRank) {
+          const nextPositionOffChart = nextRank >= MAX_DOMAIN_Y;
+          const {
+            rectDimensions: nextDimensions,
+            topRight: nextTopRight,
+            bottomRight: nextBottomRight,
+          } = this.createRectDataFromCoordinate({
+            coordinate: nextState,
+            xScale,
+            yScale,
           });
 
-          const textPosition = {
-            x: xScale(18000),
-            y: yScale(coordinates.y) + rectDimensions.height * 0.625,
+          const margin = 30;
+          const arrowLength = 50;
+          let arrowTo = {
+            x: nextTopRight.x + margin,
+            y: nextTopRight.y + nextDimensions.height * 0.5,
           };
+
+          let arrowFrom = {
+            x: nextTopRight.x + arrowLength + margin,
+            y: nextTopRight.y + nextDimensions.height * 0.5,
+          };
+
+          if (nextPositionOffChart) {
+            const { x, y } = this.getBounds();
+            const chartMidPoint = x.start + (x.end - x.start) / 2;
+            const chartEnd = y.start + (y.end - y.start);
+            arrowFrom = {
+              x: chartMidPoint,
+              y: chartEnd - arrowLength - margin,
+            };
+            arrowTo = {
+              x: chartMidPoint,
+              y: chartEnd - margin,
+            };
+          }
 
           this.drawingUtils.modifyContextStyleAndDraw(
             {
-              fillStyle: "white",
-              fontSize: 12,
+              strokeStyle: "white",
               opacity: 1,
-              textAlign: "left",
             },
-            () => {
-              this.drawingUtils.drawText({
-                coordinates: textPosition,
-                text: label,
+            (context) => {
+              this.drawingUtils.drawArrow({
+                from: arrowFrom,
+                to: arrowTo,
+                arrowWidth: nextDimensions.height * 0.6,
+                context,
               });
             }
           );
 
-          const rankLabelPosition = {
-            x: xScale(10000),
-            y: yScale(coordinates.y) + rectDimensions.height * 0.625,
-          };
-
           this.drawingUtils.modifyContextStyleAndDraw(
             {
-              fillStyle: "white",
-              opacity: 1,
+              strokeStyle: color,
+              opacity: 0.7,
             },
-            () => {
-              this.drawingUtils.drawCircle({
-                coordinates: {
-                  ...rankLabelPosition,
-                  y: yScale(coordinates.y) + 5 + rectDimensions.height * 0.625,
-                },
-                radius: 12,
-                fill: true,
+            (context) => {
+              this.drawingUtils.drawArrow({
+                from: arrowFrom,
+                to: arrowTo,
+                arrowWidth: nextDimensions.height * 0.5,
+                context,
               });
             }
           );
 
-          const useImplicit = !isCurrent && coordinates.y > 5;
+          let lineData = [nextTopRight, nextBottomRight];
+
+          // If its off chart, show next rect length on the same y position not the next one
+          if (nextPositionOffChart) {
+            lineData = [
+              {
+                ...currentTopRight,
+                x: nextTopRight.x,
+              },
+              {
+                ...currentBottomRight,
+                x: nextBottomRight.x,
+              },
+            ];
+          }
 
           this.drawingUtils.modifyContextStyleAndDraw(
             {
-              fillStyle: useImplicit ? "white" : color,
-              fontSize: useImplicit ? 16 : 12,
-              opacity: 1,
-              textAlign: useImplicit ? "left" : "center",
+              strokeStyle: "white",
+              lineWidth: 6,
             },
-            () => {
-              const foreshadowLabelPosition = {
-                x: xScale(currentState?.x ?? 0) + 10,
-                y: yScale(currentState?.y ?? 0) + rectDimensions.height / 2,
-              };
-
-              let drawTextData = {
-                coordinates: rankLabelPosition,
-                text: Math.floor(coordinates.y).toString(),
-              };
-
-              if (useImplicit) {
-                drawTextData = {
-                  coordinates: foreshadowLabelPosition,
-                  text: `${label} moves to position ${Math.floor(
-                    coordinates.y
-                  ).toString()}`,
-                };
-              }
-
-              this.drawingUtils.drawText(drawTextData);
+            (context) => {
+              this.drawingUtils.drawLine({
+                coordinates: lineData,
+                shape: LineShape.SHARP,
+                context,
+              });
+            }
+          );
+          this.drawingUtils.modifyContextStyleAndDraw(
+            {
+              strokeStyle: color,
+              lineWidth: 2,
+            },
+            (context) => {
+              this.drawingUtils.drawLine({
+                coordinates: lineData,
+                shape: LineShape.SHARP,
+                context,
+              });
             }
           );
         }
@@ -504,32 +695,16 @@ export class BarChart {
     xScale,
     yScale,
     range,
-    isForeshadowing,
-    isRectGesture,
   }: {
     keys: string[];
     xScale: ScaleFn;
     yScale: ScaleFn;
     range: ChartRangeType;
-    isForeshadowing: boolean;
-    isRectGesture: boolean;
   }) {
+    const { isInBound: isInForeshadowingBounds } = this.getForeshadowingInfo();
+
     const isSelected = true;
     const selectedItems = _.pick(this.items, keys);
-    let foreshadowedRects: {
-      currentStateData: BarChartItemState;
-      nextStateData: BarChartItemState | undefined;
-      interpolatedData: {
-        x: any;
-        y: any;
-      };
-      color: string;
-      label: string;
-    }[] = [];
-
-    let hasNextState = false;
-
-    let currentStateRange: ChartRangeType | undefined;
 
     const extent = this.getExtentBasedOnInterpolateStrategy();
 
@@ -549,9 +724,9 @@ export class BarChart {
           nextStateData = states.find(
             (state: BarChartItemState) => state.keyframe === nextKeyframe
           );
-          hasNextState = true;
         }
 
+        // SET DEFAULT FOR DATA POINTS THAT DON'T HAVE A VALUE AT THE CURRENT KEYFRAME
         if (!currentStateData?.data) {
           currentStateData = {
             data: { x: 0, y: 300 },
@@ -565,92 +740,41 @@ export class BarChart {
           nextState: nextStateData?.data,
         });
 
+        const { topLeft, topRight, bottomRight, bottomLeft } =
+          this.createRectDataFromCoordinate({
+            coordinate: currentStateData.data,
+            xScale,
+            yScale,
+          });
+
+        // All 4 corners fall in bounds to be foreshadowed
+        const isForeshadowed = [
+          topLeft,
+          topRight,
+          bottomRight,
+          bottomLeft,
+        ].reduce((isForeshadowed: boolean, corner: Coordinate2D) => {
+          return isForeshadowed && isInForeshadowingBounds(corner);
+        }, true);
+
         const rectData = {
-          currentStateData,
-          nextStateData,
-          interpolatedData,
+          currentState: interpolatedData,
+          nextState: nextStateData?.data,
+          isForeshadowed,
           color,
           label,
         };
-
-        const rectDimensions = {
-          height:
-            yScale(currentStateData.data.y) -
-            yScale(currentStateData.data.y + 1) +
-            5,
-          width: xScale(currentStateData.data.x),
-        };
-
-        const rectCorners = [
-          { x: xScale(0), y: yScale(currentStateData.data.y) },
-          {
-            x: xScale(0),
-            y: yScale(currentStateData.data.y) + rectDimensions.height,
-          },
-          {
-            x: xScale(0) + rectDimensions.width,
-            y: yScale(currentStateData.data.y),
-          },
-          {
-            x: xScale(0) + rectDimensions.width,
-            y: yScale(currentStateData.data.y) + rectDimensions.height,
-          },
-        ];
-
-        const isInForeshadowingBounds = rectCorners.reduce(
-          (isBounded: boolean, currentCorner: Coordinate2D) => {
-            if (isRectGesture) {
-              const bounds = {
-                position: this.foreshadowingSettings!.area.position,
-                dimensions: this.foreshadowingSettings!.area.dimensions,
-              };
-              const isWithinBounds = isInBound(currentCorner, bounds);
-              if (isWithinBounds) {
-                return isBounded;
-              }
-            }
-            return false;
-          },
-          true
-        );
-
-        if (isInForeshadowingBounds) {
-          foreshadowedRects = [...foreshadowedRects, rectData];
-        }
 
         return rectData;
       }
     );
 
-    // ------------- DRAW NORMAL ----------------------
-    this.drawRects({
-      rectData: selectedRects.map((rect) => ({
-        label: rect.label,
-        color: rect.color,
-        coordinates: rect.interpolatedData,
-      })),
+    this.drawBars({
+      rectData: selectedRects,
       xScale,
       yScale,
       isSelected,
-      isCurrent: true,
-      range: currentStateRange,
     });
-
-    // ------------- DRAW NEXT STATE ----------------------
-    if (isForeshadowing && hasNextState) {
-      this.drawRects({
-        rectData: foreshadowedRects.map((rect) => ({
-          color: rect.color,
-          coordinates: rect.nextStateData!.data,
-          label: rect.label,
-          currentState: rect.currentStateData.data,
-        })),
-        xScale,
-        yScale,
-        isSelected,
-        isCurrent: false,
-      });
-    }
   }
 
   drawKeyframeValue() {
@@ -664,51 +788,31 @@ export class BarChart {
           fillStyle: "red",
           textAlign: "right",
         },
-        () => {
+        (context) => {
           this.drawingUtils.drawText({
             text: keyframe,
             coordinates: {
               x:
+                this.position.x +
                 this.chartDimensions.width -
                 (this.chartDimensions.margin?.right ?? 0) -
                 textPadding,
               y:
+                this.position.y +
                 this.chartDimensions.height -
                 (this.chartDimensions.margin?.bottom ?? 0) -
                 textPadding,
             },
+            context,
           });
         }
       );
     }
   }
 
-  draw() {
-    this.context.save();
-    const { selectedItemsKeys, unselectedItemsKeys } = this.getItemKeys();
-    const foreshadowing = this.foreshadowingSettings;
+  clipDrawingArea(context: CanvasRenderingContext2D) {
     const range = this.getRange();
-    const isRectGesture =
-      foreshadowing?.type === ForeshadowingAreaSubjectType.RECTANGLE;
-
-    const xScale = this.xScale;
-    const yScale = this.yScale;
-
-    this.drawingUtils.clearArea({
-      coordinates: {
-        x: 0,
-        y: 0,
-      },
-      dimensions: this.canvasDimensions,
-    });
-
-    this.drawAxes({
-      xScale,
-      yScale,
-      range,
-    });
-
-    this.drawingUtils.clearAndClipRect({
+    this.drawingUtils.drawRect({
       dimensions: {
         width: range.xRange[1] - range.xRange[0],
         height: range.yRange[1] - range.yRange[0],
@@ -717,6 +821,22 @@ export class BarChart {
         x: range.xRange[0],
         y: range.yRange[0],
       },
+      context,
+      clip: true,
+    });
+  }
+
+  draw() {
+    const { selectedItemsKeys, unselectedItemsKeys } = this.getItemKeys();
+    const range = this.getRange();
+
+    const xScale = this.xScale;
+    const yScale = this.yScale;
+
+    this.drawAxes({
+      xScale,
+      yScale,
+      range,
     });
 
     // Draw Rects
@@ -725,11 +845,8 @@ export class BarChart {
       xScale,
       yScale,
       range,
-      isForeshadowing: !!foreshadowing,
-      isRectGesture,
     });
 
-    this.context.restore();
     this.drawKeyframeValue();
   }
 }

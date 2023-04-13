@@ -1,4 +1,4 @@
-import type { Dimensions } from "@/utils";
+import { DrawingUtils, type Dimensions } from "@/utils";
 import { reactive } from "vue";
 import { CameraSettings } from "./camera-settings";
 
@@ -19,6 +19,12 @@ export const CanvasSettings = reactive<{
     allowMirror?: boolean
   ) => void;
   setCanvasCtx: (key: string) => void;
+  generalDrawingUtils: DrawingUtils | undefined;
+  upsertGeneralDrawingUtils: (
+    key: string,
+    context: CanvasRenderingContext2D
+  ) => void;
+  addContextToDrawingUtils: (key: string) => void;
 }>({
   dimensions: initialCanvasDimensions,
   setCanvasDimensions(width: number) {
@@ -35,7 +41,7 @@ export const CanvasSettings = reactive<{
 
     if (!context) return;
 
-    if (key === "video") {
+    if (key.includes("video")) {
       context.filter = "grayscale(1)";
       context.scale(-1, 1);
       context.translate(-this.dimensions.width, 0);
@@ -45,22 +51,54 @@ export const CanvasSettings = reactive<{
   setCanvasCtx(key: string) {
     this.canvasCtx[key] = this.canvas[key]?.getContext("2d");
   },
+  generalDrawingUtils: undefined,
+  upsertGeneralDrawingUtils(key: string, context: CanvasRenderingContext2D) {
+    if (this.generalDrawingUtils) {
+      const hasExistingContext = this.generalDrawingUtils.getContexts([key]);
+      if (hasExistingContext.length === 0) {
+        this.generalDrawingUtils.addContext({
+          key,
+          context,
+        });
+      }
+    } else {
+      this.generalDrawingUtils = new DrawingUtils([
+        {
+          key,
+          context,
+        },
+      ]);
+    }
+  },
+  addContextToDrawingUtils(key: string) {
+    const context = this.canvasCtx[key];
+    if (context) {
+      this.upsertGeneralDrawingUtils(key, context);
+      console.log(`Successfully added ${key}`);
+    } else {
+      console.log(`Failed to add ${key}`);
+    }
+  },
 });
 
 export async function renderVideoOnCanvas() {
-  if (CanvasSettings.canvas["video"] && CameraSettings.video) {
-    CanvasSettings.canvasCtx["video"]?.clearRect(
-      0,
-      0,
-      CanvasSettings.dimensions.width,
-      CanvasSettings.dimensions.height
-    );
-    CanvasSettings.canvasCtx["video"]?.drawImage(
-      CameraSettings.video,
-      0,
-      0,
-      CanvasSettings.dimensions.width,
-      CanvasSettings.dimensions.height
-    );
-  }
+  Object.entries(CanvasSettings.canvasCtx).forEach(
+    ([key, value]: [string, CanvasRenderingContext2D | null | undefined]) => {
+      if (key.includes("video") && value && CameraSettings.video) {
+        value.clearRect(
+          0,
+          0,
+          CanvasSettings.dimensions.width,
+          CanvasSettings.dimensions.height
+        );
+        value.drawImage(
+          CameraSettings.video,
+          0,
+          0,
+          CanvasSettings.dimensions.width,
+          CanvasSettings.dimensions.height
+        );
+      }
+    }
+  );
 }

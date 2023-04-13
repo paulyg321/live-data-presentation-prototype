@@ -39,7 +39,7 @@ export interface LineChartConstructorArgs {
   canvasDimensions: Dimensions;
   chartDimensions: Dimensions;
   position: Coordinate2D;
-  context: CanvasRenderingContext2D;
+  drawingUtils: DrawingUtils;
 }
 
 export class LineChart {
@@ -47,7 +47,6 @@ export class LineChart {
   canvasDimensions: Dimensions;
   chartDimensions: Dimensions;
   position: Coordinate2D;
-  context: CanvasRenderingContext2D;
   drawingUtils: DrawingUtils;
 
   items: Record<string, { color: string; states: LineItemStates }>;
@@ -74,14 +73,13 @@ export class LineChart {
     canvasDimensions,
     chartDimensions,
     position,
-    context,
+    drawingUtils,
   }: LineChartConstructorArgs) {
     this.items = items;
     this.canvasDimensions = canvasDimensions;
     this.chartDimensions = chartDimensions;
     this.position = position;
-    this.context = context;
-    this.drawingUtils = new DrawingUtils(this.context);
+    this.drawingUtils = drawingUtils;
     this.setStateCount();
     this.setStates("initialize");
     this.setScales();
@@ -91,14 +89,17 @@ export class LineChart {
   updateState({
     chartDimensions,
     canvasDimensions,
-    context,
     extent,
     position,
+    drawingUtils,
   }: Partial<LineChartConstructorArgs> & {
     extent?: number;
   }) {
     if (chartDimensions) {
-      this.chartDimensions = chartDimensions;
+      this.chartDimensions = {
+        ...this.canvasDimensions,
+        ...chartDimensions,
+      };
       this.setScales();
     }
     if (position) {
@@ -108,9 +109,8 @@ export class LineChart {
     if (canvasDimensions) {
       this.canvasDimensions = canvasDimensions;
     }
-    if (context) {
-      this.context = context;
-      this.drawingUtils = new DrawingUtils(this.context);
+    if (drawingUtils) {
+      this.drawingUtils = drawingUtils;
     }
     if (extent) {
       this.animationExtent = extent;
@@ -508,7 +508,7 @@ export class LineChart {
   }
 
   private getRange(
-    type: "default" | "small-multiple" | "foreshadow-range" = "default",
+    type: "default" | "small-multiple" | "foreshadow-range" = "default"
   ): ChartRangeType {
     const chartBounds = this.getBounds();
 
@@ -556,8 +556,9 @@ export class LineChart {
   // TODO: Return scales that plot only stuff that falls in the domain - googlw this!
   private getForeshadowingScales() {
     const { xDomain, yDomain } = this.getDomain(true);
-    const isRectGesture = this.foreshadowingSettings?.type ===
-      ForeshadowingAreaSubjectType.RECTANGLE
+    const isRectGesture =
+      this.foreshadowingSettings?.type ===
+      ForeshadowingAreaSubjectType.RECTANGLE;
     const rangeArg = isRectGesture ? "small-multiple" : "default";
     const { xRange, yRange, xRangeNext } = this.getRange(rangeArg);
 
@@ -692,19 +693,25 @@ export class LineChart {
     /**
      * -------------------- DRAW AXES --------------------
      * */
-    drawXAxis(this.context, xScale, range.yRange[0], range.xRange, 12);
-    drawYAxis(this.context, yScale, range.xRange[0], range.yRange, 12);
+    drawXAxis(this.drawingUtils, xScale, range.yRange[0], range.xRange, 12);
+    drawYAxis(this.drawingUtils, yScale, range.xRange[0], range.yRange, 12);
 
     // Draw extra axes for small multiple view
     if (isRectGesture) {
       drawXAxis(
-        this.context,
+        this.drawingUtils,
         xScaleNext,
         range.yRange[0],
         range.xRangeNext,
         12
       );
-      drawYAxis(this.context, yScale, range.xRangeNext[0], range.yRange, 12);
+      drawYAxis(
+        this.drawingUtils,
+        yScale,
+        range.xRangeNext[0],
+        range.yRange,
+        12
+      );
     }
   }
 
@@ -733,7 +740,7 @@ export class LineChart {
       isCurrent,
       color,
     });
-    this.drawingUtils.modifyContextStyleAndDraw(settings, () => {
+    this.drawingUtils.modifyContextStyleAndDraw(settings, (context) => {
       if (range !== undefined) {
         const dimensions = {
           width: range.xRange[1] - range.xRange[0],
@@ -743,9 +750,10 @@ export class LineChart {
           x: range.xRange[0],
           y: range.yRange[1],
         };
-        this.drawingUtils.clearAndClipRect({
+        this.drawingUtils.clipRect({
           dimensions,
           coordinates,
+          context
         });
       }
       coordinates.map((coordinate: Coordinate2D) => {
@@ -757,6 +765,7 @@ export class LineChart {
           radius,
           fill,
           stroke,
+          context
         });
       });
     });
@@ -839,7 +848,7 @@ export class LineChart {
 
           /**
            * Because on small multiple view (when we have isRectGesture as true,
-           * we have separate charts we only adjust our foreshadowing clip range 
+           * we have separate charts we only adjust our foreshadowing clip range
            * by the extent for other scenarios
            */
           if (!isRectGesture) {
@@ -897,13 +906,14 @@ export class LineChart {
                 isSelected: isSelected,
               }),
             },
-            () => {
+            (context) => {
               this.drawingUtils.drawLine({
                 coordinates: parsedCoordinates,
                 xScale,
                 yScale,
                 range: currentStateRange,
                 filterMode: "clip",
+                context,
               });
             }
           );
@@ -928,13 +938,14 @@ export class LineChart {
                   isSelected: isSelected,
                 }),
               },
-              () => {
+              (context) => {
                 this.drawingUtils.drawLine({
                   coordinates: parsedCoordinates,
                   xScale: xScaleNext,
                   yScale,
                   range: foreshadowingRange,
                   filterMode: "clip",
+                  context,
                 });
               }
             );
@@ -1010,7 +1021,7 @@ export class LineChart {
               isSelected: isSelected,
             }),
           },
-          () => {
+          (context) => {
             // draw our current state line
             this.drawingUtils.drawLine({
               coordinates: primaryLineCoords,
@@ -1018,6 +1029,7 @@ export class LineChart {
               yScale,
               range: currentStateRange,
               filterMode: "clip",
+              context,
             });
           }
         );
@@ -1055,7 +1067,7 @@ export class LineChart {
                 isSelected,
               }),
             },
-            () => {
+            (context) => {
               // Draw our next state line
               this.drawingUtils.drawLine({
                 coordinates: nextStateData as {
@@ -1066,6 +1078,7 @@ export class LineChart {
                 yScale,
                 range: foreshadowingRange,
                 filterMode: "clip",
+                context,
               });
             }
           );
@@ -1126,11 +1139,12 @@ export class LineChart {
               isSelected: isSelected,
             }),
           },
-          () =>
+          (context) =>
             this.drawingUtils.drawLine({
               coordinates: primaryLineCoords,
               xScale,
               yScale,
+              context,
             })
         );
 
@@ -1140,7 +1154,6 @@ export class LineChart {
   }
 
   draw() {
-    this.context.save();
     const { selectedItemsKeys, unselectedItemsKeys } = this.getItemKeys();
     const foreshadowing = this.foreshadowingSettings;
     const isRectGesture =
@@ -1156,14 +1169,6 @@ export class LineChart {
       ({ xScale, yScale, xScaleNext } = this.getForeshadowingScales());
     }
 
-    this.drawingUtils.clearArea({
-      coordinates: {
-        x: 0,
-        y: 0,
-      },
-      dimensions: this.canvasDimensions,
-    });
-
     const axesRangeArg = isRectGesture ? "small-multiple" : "default";
     const axesRange = this.getRange(axesRangeArg);
     this.drawAxes({
@@ -1175,7 +1180,8 @@ export class LineChart {
     });
 
     // Draw Lines
-    let lineRangeArg: "default" | "small-multiple" | "foreshadow-range" = "default";
+    let lineRangeArg: "default" | "small-multiple" | "foreshadow-range" =
+      "default";
     if (isRectGesture) lineRangeArg = "small-multiple";
     if (isRangeGesture) lineRangeArg = "foreshadow-range";
     const lineRange = this.getRange(lineRangeArg);
@@ -1197,7 +1203,5 @@ export class LineChart {
         yScale,
       });
     }
-
-    this.context.restore();
   }
 }

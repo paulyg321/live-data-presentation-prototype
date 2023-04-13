@@ -63,23 +63,16 @@ export const LegendSettings = reactive<{
     this.legendItems = legendItems ?? [];
   },
   drawLegendItems() {
-    const context = CanvasSettings.canvasCtx["legend"];
+    const drawingUtils = CanvasSettings.generalDrawingUtils;
+    if (!drawingUtils) return;
 
-    if (!context) return;
     const start = this.page * this.numItems;
     const end = this.page * this.numItems + this.numItems;
-    const drawingUtils = new DrawingUtils(context);
-    if (context) {
-      drawingUtils.clearArea({
-        coordinates: { x: 0, y: 0 },
-        dimensions: CanvasSettings.dimensions,
-      });
-    }
+
     this.legendItems.forEach((legendItem: LegendItem, index: number) => {
       const isInRange = index >= start && index < end;
-      if (context && isInRange) {
+      if (isInRange) {
         const displayedItemIndex = index - start;
-        legendItem.setContext(context);
         legendItem.setGestureTracker(gestureTracker.value);
         legendItem.setLegendSubject(legendSubject);
         legendItem.updateState({

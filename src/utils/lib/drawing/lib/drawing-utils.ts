@@ -9,7 +9,8 @@ export enum LineShape {
 }
 
 interface DrawingArgs {
-  context?: CanvasRenderingContext2D;
+  context: CanvasRenderingContext2D;
+  key?: string;
   coordinates: Coordinate2D;
   xScale?: (value: any) => number;
   yScale?: (value: any) => number;
@@ -23,14 +24,14 @@ interface DrawingArgs {
 }
 
 export interface ModifyContextStyleArgs {
-  context?: CanvasRenderingContext2D;
   strokeStyle?: string;
   fillStyle?: string;
   fontSize?: number;
   opacity?: number;
   lineWidth?: number;
   lineDash?: number[];
-  textAlign?: "left" | "right" | "center";
+  textAlign?: CanvasTextAlign;
+  textBaseline?: CanvasTextBaseline;
 }
 
 export interface DrawCircleArgs extends DrawingArgs {
@@ -60,9 +61,113 @@ export interface DrawLineArgs {
 }
 
 export class DrawingUtils {
-  context: CanvasRenderingContext2D;
-  constructor(context: CanvasRenderingContext2D) {
-    this.context = context;
+  contexts: { key: string; context: CanvasRenderingContext2D }[];
+  constructor(contexts: { key: string; context: CanvasRenderingContext2D }[]) {
+    this.contexts = [...contexts];
+  }
+
+  addContext(newContext: { key: string; context: CanvasRenderingContext2D }) {
+    this.contexts.push(newContext);
+  }
+
+  getContexts(filter?: string[]) {
+    let contextsToDraw = this.contexts;
+
+    if (filter) {
+      contextsToDraw = contextsToDraw.filter((ctx) => {
+        return filter.includes(ctx.key);
+      });
+    }
+
+    return contextsToDraw;
+  }
+
+  removeContext(key: string) {
+    let contextsToDraw = this.contexts;
+
+    contextsToDraw = contextsToDraw.filter((ctx) => {
+      return key !== ctx.key;
+    });
+
+    this.contexts = contextsToDraw;
+  }
+
+  drawInContext(
+    callbackFn: (context: CanvasRenderingContext2D, key: string) => void,
+    filters?: string[]
+  ) {
+    this.getContexts(filters).forEach(({ context, key }) => {
+      callbackFn(context, key);
+    });
+  }
+
+  drawArrow({
+    from,
+    to,
+    arrowWidth,
+    xScale = defaultScale,
+    yScale = defaultScale,
+    context,
+  }: {
+    from: Coordinate2D;
+    to: Coordinate2D;
+    arrowWidth: number;
+    xScale?: (value: any) => number;
+    yScale?: (value: any) => number;
+    context: CanvasRenderingContext2D;
+  }) {
+    context.save();
+    context.lineWidth = arrowWidth;
+    const scaledTo = {
+      x: xScale(to.x),
+      y: yScale(to.y),
+    };
+
+    const scaledFrom = {
+      x: xScale(from.x),
+      y: yScale(from.y),
+    };
+
+    //variables to be used when creating the arrow
+    const headlen = 10;
+    const angle = Math.atan2(
+      scaledTo.y - scaledFrom.y,
+      scaledTo.x - scaledFrom.x
+    );
+
+    //starting path of the arrow from the start square to the end square
+    //and drawing the stroke
+    context.beginPath();
+    context.moveTo(scaledFrom.x, scaledFrom.y);
+    context.lineTo(scaledTo.x, scaledTo.y);
+    // context.stroke();
+
+    //starting a new path from the head of the arrow to one of the sides of
+    //the point
+    // context.beginPath();
+    context.moveTo(scaledTo.x, scaledTo.y);
+    context.lineTo(
+      scaledTo.x - headlen * Math.cos(angle - Math.PI / 7),
+      scaledTo.y - headlen * Math.sin(angle - Math.PI / 7)
+    );
+
+    //path from the side point of the arrow, to the other side point
+    context.lineTo(
+      scaledTo.x - headlen * Math.cos(angle + Math.PI / 7),
+      scaledTo.y - headlen * Math.sin(angle + Math.PI / 7)
+    );
+
+    //path from the side point back to the tip of the arrow, and then
+    //again to the opposite side point
+    context.lineTo(scaledTo.x, scaledTo.y);
+    context.lineTo(
+      scaledTo.x - headlen * Math.cos(angle - Math.PI / 7),
+      scaledTo.y - headlen * Math.sin(angle - Math.PI / 7)
+    );
+
+    //draws the paths created above
+    context.stroke();
+    context.restore();
   }
 
   drawText({
@@ -72,17 +177,14 @@ export class DrawingUtils {
     yScale = defaultScale,
     fill = true,
     stroke = false,
+    context,
   }: DrawTextArgs) {
     if (fill) {
-      this.context.fillText(text, xScale(coordinates.x), yScale(coordinates.y));
+      context.fillText(text, xScale(coordinates.x), yScale(coordinates.y));
     }
 
     if (stroke) {
-      this.context.strokeText(
-        text,
-        xScale(coordinates.x),
-        yScale(coordinates.y)
-      );
+      context.strokeText(text, xScale(coordinates.x), yScale(coordinates.y));
     }
   }
 
@@ -97,10 +199,11 @@ export class DrawingUtils {
     stroke = false,
     clip = false,
     drawLineToCenter = false,
+    context,
   }: DrawCircleArgs) {
     if (clip) {
-      this.context.beginPath();
-      this.context.arc(
+      context.beginPath();
+      context.arc(
         xScale(coordinates.x),
         yScale(coordinates.y),
         radius,
@@ -108,12 +211,12 @@ export class DrawingUtils {
         endAngle,
         false
       );
-      this.context.clip();
+      context.clip();
       return;
     }
 
-    this.context.beginPath();
-    this.context.arc(
+    context.beginPath();
+    context.arc(
       xScale(coordinates.x),
       yScale(coordinates.y),
       radius,
@@ -123,15 +226,15 @@ export class DrawingUtils {
     );
 
     if (drawLineToCenter) {
-      this.context.lineTo(xScale(coordinates.x), yScale(coordinates.y));
+      context.lineTo(xScale(coordinates.x), yScale(coordinates.y));
     }
 
     if (fill) {
-      this.context.fill();
+      context.fill();
     }
 
     if (stroke) {
-      this.context.stroke();
+      context.stroke();
     }
   }
 
@@ -142,6 +245,7 @@ export class DrawingUtils {
     range,
     xScale = defaultScale,
     yScale = defaultScale,
+    context,
   }: {
     coordinates: { x: any; y: any }[];
     shape?: LineShape;
@@ -152,9 +256,8 @@ export class DrawingUtils {
     };
     xScale?: (value: number) => number;
     yScale?: (value: number) => number;
+    context: CanvasRenderingContext2D;
   }) {
-    if (!this.context) return;
-
     let line = d3
       .line<Coordinate2D>()
       .x((d: Coordinate2D) => xScale(d.x))
@@ -188,20 +291,21 @@ export class DrawingUtils {
           x: range.xRange[0],
           y: range.yRange[1],
         };
-        this.clearAndClipRect({
+        this.clipRect({
           dimensions,
           coordinates,
+          context,
         });
       }
     }
 
-    const drawLine = line.context(this.context);
+    const drawLine = line.context(context);
 
-    this.context.save();
-    this.context?.beginPath();
+    context.save();
+    context.beginPath();
     drawLine(coordinates);
-    this.context?.stroke();
-    this.context.restore();
+    context.stroke();
+    context.restore();
   }
 
   drawRect({
@@ -212,28 +316,30 @@ export class DrawingUtils {
     fill = false,
     stroke = false,
     clip = false,
+    context,
+    key
   }: DrawRectArgs) {
     if (clip) {
-      this.context.beginPath();
-      this.context.rect(
+      context.beginPath();
+      context.rect(
         xScale(coordinates.x),
         yScale(coordinates.y),
         dimensions.width,
         dimensions.height
       );
-      this.context.clip();
+      context.clip();
       return;
     }
 
     if (fill) {
-      this.context.fillRect(
+      context.fillRect(
         xScale(coordinates.x),
         yScale(coordinates.y),
         dimensions.width,
         dimensions.height
       );
     } else if (stroke) {
-      this.context.strokeRect(
+      context.strokeRect(
         xScale(coordinates.x),
         yScale(coordinates.y),
         dimensions.width,
@@ -247,13 +353,15 @@ export class DrawingUtils {
     dimensions,
     xScale = defaultScale,
     yScale = defaultScale,
+    context,
   }: {
     coordinates: Coordinate2D;
     dimensions: Dimensions;
     xScale?: (value: any) => number;
     yScale?: (value: any) => number;
+    context: CanvasRenderingContext2D;
   }) {
-    this.context.clearRect(
+    context.clearRect(
       xScale(coordinates.x),
       yScale(coordinates.y),
       dimensions.width,
@@ -261,16 +369,17 @@ export class DrawingUtils {
     );
   }
 
-  clearAndClipRect({
+  clipRect({
     dimensions,
     coordinates,
+    context,
   }: {
     dimensions: Dimensions;
     coordinates: Coordinate2D;
+    context: CanvasRenderingContext2D;
   }) {
-    if (!this.context) return;
     this.drawRect({
-      context: this.context,
+      context,
       coordinates,
       dimensions,
       clip: true,
@@ -297,56 +406,58 @@ export class DrawingUtils {
 
   modifyContextStyleAndDraw(
     settings: ModifyContextStyleArgs,
-    drawFn: (context: CanvasRenderingContext2D) => void
+    drawFn: (context: CanvasRenderingContext2D, key: string) => void,
+    filters?: string[]
   ) {
-    const {
-      context: contextArg,
-      fillStyle,
-      strokeStyle,
-      fontSize,
-      opacity,
-      lineWidth,
-      lineDash,
-      textAlign,
-    } = settings;
+    this.drawInContext((context: CanvasRenderingContext2D, key: string) => {
+      const {
+        fillStyle,
+        strokeStyle,
+        fontSize,
+        opacity,
+        lineWidth,
+        lineDash,
+        textAlign,
+        textBaseline,
+      } = settings;
 
-    let context = this.context;
-    if (contextArg) {
-      context = contextArg;
-    }
+      context.save();
 
-    context.save();
+      if (fillStyle) {
+        context.fillStyle = fillStyle;
+      }
 
-    if (fillStyle) {
-      context.fillStyle = fillStyle;
-    }
+      if (strokeStyle) {
+        context.strokeStyle = strokeStyle;
+      }
 
-    if (strokeStyle) {
-      context.strokeStyle = strokeStyle;
-    }
+      if (fontSize) {
+        context.font = `${fontSize}px Arial`;
+      }
 
-    if (fontSize) {
-      context.font = `${fontSize}px Arial`;
-    }
+      if (opacity) {
+        context.globalAlpha = opacity;
+      }
 
-    if (opacity) {
-      context.globalAlpha = opacity;
-    }
+      if (lineWidth) {
+        context.lineWidth = lineWidth;
+      }
 
-    if (lineWidth) {
-      context.lineWidth = lineWidth;
-    }
+      if (lineDash) {
+        context.setLineDash(lineDash);
+      }
 
-    if (lineDash) {
-      context.setLineDash(lineDash);
-    }
+      if (textAlign) {
+        context.textAlign = textAlign;
+      }
 
-    if (textAlign) {
-      context.textAlign = textAlign;
-    }
+      if (textBaseline) {
+        context.textBaseline = textBaseline;
+      }
 
-    drawFn(this.context);
+      drawFn(context, key);
 
-    context.restore();
+      context.restore();
+    }, filters);
   }
 }

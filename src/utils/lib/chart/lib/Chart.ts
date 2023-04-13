@@ -1,6 +1,7 @@
 import * as d3 from "d3";
 import {
   CanvasElementListener,
+  DrawingUtils,
   // AnimatedLine,
   LegendItem,
   type Coordinate2D,
@@ -70,7 +71,7 @@ export interface NewChartArgs {
   position: Coordinate2D;
   dimensions: Dimensions;
   canvasDimensions: Dimensions;
-  eventContext?: CanvasRenderingContext2D;
+  drawingUtils: DrawingUtils;
 }
 
 const colorArray = d3["schemeCategory10"];
@@ -117,6 +118,7 @@ export class Chart {
   yDomain: [any, any] | undefined;
   keyframeData: any;
   keyframes: string[] = [];
+  drawingUtils: DrawingUtils;
 
   /**
    * @param type the chart type
@@ -143,7 +145,7 @@ export class Chart {
     canvasDimensions,
     dimensions,
     useGroups,
-    eventContext,
+    drawingUtils,
   }: NewChartArgs) {
     this.title = title;
     this.type = type;
@@ -158,15 +160,14 @@ export class Chart {
 
     this.position = position;
     this.dimensions = dimensions;
-    if (eventContext) {
-      this.canvasListener = new CanvasElementListener({
-        position: this.position,
-        dimensions: this.dimensions,
-        isCircle: false,
-        canvasElement: this,
-        context: eventContext,
-      });
-    }
+    this.drawingUtils = drawingUtils;
+    this.canvasListener = new CanvasElementListener({
+      position: this.position,
+      dimensions: this.dimensions,
+      isCircle: false,
+      canvasElement: this,
+      drawingUtils,
+    });
     this.canvasDimensions = canvasDimensions;
 
     this.groupDataIntoKeyFrames();
@@ -291,8 +292,8 @@ export class Chart {
     this.keyframeData = groupedData;
   }
 
-  private setOrUpdateLineChart(context?: CanvasRenderingContext2D) {
-    if (this.chart === undefined && context) {
+  private setOrUpdateLineChart() {
+    if (this.chart === undefined) {
       const items = Object.entries(this.keyframeData).reduce(
         (
           chartMap: LineChartItemTypes,
@@ -319,7 +320,7 @@ export class Chart {
         canvasDimensions: this.canvasDimensions,
         chartDimensions: this.dimensions,
         position: this.position,
-        context,
+        drawingUtils: this.drawingUtils,
       });
 
       this.setLegendItems(items);
@@ -328,13 +329,13 @@ export class Chart {
         chartDimensions: this.dimensions,
         canvasDimensions: this.canvasDimensions,
         position: this.position,
-        context,
+        drawingUtils: this.drawingUtils,
       });
     }
   }
 
-  private setOrUpdateScatterPlot(context?: CanvasRenderingContext2D) {
-    if (this.chart === undefined && context) {
+  private setOrUpdateScatterPlot() {
+    if (this.chart === undefined) {
       const items = _.slice(Object.entries(this.keyframeData)).reduce(
         (chartMap: ScatterPlotItemTypes, [key, value]: [string, any]) => {
           let item_group = key;
@@ -362,7 +363,7 @@ export class Chart {
         canvasDimensions: this.canvasDimensions,
         chartDimensions: this.dimensions,
         position: this.position,
-        context,
+        drawingUtils: this.drawingUtils,
         keyframes: this.keyframes,
       });
 
@@ -372,13 +373,13 @@ export class Chart {
         chartDimensions: this.dimensions,
         canvasDimensions: this.canvasDimensions,
         position: this.position,
-        context,
+        drawingUtils: this.drawingUtils,
       });
     }
   }
 
-  private setOrUpdateBarChart(context?: CanvasRenderingContext2D) {
-    if (this.chart === undefined && context) {
+  private setOrUpdateBarChart() {
+    if (this.chart === undefined) {
       const items = Object.entries(this.keyframeData)
         .slice(0, 10)
         .reduce((chartMap: BarChartItemTypes, [key, value]: [string, any]) => {
@@ -405,7 +406,7 @@ export class Chart {
         canvasDimensions: this.canvasDimensions,
         chartDimensions: this.dimensions,
         position: this.position,
-        context,
+        drawingUtils: this.drawingUtils,
         keyframes: this.keyframes,
       });
     } else {
@@ -413,7 +414,7 @@ export class Chart {
         chartDimensions: this.dimensions,
         canvasDimensions: this.canvasDimensions,
         position: this.position,
-        context,
+        drawingUtils: this.drawingUtils,
       });
     }
   }
@@ -461,35 +462,33 @@ export class Chart {
       this.position = position;
     }
     if (dimensions) {
-      this.dimensions = dimensions;
+      this.dimensions = {
+        ...this.dimensions,
+        ...dimensions,
+      };
     }
     this.computeChartItems();
   }
 
-  setContext(
-    key: "chart" | "legend",
-    context: CanvasRenderingContext2D | null | undefined
-  ) {
-    if (context) {
-      this.computeChartItems(context);
-    }
-  }
-
-  computeChartItems(context?: CanvasRenderingContext2D) {
+  computeChartItems() {
     switch (this.type.value) {
       case ChartTypeValue.LINE: {
-        this.setOrUpdateLineChart(context);
+        this.setOrUpdateLineChart();
         break;
       }
       case ChartTypeValue.SCATTER: {
-        this.setOrUpdateScatterPlot(context);
+        this.setOrUpdateScatterPlot();
         break;
       }
       case ChartTypeValue.BAR: {
-        this.setOrUpdateBarChart(context);
+        this.setOrUpdateBarChart();
         break;
       }
       default:
     }
+  }
+
+  draw() {
+    this.chart?.draw();
   }
 }

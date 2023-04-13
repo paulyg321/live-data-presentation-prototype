@@ -1,240 +1,157 @@
 import _ from "lodash";
-import type {
-  Chart,
-  Coordinate2D,
-  Dimensions,
-  PartialCoordinate2D,
-} from "../../chart";
+import { ChartTypeValue, Chart, type Coordinate2D } from "../../chart";
 import {
   ForeshadowingGestureListener,
   ListenerType,
   RadialPlaybackGestureListener,
-  type LinearPlaybackGestureListener,
+  LinearPlaybackGestureListener,
 } from "../../gestures";
-import type { CanvasEvent } from "../../interactions";
+import { CanvasEvent } from "../../interactions";
+
+export type StoryLayer =
+  | ForeshadowingGestureListener
+  | RadialPlaybackGestureListener
+  | LinearPlaybackGestureListener
+  | Chart;
+
+export type LayerType = ChartTypeValue | ListenerType;
 
 export class Story {
   title: string;
-  chart?: Chart;
-  temporalPlaybackTracker?: LinearPlaybackGestureListener;
-  radialPlaybackTracker?: RadialPlaybackGestureListener;
-  foreshadowingTracker?: ForeshadowingGestureListener;
-  layers: [
-    string,
-    (
-      | ForeshadowingGestureListener
-      | RadialPlaybackGestureListener
-      | LinearPlaybackGestureListener
-      | Chart
-    )
-  ][] = [];
+  layers: {
+    type: LayerType;
+    id: string;
+    layer: StoryLayer;
+  }[] = [];
+  currentWidget?: {
+    type: LayerType;
+    id: string;
+    layer: StoryLayer;
+  };
 
   constructor({ title }: { title: string }) {
     this.title = title;
+    this.loadStoredLayers;
   }
 
-  addLayer(type: string, listener: any) {
-    if (type) {
-      this.layers = [[type, listener], ...this.layers];
-    }
-  }
-
-  canvasEventListener(eventType: CanvasEvent, eventData: Coordinate2D) {
-    let handled = false;
-    let currentIndex = 0;
-
-    while (!handled && currentIndex < this.layers.length) {
-      const [key, element] = this.layers[currentIndex];
-      if (element.canvasListener) {
-        const { isInBounds } = element.canvasListener.isInBounds(eventData);
-        if (isInBounds) {
-          handled = true;
+  private loadStoredLayers() {
+    const storedLayerString = localStorage.getItem(this.title);
+    if (storedLayerString) {
+      this.layers = JSON.parse(storedLayerString).map(
+        ({ layer, type }: any) => {
+          switch (type) {
+            case ChartTypeValue.BAR:
+            case ChartTypeValue.LINE:
+            case ChartTypeValue.SCATTER:
+              return new Chart(layer);
+            case ListenerType.FORESHADOWING: {
+              return new ForeshadowingGestureListener(layer);
+            }
+            case ListenerType.TEMPORAL: {
+              return new LinearPlaybackGestureListener(layer);
+            }
+            case ListenerType.RADIAL: {
+              return new RadialPlaybackGestureListener(layer);
+            }
+            default:
+              return {};
+          }
         }
-        element.canvasListener.handleEvent(eventType, eventData);
-      }
-      currentIndex += 1;
+      );
+    } else {
+      this.layers = [];
     }
   }
 
-  // CHART
-  getChartWidth() {
-    return this.chart?.dimensions.width;
+  isChartLayer(type: string) {
+    return [
+      ChartTypeValue.BAR,
+      ChartTypeValue.SCATTER,
+      ChartTypeValue.LINE,
+    ].includes(type as ChartTypeValue);
   }
 
-  getChartPosition() {
-    return this.chart?.position;
+  getCurrentWidget() {
+    return this.currentWidget;
+  }
+
+  setCurrentWidget(id?: string) {
+    if (id) {
+      this.currentWidget = this.getLayer(id);
+    } else {
+      this.currentWidget = this.getDefaultWidget();
+    }
+  }
+
+  getDefaultWidget() {
+    if (this.layers.length >= 1) {
+      return this.layers[0];
+    }
+  }
+
+  addLayer(type: LayerType, layer: StoryLayer) {
+    const id = _.uniqueId();
+    if (type) {
+      this.layers = [{ type, id, layer }, ...this.layers];
+    }
+
+    // localStorage.setItem(this.title, JSON.stringify(this.layers));
+
+    return {
+      type,
+      id,
+      layer,
+    };
+  }
+
+  removeLayer(layerId: string) {
+    const updatedLayers = this.layers.filter((layer) => layer.id !== layerId);
+    this.layers = updatedLayers;
+
+    return this.layers;
+  }
+
+  getLayer(layerId: string) {
+    return this.layers.find(({ id }) => {
+      return layerId === id;
+    });
   }
 
   getChart() {
-    return this.chart;
+    return this.layers.find(({ type }) => {
+      return this.isChartLayer(type as ChartTypeValue);
+    })?.layer as Chart;
   }
 
-  addChart(chart: Chart) {
-    this.chart = chart;
-    this.addLayer("chart", chart);
+  handleDeleteCurrentLayer(id: string) {
+    this.removeLayer(id);
+    this.setCurrentWidget();
   }
 
-  changeChartDimensions(width: number) {
-    if (!this.chart) return;
-    const newDimensions = {
-      ...this.chart?.dimensions,
-      width,
-      height: width * (3 / 4),
-    };
+  canvasEventListener(eventType: CanvasEvent, eventData: Coordinate2D) {
+    const currentWidget = this.currentWidget;
+    if (!currentWidget) return;
 
-    this.chart.updateState({
-      dimensions: newDimensions,
-    });
-    this.changeListenerDimensions(newDimensions, ListenerType.FORESHADOWING);
-  }
+    const listener = currentWidget?.layer.canvasListener;
+    const boundsInformation = listener?.isInBounds(eventData);
 
-  changePosition(coords: PartialCoordinate2D) {
-    if (!this.chart) return;
+    if (boundsInformation) {
+      const { isInDeleteBounds } = boundsInformation;
 
-    const newPosition = {
-      ...this.chart?.position,
-      ...(coords.x ? { x: coords.x } : {}),
-      ...(coords.y ? { y: coords.y } : {}),
-    };
-
-    this.chart.updateState({
-      position: newPosition,
-    });
-    this.changeListenerPosition(newPosition, ListenerType.FORESHADOWING);
-  }
-
-  private getListenerField(type?: ListenerType, field?: string) {
-    switch (type) {
-      case ListenerType.TEMPORAL:
-        return _.get(
-          this.temporalPlaybackTracker,
-          field ?? "",
-          this.temporalPlaybackTracker
-        );
-      case ListenerType.RADIAL:
-        return _.get(
-          this.radialPlaybackTracker,
-          field ?? "",
-          this.radialPlaybackTracker
-        );
-      case ListenerType.FORESHADOWING:
-        return _.get(
-          this.foreshadowingTracker,
-          field ?? "",
-          this.foreshadowingTracker
-        );
-      default:
-        break;
-    }
-  }
-
-  // temporal gesture listener
-  getListenerDimensions(type?: ListenerType) {
-    return this.getListenerField(type, "dimensions");
-  }
-
-  getListenerPosition(type?: ListenerType) {
-    return this.getListenerField(type, "position");
-  }
-
-  getListener(
-    type?: ListenerType
-  ):
-    | undefined
-    | LinearPlaybackGestureListener
-    | RadialPlaybackGestureListener
-    | ForeshadowingGestureListener {
-    return this.getListenerField(type);
-  }
-
-  addListener(
-    listener:
-      | LinearPlaybackGestureListener
-      | RadialPlaybackGestureListener
-      | ForeshadowingGestureListener,
-    type?: ListenerType
-  ) {
-    switch (type) {
-      case ListenerType.TEMPORAL:
-        this.temporalPlaybackTracker =
-          listener as LinearPlaybackGestureListener;
-        break;
-      case ListenerType.RADIAL:
-        this.radialPlaybackTracker = listener as RadialPlaybackGestureListener;
-        break;
-      case ListenerType.FORESHADOWING:
-        this.foreshadowingTracker = listener as ForeshadowingGestureListener;
-        break;
-      default:
-        break;
-    }
-
-    if (type) {
-      this.addLayer(type, listener);
-    }
-  }
-
-  removeListener(type?: ListenerType) {
-    switch (type) {
-      case ListenerType.TEMPORAL:
-        this.temporalPlaybackTracker?.unsubscribe();
-        this.temporalPlaybackTracker = undefined;
-        break;
-      case ListenerType.RADIAL:
-        this.radialPlaybackTracker?.unsubscribe();
-        this.radialPlaybackTracker = undefined;
-        break;
-      case ListenerType.FORESHADOWING:
-        this.foreshadowingTracker?.unsubscribe();
-        this.foreshadowingTracker = undefined;
-        break;
-      default:
-        break;
-    }
-  }
-
-  changeListenerDimensions(
-    dimensions: Partial<Dimensions>,
-    type?: ListenerType
-  ) {
-    const newDimensions = {
-      ...(dimensions.width ? { width: dimensions.width } : {}),
-      ...(dimensions.height ? { height: dimensions.height } : {}),
-    };
-
-    const listener = this.getListenerField(type);
-    if (listener) {
-      listener.updateState({
-        dimensions: {
-          ...listener.dimensions,
-          ...newDimensions,
-        },
-      });
-    }
-  }
-
-  changeListenerPosition(coords: PartialCoordinate2D, type?: ListenerType) {
-    const newPosition = {
-      ...(coords.x ? { x: coords.x } : {}),
-      ...(coords.y ? { y: coords.y } : {}),
-    };
-
-    const listener = this.getListenerField(type);
-    if (listener) {
-      listener.updateState({
-        position: {
-          ...listener.position,
-          ...newPosition,
-        },
-      });
+      if (isInDeleteBounds && eventType === CanvasEvent.CLICK) {
+        this.handleDeleteCurrentLayer(currentWidget.id);
+      } else {
+        listener?.handleEvent(eventType, eventData);
+      }
     }
   }
 
   draw() {
-    console.log("drawing");
-    this.chart?.chart?.draw();
-    this.getListener(ListenerType.FORESHADOWING)?.draw();
-    this.getListener(ListenerType.RADIAL)?.draw();
-    this.getListener(ListenerType.TEMPORAL)?.draw();
+    this.layers.forEach(({ layer, id }) => {
+      if (id === this.currentWidget?.id) {
+        this.currentWidget.layer.canvasListener?.draw();
+      }
+      layer.draw();
+    });
   }
 }

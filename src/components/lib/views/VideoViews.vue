@@ -4,6 +4,7 @@ import { CanvasSettings } from "../app-settings/settings-state";
 
 type VideoViewsProps = {
   className?: string;
+  id: string;
 };
 const props = defineProps<VideoViewsProps>();
 </script>
@@ -13,7 +14,7 @@ const props = defineProps<VideoViewsProps>();
     :width="CanvasSettings.dimensions.width"
     :height="CanvasSettings.dimensions.height"
     :class="className"
-    :ref="(el) => CanvasSettings.setCanvas(el, 'video')"
+    :ref="(el) => CanvasSettings.setCanvas(el, `video-${id}`)"
   ></canvas>
 </template>
 

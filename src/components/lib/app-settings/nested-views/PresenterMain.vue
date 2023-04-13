@@ -1,32 +1,23 @@
 <script setup lang="ts">
 import {
-  emphasisSubject,
   playbackSubject,
   PlaybackSubjectType,
-  ForeshadowingAreaSubjectType,
   foreshadowingAreaSubject,
-  Effect,
-  // type AnimatedLine,
   legendSubject,
-  ListenerType,
   CanvasEvent,
-  // AnimatedCircle,
 } from "@/utils";
-import { onMounted, watch, watchEffect } from "vue";
-import { useRoute } from "vue-router";
+import { onMounted, onUnmounted, watch } from "vue";
 import CanvasWrapper from "../../CanvasWrapper.vue";
 import {
   ChartSettings,
   PlaybackType,
   CanvasSettings,
-  // radialPlaybackTracker,
-  // foreshadowingTracker,
   gestureCanvasKeys,
   LegendSettings,
   StorySettings,
 } from "../settings-state";
 import VideoViews from "../../views/VideoViews.vue";
-import { LayerSettings } from "../settings-state/layer-settings";
+import AppCanvas from "../../AppCanvas.vue";
 
 // EMPHASIS CONTROLS ANIMATION
 // emphasisSubject.subscribe({
@@ -90,20 +81,24 @@ watch(
 watch(
   () => ChartSettings.currentChart,
   () => {
-    // Do whatever you need to do with canvasCtx after this
-    ChartSettings.currentChart?.setContext(
-      "chart",
-      CanvasSettings.canvasCtx["chart"]
-    );
-
     LegendSettings.initializeLegendItems();
   }
 );
 
 // TODO_Paul: Move all the draw functions in here
 function draw() {
-  StorySettings.currentStory?.draw();
-  LegendSettings.drawLegendItems();
+  const generalDrawingUtils = CanvasSettings.generalDrawingUtils;
+  if (generalDrawingUtils) {
+    generalDrawingUtils.drawInContext((context: CanvasRenderingContext2D) => {
+      generalDrawingUtils.clearArea({
+        coordinates: { x: 0, y: 0 },
+        dimensions: CanvasSettings.dimensions,
+        context,
+      });
+    });
+    StorySettings.currentStory?.draw();
+    // LegendSettings.drawLegendItems();
+  }
   requestAnimationFrame(() => draw());
 }
 
@@ -114,6 +109,7 @@ function initializeCanvasListeners() {
       CanvasEvent.MOUSE_DOWN,
       CanvasEvent.MOUSE_MOVE,
       CanvasEvent.MOUSE_UP,
+      CanvasEvent.CLICK,
     ].forEach((event: CanvasEvent) => {
       CanvasSettings.canvas.events.addEventListener(
         event,
@@ -129,8 +125,8 @@ function initializeCanvasListeners() {
 }
 
 onMounted(() => {
-  draw();
   initializeCanvasListeners();
+  draw();
 });
 </script>
 <!---------------------------------------------------------------------------------------------------------->
@@ -202,15 +198,8 @@ onMounted(() => {
           :height="CanvasSettings.dimensions.height"
           v-slot="{ className }"
         >
-          <VideoViews :className="className" />
-          <canvas
-            v-for="key in [...gestureCanvasKeys, 'chart', 'legend']"
-            v-bind:key="key"
-            :width="CanvasSettings.dimensions.width"
-            :height="CanvasSettings.dimensions.height"
-            :class="className"
-            :ref="(el) => CanvasSettings.setCanvas(el, key as unknown as string)"
-          ></canvas>
+          <VideoViews id="default" :className="className" />
+          <AppCanvas v-for="key in ['preview']" :id="key" v-bind:key="key" />
           <canvas
             :width="CanvasSettings.dimensions.width"
             :height="CanvasSettings.dimensions.height"

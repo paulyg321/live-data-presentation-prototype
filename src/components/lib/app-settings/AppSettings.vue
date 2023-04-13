@@ -4,24 +4,42 @@ import { computed, onMounted, ref, toRaw } from "vue";
 import PortalView from "../views/PortalView.vue";
 import {
   CameraSettings,
+  CanvasSettings,
+  ChartSettings,
   gestureTracker,
+  getGestureListenerResetKeys,
   renderVideoOnCanvas,
   setVideoDimensions,
   StorySettings,
+  widgetIconMap,
 } from "../app-settings/settings-state";
 
 import StoriesTabVue from "./nav-drawer-tab/StoriesTab.vue";
-import ChartSettingsTab from "./nav-drawer-tab/ChartSettingsTab.vue";
-import GestureSettingsTab from "./nav-drawer-tab/GestureSettingsTab.vue";
+import VideoSettingsTab from "./nav-drawer-tab/VideoSettingsTab.vue";
+import ChartSettingsData from "./nav-drawer-tab/chart-settings/ChartSettingsData.vue";
 import PresenterMain from "../app-settings/nested-views/PresenterMain.vue";
 // MEDIAPIPE
 import { Hands, type Results } from "@mediapipe/hands";
 
 // STATE
 import { PortalState } from "./settings-state";
-import { ChartTypeValue, ListenerType, type ChartType } from "@/utils";
-import VideoSettingsTab from "./nav-drawer-tab/VideoSettingsTab.vue";
-import LayerSettingsTab from "./nav-drawer-tab/LayerSettingsTab.vue";
+import {
+  ChartTypeValue,
+  DrawingUtils,
+  emphasisSubject,
+  foreshadowingAreaSubject,
+  ForeshadowingGestureListener,
+  ForeshadowingShapes,
+  LinearPlaybackGestureListener,
+  ListenerType,
+  playbackSubject,
+  RadialPlaybackGestureListener,
+  RadialTrackerMode,
+  SupportedGestures,
+  type ChartType,
+} from "@/utils";
+import WidgetSettingsTab from "./nav-drawer-tab/WidgetSettingsTab.vue";
+import PortalSettingsTab from "./nav-drawer-tab/PortalSettingsTab.vue";
 
 enum AvailableWidgets {
   // Not really widgets
@@ -34,6 +52,7 @@ enum AvailableWidgets {
   LINEAR_PLAYBACK = "linear-playback",
   RADIAL_PLAYBACK = "radial-playback",
   FORESHADOWING = "foreshadowing",
+  PORTALS = "portals",
 }
 
 enum SettingsTab {
@@ -41,7 +60,7 @@ enum SettingsTab {
   GESTURE_SETTINGS = "gesture-settings",
   PORTALS = "portals",
   VIDEO_SETTINGS = "video-settings",
-  LAYER_SETTINGS = "layer-settings",
+  WIDGET_SETTINGS = "widget-settings",
 }
 
 const currentTab = ref<SettingsTab | null>();
@@ -50,16 +69,19 @@ const disableChartType = computed(() => {
   return StorySettings.currentStory === undefined;
 });
 
-const gestureListenerType = ref<ListenerType | undefined>();
+function handleSaveChart() {
+  currentTab.value = SettingsTab.WIDGET_SETTINGS;
+  ChartSettings.setCurrentChart();
+}
 
 function handleChartWidget(value: SettingsTab, type?: ChartType) {
   chartType.value = type;
   currentTab.value = value;
 }
 
-function handleGestureWidget(value: SettingsTab, type?: ListenerType) {
-  gestureListenerType.value = type;
+function handleGestureWidget(value: SettingsTab, type: ListenerType) {
   currentTab.value = value;
+  addWidget(type);
 }
 
 function handleAddWidget(value: {
@@ -72,8 +94,11 @@ function handleAddWidget(value: {
       case AvailableWidgets.VIDEO:
         currentTab.value = SettingsTab.VIDEO_SETTINGS;
         break;
+      case AvailableWidgets.PORTALS:
+        currentTab.value = SettingsTab.PORTALS;
+        break;
       case AvailableWidgets.LAYERS:
-        currentTab.value = SettingsTab.LAYER_SETTINGS;
+        currentTab.value = SettingsTab.WIDGET_SETTINGS;
         break;
       case AvailableWidgets.BAR_CHART:
         handleChartWidget(SettingsTab.CHART_SETTINGS, {
@@ -94,17 +119,14 @@ function handleAddWidget(value: {
         });
         break;
       case AvailableWidgets.LINEAR_PLAYBACK:
-        handleGestureWidget(
-          SettingsTab.GESTURE_SETTINGS,
-          ListenerType.TEMPORAL
-        );
+        handleGestureWidget(SettingsTab.WIDGET_SETTINGS, ListenerType.TEMPORAL);
         break;
       case AvailableWidgets.RADIAL_PLAYBACK:
-        handleGestureWidget(SettingsTab.GESTURE_SETTINGS, ListenerType.RADIAL);
+        handleGestureWidget(SettingsTab.WIDGET_SETTINGS, ListenerType.RADIAL);
         break;
       case AvailableWidgets.FORESHADOWING:
         handleGestureWidget(
-          SettingsTab.GESTURE_SETTINGS,
+          SettingsTab.WIDGET_SETTINGS,
           ListenerType.FORESHADOWING
         );
         break;
@@ -114,6 +136,86 @@ function handleAddWidget(value: {
     }
   } else {
     currentTab.value = undefined;
+  }
+}
+
+function addWidget(type: string) {
+  const drawingUtils = CanvasSettings.generalDrawingUtils;
+  if (!drawingUtils) return;
+
+  switch (type) {
+    case ListenerType.TEMPORAL: {
+      const newListener = new LinearPlaybackGestureListener({
+        position: { x: 0, y: 0 },
+        dimensions: {
+          width: 400,
+          height: 50,
+        },
+        gestureTypes: [
+          {
+            leftHand: SupportedGestures.OPEN_HAND,
+            rightHand: SupportedGestures.OPEN_HAND,
+          },
+        ],
+        gestureSubject: gestureTracker.value.gestureSubject,
+        canvasDimensions: CanvasSettings.dimensions,
+        subjects: {
+          [LinearPlaybackGestureListener.playbackSubjectKey]: playbackSubject,
+        },
+        resetKeys: getGestureListenerResetKeys("KeyL"),
+        drawingUtils,
+      });
+
+      StorySettings.currentStory?.addLayer(type, newListener);
+
+      break;
+    }
+    case ListenerType.RADIAL: {
+      const newListener = new RadialPlaybackGestureListener({
+        position: { x: 0, y: 0 },
+        dimensions: { width: 100, height: 100 },
+        gestureSubject: gestureTracker.value.gestureSubject,
+        canvasDimensions: CanvasSettings.dimensions,
+        mode: RadialTrackerMode.NORMAL,
+        subjects: {
+          [RadialPlaybackGestureListener.playbackSubjectKey]: playbackSubject,
+        },
+        resetKeys: getGestureListenerResetKeys("KeyR"),
+        drawingUtils,
+      });
+
+      StorySettings.currentStory?.addLayer(type, newListener);
+
+      break;
+    }
+    case ListenerType.FORESHADOWING: {
+      const chart = StorySettings.currentStory?.getChart();
+      const chartPosition = chart?.position;
+      const chartDimensions = chart?.dimensions;
+      if (!chartDimensions || !chartPosition) return;
+
+      const newListener = new ForeshadowingGestureListener({
+        position: chartPosition,
+        dimensions: chartDimensions,
+        gestureSubject: gestureTracker.value.gestureSubject,
+        canvasDimensions: CanvasSettings.dimensions,
+        subjects: {
+          [ForeshadowingGestureListener.playbackSubjectKey]: playbackSubject,
+          [ForeshadowingGestureListener.emphasisSubjectKey]: emphasisSubject,
+          [ForeshadowingGestureListener.foreshadowingAreaSubjectKey]:
+            foreshadowingAreaSubject,
+        },
+        resetKeys: getGestureListenerResetKeys("KeyF"),
+        mode: ForeshadowingShapes.RECTANGLE,
+        playbackControllerType: "absolute",
+        drawingUtils,
+      });
+
+      StorySettings.currentStory?.addLayer(type, newListener);
+      break;
+    }
+    default:
+      break;
   }
 }
 
@@ -161,11 +263,11 @@ onMounted(() => {
   <v-container>
     <v-app>
       <v-navigation-drawer theme="light" rail permanent>
-        <v-list density="compact" nav @click:select="handleAddWidget">
+        <v-list density="compact" @click:select="handleAddWidget">
           <v-tooltip text="Line Chart">
             <template v-slot:activator="{ props }">
               <v-list-item
-                prepend-icon="mdi-chart-line"
+                :prepend-icon="widgetIconMap.line"
                 :value="AvailableWidgets.LINE_CHART"
                 v-bind="props"
                 :disabled="disableChartType"
@@ -177,7 +279,7 @@ onMounted(() => {
           <v-tooltip text="Scatter Plot">
             <template v-slot:activator="{ props }">
               <v-list-item
-                prepend-icon="mdi-chart-scatter-plot"
+                :prepend-icon="widgetIconMap.scatter"
                 :value="AvailableWidgets.SCATTER_PLOT"
                 v-bind="props"
                 :disabled="disableChartType"
@@ -189,7 +291,7 @@ onMounted(() => {
           <v-tooltip text="Bar Chart">
             <template v-slot:activator="{ props }">
               <v-list-item
-                prepend-icon="mdi-chart-bar"
+                :prepend-icon="widgetIconMap.bar"
                 :value="AvailableWidgets.BAR_CHART"
                 v-bind="props"
                 :disabled="disableChartType"
@@ -201,7 +303,7 @@ onMounted(() => {
           <v-tooltip text="Temporal Playback Widget">
             <template v-slot:activator="{ props }">
               <v-list-item
-                prepend-icon="mdi-play-box"
+                :prepend-icon="widgetIconMap.temporal"
                 :value="AvailableWidgets.LINEAR_PLAYBACK"
                 v-bind="props"
                 :disabled="disableChartType"
@@ -213,7 +315,7 @@ onMounted(() => {
           <v-tooltip text="Radial Playback Widget">
             <template v-slot:activator="{ props }">
               <v-list-item
-                prepend-icon="mdi-play-circle"
+                :prepend-icon="widgetIconMap.radial"
                 :value="AvailableWidgets.RADIAL_PLAYBACK"
                 v-bind="props"
                 :disabled="disableChartType"
@@ -225,12 +327,10 @@ onMounted(() => {
           <v-tooltip text="Foreshadowing Widget">
             <template v-slot:activator="{ props }">
               <v-list-item
-                prepend-icon="mdi-crystal-ball"
+                :prepend-icon="widgetIconMap.foreshadowing"
                 :value="AvailableWidgets.FORESHADOWING"
                 v-bind="props"
-                :disabled="
-                  disableChartType || !StorySettings.currentStory?.chart
-                "
+                :disabled="disableChartType"
               >
               </v-list-item>
             </template>
@@ -249,10 +349,21 @@ onMounted(() => {
             </template>
           </v-tooltip>
 
-          <v-tooltip text="Layers">
+          <v-tooltip text="Portals">
             <template v-slot:activator="{ props }">
               <v-list-item
-                prepend-icon="mdi-layers-edit"
+                prepend-icon="mdi-dock-window"
+                :value="AvailableWidgets.PORTALS"
+                v-bind="props"
+              >
+              </v-list-item>
+            </template>
+          </v-tooltip>
+
+          <v-tooltip text="Widgets">
+            <template v-slot:activator="{ props }">
+              <v-list-item
+                prepend-icon="mdi-layers"
                 :value="AvailableWidgets.LAYERS"
                 v-bind="props"
               >
@@ -262,21 +373,21 @@ onMounted(() => {
         </v-list>
       </v-navigation-drawer>
 
-      <v-navigation-drawer permanent location="left" width="300">
+      <v-navigation-drawer permanent location="right" width="300">
         <StoriesTabVue />
       </v-navigation-drawer>
-      <v-navigation-drawer permanent location="right" width="300">
-        <div v-if="currentTab === SettingsTab.CHART_SETTINGS">
-          <ChartSettingsTab :type="chartType" />
+      <v-navigation-drawer permanent location="left" width="400">
+        <div v-if="currentTab === SettingsTab.WIDGET_SETTINGS">
+          <WidgetSettingsTab />
         </div>
-        <div v-if="currentTab === SettingsTab.GESTURE_SETTINGS">
-          <GestureSettingsTab :type="gestureListenerType" />
+        <div v-if="currentTab === SettingsTab.CHART_SETTINGS">
+          <ChartSettingsData :handleNext="handleSaveChart" :type="chartType" />
         </div>
         <div v-if="currentTab === SettingsTab.VIDEO_SETTINGS">
           <VideoSettingsTab />
         </div>
-        <div v-if="currentTab === SettingsTab.LAYER_SETTINGS">
-          <LayerSettingsTab />
+        <div v-if="currentTab === SettingsTab.PORTALS">
+          <PortalSettingsTab />
         </div>
       </v-navigation-drawer>
 
@@ -285,10 +396,12 @@ onMounted(() => {
       </v-main>
     </v-app>
     <PortalView
+      id="presenter"
       :open="PortalState.presenterPortalOpen"
       :handle-close="() => PortalState.handlePresenterPortalClose()"
     />
     <PortalView
+      id="audience"
       :open="PortalState.audiencePortalOpen"
       :handle-close="() => PortalState.handleAudiencePortalClose()"
     />

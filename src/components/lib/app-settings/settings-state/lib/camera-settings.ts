@@ -51,13 +51,16 @@ watch(
 watch(
   () => CameraSettings.grayScale,
   () => {
-    if (!CanvasSettings.canvasCtx["video"]) return;
-
-    if (CameraSettings.grayScale === true) {
-      CanvasSettings.canvasCtx["video"].filter = "grayscale(1)";
-    } else {
-      CanvasSettings.canvasCtx["video"].filter = "grayscale(0)";
-    }
+    Object.entries(CanvasSettings.canvasCtx).forEach(
+      ([key, value]: [string, CanvasRenderingContext2D | null | undefined]) => {
+        if (key.includes("video") && value && CameraSettings.video) {
+          if (CameraSettings.grayScale === true) {
+            value.filter = "grayscale(1)";
+          } else {
+            value.filter = "grayscale(0)";
+          }
+        }
+      });
   }
 );
 

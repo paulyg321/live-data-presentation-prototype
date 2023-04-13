@@ -5,14 +5,13 @@ import {
 } from "@/utils";
 
 interface EmphasisMeterConstructor {
-  context?: CanvasRenderingContext2D;
   canvasDimensions: Dimensions;
+  drawingUtils: DrawingUtils;
 }
 
 export class EmphasisMeter {
-  context: CanvasRenderingContext2D | null | undefined;
   canvasDimensions: Dimensions;
-  drawingUtils?: DrawingUtils;
+  drawingUtils: DrawingUtils;
   private dimensions: Dimensions = {
     width: 50,
     height: 0,
@@ -24,12 +23,9 @@ export class EmphasisMeter {
     },
   };
 
-  constructor({ context, canvasDimensions }: EmphasisMeterConstructor) {
-    this.context = context;
+  constructor({ drawingUtils, canvasDimensions }: EmphasisMeterConstructor) {
+    this.drawingUtils = drawingUtils;
     this.canvasDimensions = canvasDimensions;
-    if (context) {
-      this.drawingUtils = new DrawingUtils(context);
-    }
   }
 
   private setDimensions(newDimensions: Partial<Dimensions>) {
@@ -46,22 +42,24 @@ export class EmphasisMeter {
   }
 
   protected clearCanvas() {
-    if (this.context) {
+    this.drawingUtils.drawInContext((context) => {
       this.drawingUtils?.clearArea({
         coordinates: { x: 0, y: 0 },
         dimensions: this.canvasDimensions,
+        context
       });
-    }
+    })
   }
 
   private draw() {
-    if (this.context) {
+    this.drawingUtils.drawInContext((context) => {
       this.drawingUtils?.clearArea({
         dimensions: this.canvasDimensions,
         coordinates: {
           x: 0,
           y: 0,
         },
+        context
       });
 
       const fillStyle = EmphasisGestureListener.getConfigValuesBasedOnRange(
@@ -72,9 +70,8 @@ export class EmphasisMeter {
         x: this.canvasDimensions.width - this.dimensions.width - padding,
         y: EmphasisGestureListener.MAX_EMPHASIS + padding,
       };
-
+  
       this.drawingUtils?.drawRect({
-        context: this.context,
         coordinates,
         dimensions: {
           ...this.dimensions,
@@ -82,17 +79,17 @@ export class EmphasisMeter {
         },
         fillStyle,
         fill: true,
+        context,
       });
-    }
+    });
   }
 
   updateState({
-    context,
+    drawingUtils,
     canvasDimensions,
   }: Partial<EmphasisMeterConstructor>) {
-    if (context) {
-      this.context = context;
-      this.drawingUtils = new DrawingUtils(context);
+    if (drawingUtils) {
+      this.drawingUtils = drawingUtils;
     }
     if (canvasDimensions) {
       this.canvasDimensions = canvasDimensions;

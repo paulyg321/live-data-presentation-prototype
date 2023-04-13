@@ -59,21 +59,23 @@ function closeMenu() {
             :close-on-content-click="false"
           >
             <v-card min-width="300">
-              <v-list>
-                <v-list-item>
-                  <v-text-field
-                    v-model="title"
-                    label="Story Title"
-                  ></v-text-field>
-                </v-list-item>
-              </v-list>
-              <v-card-actions>
-                <v-spacer></v-spacer>
-                <v-btn variant="text" @click="closeMenu"> Cancel </v-btn>
-                <v-btn color="primary" variant="tonal" @click="handleAddStory">
-                  Create
-                </v-btn>
-              </v-card-actions>
+              <form @submit.prevent="handleAddStory">
+                <v-list>
+                  <v-list-item>
+                    <v-text-field
+                      v-model="title"
+                      label="Story Title"
+                    ></v-text-field>
+                  </v-list-item>
+                </v-list>
+                <v-card-actions>
+                  <v-spacer></v-spacer>
+                  <v-btn variant="text" @click="closeMenu"> Cancel </v-btn>
+                  <v-btn color="primary" type="submit" variant="tonal">
+                    Create
+                  </v-btn>
+                </v-card-actions>
+              </form>
             </v-card>
           </v-menu>
         </v-btn>
