@@ -9,6 +9,7 @@ import {
 } from "./GestureListener";
 import { SupportedGestures } from "./handGestures";
 import { playbackSubject, PlaybackSubjectType } from "./subjects";
+import { calculateDistance } from "../../calculations";
 
 export interface LinearListenerEmitRange {
   start: Coordinate2D;
@@ -39,7 +40,7 @@ export class LinearPlaybackGestureListener extends GestureListener {
     },
     gestureTypes = [
       {
-        rightHand: SupportedGestures.POINTING,
+        rightHand: SupportedGestures.OPEN_HAND,
         leftHand: SupportedGestures.POINTING,
       },
     ],
@@ -116,10 +117,14 @@ export class LinearPlaybackGestureListener extends GestureListener {
     handCount: number
   ): void {
     const dominantHand = fingerData[this.handsToTrack.dominant];
-    // const nonDominantHand = fingerData[this.handsToTrack.nonDominant];
+
+    const isPinch = this.isPinchGesture(
+      fingerData,
+      this.handsToTrack.nonDominant
+    );
 
     // Don't want non dominant hand in the frame
-    if (!dominantHand || handCount === 2) {
+    if (!dominantHand || !isPinch) {
       return;
     }
 

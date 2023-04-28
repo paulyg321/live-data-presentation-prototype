@@ -149,12 +149,6 @@ function addWidget(type: string) {
           width: 400,
           height: 50,
         },
-        gestureTypes: [
-          {
-            leftHand: SupportedGestures.OPEN_HAND,
-            rightHand: SupportedGestures.OPEN_HAND,
-          },
-        ],
         canvasDimensions: CanvasSettings.dimensions,
         resetKeys: getGestureListenerResetKeys("KeyL"),
         drawingUtils,

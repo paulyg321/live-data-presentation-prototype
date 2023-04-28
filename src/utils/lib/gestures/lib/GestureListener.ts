@@ -7,6 +7,7 @@ import {
   SupportedGestures,
   type FingerPositionsData,
   type GestureTrackerValues,
+  calculateDistance,
 } from "@/utils";
 import type { Timer } from "d3";
 import type { Subject, Subscription } from "rxjs";
@@ -228,7 +229,7 @@ export abstract class GestureListener {
           coordinates: this.position,
           dimensions: this.dimensions,
           stroke: true,
-          context
+          context,
         });
       },
       ["presenter", "preview"]
@@ -318,6 +319,28 @@ export abstract class GestureListener {
     }
 
     return false;
+  }
+
+  protected isPinchGesture(
+    fingerData: ListenerProcessedFingerData,
+    handToTrack: HANDS
+  ) {
+    const hand = fingerData[handToTrack];
+
+    if (!hand) return false;
+
+    const [indexFinger, thumb] = hand.fingersToTrack;
+    const indexFingerPosition = hand.fingerPositions[
+      indexFinger
+    ] as Coordinate2D;
+    const thumbPosition = hand.fingerPositions[thumb] as Coordinate2D;
+
+    const { euclideanDistance } = calculateDistance(
+      indexFingerPosition,
+      thumbPosition
+    );
+
+    return euclideanDistance < 30;
   }
 
   // Whenever new gesture data comes we track the hand and gestures configured in the class

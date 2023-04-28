@@ -380,94 +380,79 @@ export class RadialPlaybackGestureListener extends GestureListener {
     handCount: number
   ): void {
     const dominantHand = fingerData[this.handsToTrack.dominant];
-    let distanceBetweenFingers = 0;
-    // const nonDominantHand = fingerData[this.handsToTrack.nonDominant];
+    const isPinch = this.isPinchGesture(
+      fingerData,
+      this.handsToTrack.nonDominant
+    );
 
-    // Don't want non dominant hand in the frame
-    if (!dominantHand || handCount === 2) {
-      return;
-    }
+    if (!dominantHand) return;
 
-    const [indexFinger, thumb] = dominantHand.fingersToTrack;
+    const [indexFinger] = dominantHand.fingersToTrack;
     const indexFingerPosition = dominantHand.fingerPositions[
       indexFinger
     ] as Coordinate2D;
-    const thumbPosition = dominantHand.fingerPositions[thumb] as Coordinate2D;
 
     if (
       indexFingerPosition.x === undefined ||
       indexFingerPosition.y === undefined
-    ) {
+    )
       return;
-    }
 
-    if (thumbPosition) {
-      ({ euclideanDistance: distanceBetweenFingers } = calculateDistance(
-        indexFingerPosition,
-        thumbPosition
-      ));
+    const isInBounds = this.isWithinObjectBounds(indexFingerPosition);
 
-      // this.convertDistanceToAffect(distanceBetweenFingers);
-    }
-
-    const canEmit = this.isWithinObjectBounds(indexFingerPosition);
-
-    if (canEmit && distanceBetweenFingers < 25) {
+    if (isInBounds && isPinch) {
       this.stroke.push(indexFingerPosition);
-    } else if (canEmit && distanceBetweenFingers > 45) {
-      if (this.stroke.length > 5) {
-        if (this.addGesture) {
-          this.strokeRecognizer.addGesture("radial", this.stroke);
+    } else if (!isPinch) {
+      if (this.stroke.length < 5) return;
+
+      if (this.addGesture) {
+        this.strokeRecognizer.addGesture("radial", this.stroke);
+        this.publishToSubjectIfExists(
+          RadialPlaybackGestureListener.snackbarSubjectKey,
+          {
+            open: true,
+            text: "Added new dialing gesture",
+            variant: "success",
+          }
+        );
+      } else {
+        const result = this.strokeRecognizer.recognize(this.stroke, false);
+        if (result.name === "radial") {
+          this.stroke.forEach((point: Coordinate2D) => {
+            CIRCLEFIT.addPoint(point.x, point.y);
+          });
+          const fit = CIRCLEFIT.compute();
+          const affect = this.convertDistanceToAffect(fit.radius);
+
           this.publishToSubjectIfExists(
-            RadialPlaybackGestureListener.snackbarSubjectKey,
+            RadialPlaybackGestureListener.playbackSubjectKey,
             {
-              open: true,
-              text: "Added new dialing gesture",
-              variant: "success",
+              type: PlaybackSubjectType.CONTINUOUS,
+              value: (percentComplete: number) => {
+                if (percentComplete === 1) {
+                  this.updateState({
+                    animationState: {
+                      isPlaying: false,
+                      extent: 0,
+                    },
+                  });
+                } else {
+                  this.updateState({
+                    animationState: {
+                      isPlaying: true,
+                      extent: percentComplete,
+                    },
+                  });
+                }
+              },
+              affect,
+              duration: 3000,
             }
           );
-        } else {
-          const result = this.strokeRecognizer.recognize(this.stroke, false);
-          if (result.name === "radial") {
-            this.stroke.forEach((point: Coordinate2D) => {
-              CIRCLEFIT.addPoint(point.x, point.y);
-            });
-            const fit = CIRCLEFIT.compute();
-            const affect = this.convertDistanceToAffect(fit.radius);
-
-            console.log({
-              result,
-              affect,
-            });
-            this.publishToSubjectIfExists(
-              RadialPlaybackGestureListener.playbackSubjectKey,
-              {
-                type: PlaybackSubjectType.CONTINUOUS,
-                value: (percentComplete: number) => {
-                  if (percentComplete === 1) {
-                    this.updateState({
-                      animationState: {
-                        isPlaying: false,
-                        extent: 0,
-                      },
-                    });
-                  } else {
-                    this.updateState({
-                      animationState: {
-                        isPlaying: true,
-                        extent: percentComplete,
-                      },
-                    });
-                  }
-                },
-                affect,
-                duration: 3000,
-              }
-            );
-            CIRCLEFIT.resetPoints();
-          }
+          CIRCLEFIT.resetPoints();
         }
       }
+
       this.stroke = [];
     }
   }
