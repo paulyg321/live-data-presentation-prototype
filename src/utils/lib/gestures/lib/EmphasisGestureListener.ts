@@ -25,7 +25,6 @@ export type EmphasisListenerAnimationRangeConfig = [
 ];
 
 export class EmphasisGestureListener extends GestureListener {
-  static emphasisSubjectKey = "emphasisSubject";
   // These can be changed if we want to support configuration of the behaviour of our emphasis
   static MAX_EMPHASIS = 150;
   static INCREMENT_BY_VALUE = 50;
@@ -96,7 +95,6 @@ export class EmphasisGestureListener extends GestureListener {
         leftHand: SupportedGestures.OPEN_HAND,
       },
     ],
-    gestureSubject,
     canvasDimensions,
     resetKeys,
     drawingUtils,
@@ -105,12 +103,8 @@ export class EmphasisGestureListener extends GestureListener {
       position,
       dimensions,
       handsToTrack,
-      gestureSubject,
       canvasDimensions,
       resetKeys,
-      subjects: {
-        [EmphasisGestureListener.emphasisSubjectKey]: emphasisSubject,
-      },
       drawingUtils,
     });
 

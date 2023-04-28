@@ -59,10 +59,6 @@ export interface ForeshadowingShapePosition {
 }
 
 export class ForeshadowingGestureListener extends GestureListener {
-  static playbackSubjectKey = "playbackSubject";
-  static emphasisSubjectKey = "emphasisSubject";
-  static foreshadowingAreaSubjectKey = "foreshadowingAreaSubject";
-
   private initialShapePositions: ForeshadowingShapePosition | undefined;
   private recentShapePositions: ForeshadowingShapePosition | undefined;
 
@@ -110,12 +106,6 @@ export class ForeshadowingGestureListener extends GestureListener {
       handsToTrack,
       canvasDimensions,
       resetKeys,
-      subjects: {
-        [ForeshadowingGestureListener.playbackSubjectKey]: playbackSubject,
-        [ForeshadowingGestureListener.foreshadowingAreaSubjectKey]:
-          foreshadowingAreaSubject,
-        [ForeshadowingGestureListener.emphasisSubjectKey]: emphasisSubject,
-      },
       drawingUtils,
     });
 
@@ -454,11 +444,6 @@ export class ForeshadowingGestureListener extends GestureListener {
     const { isRect, isCircle, isRange, rectData, circleData, rangeData } =
       this.getForeshadowingData();
 
-    console.log({
-      isRange,
-      rangeData,
-    });
-
     if (isRect && rectData) {
       const { coordinates, dimensions } = rectData;
 
@@ -757,8 +742,7 @@ export class ForeshadowingGestureListener extends GestureListener {
               }
               // Reset timer after 2 seconds so users have time to move hands out of frame;
               this.resetTimer(2000);
-            };
-
+            }
           }
         },
         timeout: 1000,

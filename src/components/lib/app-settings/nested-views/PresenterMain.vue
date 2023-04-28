@@ -83,7 +83,6 @@ playbackSubject.subscribe({
 // Foreshadowing area
 foreshadowingAreaSubject.subscribe({
   next(foreshadowingAreaValue: any) {
-    console.log(foreshadowingAreaValue);
     StorySettings.currentStory?.getCharts().forEach((chart: Chart) => {
       chart.chart?.setForeshadowing(foreshadowingAreaValue);
     });
@@ -92,7 +91,6 @@ foreshadowingAreaSubject.subscribe({
 
 legendSubject.subscribe({
   next(key: any) {
-    console.log(key);
     const charts = StorySettings.currentStory?.getCharts();
     if (!charts) return;
 

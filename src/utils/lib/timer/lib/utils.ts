@@ -24,17 +24,16 @@ export function startTimerInstance({
   timeout,
   delay,
 }: TimerInstanceArgs) {
-  function handler(elapsed: number) {
+  const timer = d3.timer((elapsed: number) => {
     const boundedTimeStep = Math.min(elapsed / timeout, 1);
 
     if (onTick) onTick(boundedTimeStep);
 
     if (boundedTimeStep === 1) {
+      timer.stop();
       if (onCompletion) onCompletion();
     }
-  }
-
-  const timer = d3.timer(handler, delay);
+  }, delay);
 
   return timer;
 }
@@ -45,17 +44,16 @@ export function startIntervalInstance({
   timeout,
   interval,
 }: IntervalInstanceArgs) {
-  function handler(elapsed: number) {
+  const timer = d3.timer((elapsed: number) => {
     const boundedTimeStep = Math.min(elapsed / timeout, 1);
 
-    if (onTick) onTick();
+    if (onTick) onTick(boundedTimeStep);
 
     if (boundedTimeStep === 1) {
+      timer.stop();
       if (onCompletion) onCompletion();
     }
-  }
-
-  const timer = d3.interval(handler, interval);
+  }, interval);
 
   return timer;
 }
@@ -64,10 +62,10 @@ export function startTimeoutInstance({
   onCompletion,
   timeout,
 }: TimeoutInstanceArgs) {
-  function handler() {
+  const timer = d3.timeout(() => {
+    timer.stop();
     onCompletion();
-  }
-  const timer = d3.timeout(handler, timeout);
+  }, timeout);
 
   return timer;
 }

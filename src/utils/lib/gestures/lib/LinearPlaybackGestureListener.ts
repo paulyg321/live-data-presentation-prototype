@@ -10,6 +10,7 @@ import {
 import { SupportedGestures } from "./handGestures";
 import { playbackSubject, PlaybackSubjectType } from "./subjects";
 import { calculateDistance } from "../../calculations";
+import { startTimeoutInstance, startTimerInstance } from "../../timer";
 
 export interface LinearListenerEmitRange {
   start: Coordinate2D;
@@ -23,14 +24,6 @@ export interface LinearPlaybackGestureListenerConstructorArgs
 }
 
 export class LinearPlaybackGestureListener extends GestureListener {
-  static playbackSubjectKey = "playbackSubject";
-  private emitRange:
-    | {
-        start: Coordinate2D;
-        end: Coordinate2D;
-      }
-    | undefined;
-
   constructor({
     position,
     dimensions,
@@ -40,12 +33,11 @@ export class LinearPlaybackGestureListener extends GestureListener {
     },
     gestureTypes = [
       {
-        rightHand: SupportedGestures.OPEN_HAND,
+        rightHand: SupportedGestures.POINTING,
         leftHand: SupportedGestures.POINTING,
       },
     ],
     canvasDimensions,
-    emitRange,
     resetKeys,
     drawingUtils,
   }: LinearPlaybackGestureListenerConstructorArgs) {
@@ -56,60 +48,85 @@ export class LinearPlaybackGestureListener extends GestureListener {
       gestureTypes,
       canvasDimensions,
       resetKeys,
-      subjects: {
-        [LinearPlaybackGestureListener.playbackSubjectKey]: playbackSubject,
-      },
       drawingUtils,
     });
-
-    this.emitRange = emitRange;
-  }
-
-  private ratioTravelledBetweenSpecifiedRange(
-    value: number,
-    range: {
-      min: number;
-      max: number;
-    }
-  ) {
-    return (value - range.min) / (range.max - range.min);
-  }
-
-  private isWithinEmitRange(
-    value: number,
-    range: {
-      min: number | undefined;
-      max: number | undefined;
-    }
-  ) {
-    if (range.min && range.max) {
-      if (range.min === range.max) return false;
-
-      return _.inRange(value, range.min, range.max);
-    }
-
-    return true;
-  }
-
-  updateState({
-    position,
-    dimensions,
-    handsToTrack,
-    emitRange,
-  }: Partial<LinearPlaybackGestureListenerConstructorArgs>): void {
-    super.updateState({
-      position,
-      dimensions,
-      handsToTrack,
-    });
-
-    if (emitRange) {
-      this.emitRange = emitRange;
-    }
   }
 
   resetHandler(): void {
-    this.emitRange = undefined;
+    this.stroke = [];
+  }
+
+  renderDetectionState() {
+    if (!this.startDetecting) return;
+
+    this.drawingUtils.modifyContextStyleAndDraw(
+      {
+        strokeStyle: "#90EE90",
+        opacity: 0.7,
+      },
+      (context) => {
+        this.drawingUtils.drawRect({
+          coordinates: this.position,
+          dimensions: this.dimensions,
+          stroke: true,
+          context,
+        });
+      },
+      ["presenter", "preview"]
+    );
+
+    this.drawingUtils.modifyContextStyleAndDraw(
+      {
+        fillStyle: "#90EE90",
+        opacity: 0.3,
+      },
+      (context) => {
+        this.drawingUtils.drawRect({
+          coordinates: this.position,
+          dimensions: {
+            ...this.dimensions,
+            width: this.dimensions.width * this.detectionExtent,
+          },
+          fill: true,
+          context,
+        });
+      },
+      ["presenter", "preview"]
+    );
+  }
+
+  handleTrigger() {
+    if (this.detectionTimer) return;
+    this.triggerDetection(5000, () => {
+      if (this.stroke.length < 5) {
+        this.stroke = [];
+        return;
+      }
+
+      if (this.addGesture) {
+        if (!this.gestureName) {
+          this.stroke = [];
+          return;
+        };
+
+        this.strokeRecognizer.addGesture(this.gestureName, this.stroke);
+        this.publishToSubjectIfExists(GestureListener.snackbarSubjectKey, {
+          open: true,
+          text: "Added new temporal playback gesture",
+          variant: "success",
+        });
+      } else {
+        const result = this.strokeRecognizer.recognize(this.stroke, false);
+        if (result.name === "temporal") {
+          this.publishToSubjectIfExists(GestureListener.playbackSubjectKey, {
+            type: PlaybackSubjectType.CONTINUOUS,
+            duration: 3000,
+          });
+        }
+      }
+
+      this.stroke = [];
+    });
   }
 
   protected handleNewData(
@@ -118,13 +135,18 @@ export class LinearPlaybackGestureListener extends GestureListener {
   ): void {
     const dominantHand = fingerData[this.handsToTrack.dominant];
 
-    const isPinch = this.isPinchGesture(
+    const trigger = this.thumbsTouch(
       fingerData,
-      this.handsToTrack.nonDominant
+      this.handsToTrack.nonDominant,
+      this.handsToTrack.dominant
     );
 
-    // Don't want non dominant hand in the frame
-    if (!dominantHand || !isPinch) {
+    if (trigger) {
+      this.handleTrigger();
+      return;
+    }
+
+    if (!dominantHand || !this.startDetecting) {
       return;
     }
 
@@ -138,32 +160,22 @@ export class LinearPlaybackGestureListener extends GestureListener {
     }
 
     const isInBounds = this.isWithinObjectBounds(fingerPosition);
-    const isInEmitRange = this.isWithinEmitRange(fingerPosition.x, {
-      min: this.emitRange?.start.x,
-      max: this.emitRange?.end.x,
-    });
 
-    const canEmit = isInBounds && isInEmitRange;
-
-    if (!canEmit) {
-      return;
+    if (isInBounds) {
+      this.stroke.push(fingerPosition);
     }
+  }
 
-    const trackingValue = this.ratioTravelledBetweenSpecifiedRange(
-      fingerPosition.x,
-      {
-        min: this.position.x,
-        max: this.position.x + this.dimensions.width,
-      }
-    );
-
+  cancelAnimation() {
     this.publishToSubjectIfExists(
-      LinearPlaybackGestureListener.playbackSubjectKey,
-      { type: PlaybackSubjectType.DISCRETE, value: trackingValue }
+      GestureListener.playbackSubjectKey,
+      undefined
     );
   }
 
   draw() {
     this.renderBorder();
+    this.renderStrokePath();
+    this.renderDetectionState();
   }
 }

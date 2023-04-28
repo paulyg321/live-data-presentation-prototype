@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ChartTypeValue, ListenerType, type ChartType } from "@/utils";
+import { ChartTypeValue, ListenerType, type ChartType, GestureListener } from "@/utils";
 import { onMounted, watch } from "vue";
 import { StorySettings } from "../settings-state";
 import { widgetIconMap } from "../settings-state";
@@ -86,8 +86,9 @@ onMounted(() => {
           </div>
           <div
             v-if="
-              StorySettings.currentStory?.currentWidget?.type ===
-              ListenerType.RADIAL
+              [ListenerType.RADIAL, ListenerType.TEMPORAL].includes(
+                StorySettings.currentStory?.currentWidget?.type as ListenerType
+              )
             "
           >
             <GestureSettings />

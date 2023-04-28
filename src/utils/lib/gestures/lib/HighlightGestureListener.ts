@@ -19,8 +19,6 @@ export interface HighlightGestureListenerConstructorArgs
 export class HighlightGestureListener extends GestureListener {
   private lastPosition?: Coordinate2D;
 
-  static highlighSubjectKey = "highlightSubject";
-
   constructor({
     position,
     dimensions,
@@ -45,9 +43,6 @@ export class HighlightGestureListener extends GestureListener {
       gestureTypes,
       canvasDimensions,
       resetKeys,
-      subjects: {
-        [HighlightGestureListener.highlighSubjectKey]: highlightSubject,
-      },
       drawingUtils,
     });
   }

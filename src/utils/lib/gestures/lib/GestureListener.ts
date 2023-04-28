@@ -8,6 +8,13 @@ import {
   type FingerPositionsData,
   type GestureTrackerValues,
   calculateDistance,
+  DollarRecognizer,
+  emphasisSubject,
+  highlightSubject,
+  foreshadowingAreaSubject,
+  playbackSubject,
+  snackbarSubject,
+  startTimerInstance,
 } from "@/utils";
 import type { Timer } from "d3";
 import type { Subject, Subscription } from "rxjs";
@@ -51,6 +58,12 @@ export interface ProcessedGestureListenerFingerData {
 }
 
 export abstract class GestureListener {
+  static snackbarSubjectKey = "snackbarSubject";
+  static playbackSubjectKey = "playbackSubject";
+  static emphasisSubjectKey = "emphasisSubject";
+  static foreshadowingAreaSubjectKey = "foreshadowingAreaSubject";
+  static highlighSubjectKey = "highlightSubject";
+
   canvasListener?: CanvasElementListener;
   position: Coordinate2D;
   dimensions: Dimensions;
@@ -71,8 +84,16 @@ export abstract class GestureListener {
         leftHand: SupportedGestures;
       }[];
 
+  stroke: Coordinate2D[] = [];
+  strokeRecognizer = new DollarRecognizer();
+  addGesture: boolean;
+  gestureName?: string;
+
+  detectionTimer: Timer | undefined;
+  startDetecting = false;
+  detectionExtent = 0;
+
   private gestureSubscription: Subscription | undefined;
-  protected addGesture: boolean;
 
   protected drawingUtils: DrawingUtils;
 
@@ -85,7 +106,13 @@ export abstract class GestureListener {
     },
     gestureTypes = [],
     canvasDimensions,
-    subjects,
+    subjects = {
+      [GestureListener.highlighSubjectKey]: highlightSubject,
+      [GestureListener.emphasisSubjectKey]: emphasisSubject,
+      [GestureListener.playbackSubjectKey]: playbackSubject,
+      [GestureListener.foreshadowingAreaSubjectKey]: foreshadowingAreaSubject,
+      [GestureListener.snackbarSubjectKey]: snackbarSubject,
+    },
     // ACCEPTED VALUES - https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_code_values
     resetKeys,
     drawingUtils,
@@ -116,6 +143,7 @@ export abstract class GestureListener {
     }
     this.drawingUtils = drawingUtils;
     this.addGesture = false;
+    this.strokeRecognizer = new DollarRecognizer();
   }
 
   private setResetHandler() {
@@ -236,6 +264,26 @@ export abstract class GestureListener {
     );
   }
 
+  renderStrokePath() {
+    if (!this.startDetecting) return;
+    this.stroke.forEach((stroke) => {
+      this.drawingUtils.modifyContextStyleAndDraw(
+        {
+          fillStyle: "skyBlue",
+          opacity: 0.8,
+        },
+        (context) => {
+          this.drawingUtils.drawCircle({
+            coordinates: stroke,
+            radius: 3,
+            context,
+            fill: true,
+          });
+        }
+      );
+    });
+  }
+
   // protected clearCanvas() {
   //   this.drawingUtils?.clearArea({
   //     coordinates: { x: 0, y: 0 },
@@ -276,6 +324,7 @@ export abstract class GestureListener {
     handsToTrack,
     canvasDimensions,
     addGesture,
+    gestureName,
   }: Partial<GestureListenerConstructorArgs> | any) {
     if (position) {
       this.position = position;
@@ -291,6 +340,9 @@ export abstract class GestureListener {
     }
     if (addGesture !== undefined) {
       this.addGesture = addGesture;
+    }
+    if (gestureName) {
+      this.gestureName = gestureName;
     }
   }
 
@@ -319,6 +371,46 @@ export abstract class GestureListener {
     }
 
     return false;
+  }
+
+  triggerDetection(duration: number, onComplete: () => void) {
+    this.startDetecting = true;
+    this.detectionTimer = startTimerInstance({
+      onTick: (elapsed?: number) => {
+        if (!elapsed) return;
+        this.detectionExtent = elapsed;
+      },
+      onCompletion: () => {
+        this.startDetecting = false;
+        this.detectionTimer = undefined;
+        this.detectionExtent = 0;
+        onComplete();
+      },
+      timeout: duration,
+    });
+  }
+
+  protected thumbsTouch(
+    fingerData: ListenerProcessedFingerData,
+    nonDominantHand: HANDS,
+    dominantHand: HANDS
+  ) {
+    const handOne = fingerData[nonDominantHand];
+    const handTwo = fingerData[dominantHand];
+
+    if (!handOne || !handTwo) return false;
+
+    const [_, thumbOne] = handOne.fingersToTrack;
+    const [__, thumbTwo] = handTwo.fingersToTrack;
+    const thumbOnePosition = handOne.fingerPositions[thumbOne] as Coordinate2D;
+    const thumbTwoPosition = handTwo.fingerPositions[thumbTwo] as Coordinate2D;
+
+    const { euclideanDistance } = calculateDistance(
+      thumbOnePosition,
+      thumbTwoPosition
+    );
+
+    return euclideanDistance < 30;
   }
 
   protected isPinchGesture(

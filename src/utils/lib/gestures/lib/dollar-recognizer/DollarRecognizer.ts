@@ -1,3 +1,4 @@
+import _ from "lodash";
 import type { Coordinate2D } from "../../../chart";
 import {
   dollar_recognizer_arrow,
@@ -155,5 +156,15 @@ export class DollarRecognizer {
   deleteUserGestures() {
     this.unistrokes.length = numUnistrokes; // clear any beyond the original set
     return numUnistrokes;
+  }
+  deleteGestureByName(gestureName: string) {
+    this.unistrokes = this.unistrokes.filter(({ name }: Unistroke) => {
+      return name !== gestureName;
+    });
+  }
+  getGestureNames() {
+    return _.uniqBy(this.unistrokes, function (stroke) {
+      return stroke.name;
+    }).map(({ name }: Unistroke) => name);
   }
 }
