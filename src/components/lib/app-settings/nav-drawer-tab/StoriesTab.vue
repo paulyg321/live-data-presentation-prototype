@@ -37,6 +37,13 @@ function closeMenu() {
           </v-img>
 
           <v-card-actions>
+            <v-btn
+              size="small"
+              color="surface-variant"
+              variant="text"
+              icon="mdi-delete"
+              @click="StorySettings.deleteStory(story.title)"
+            ></v-btn>
             <v-spacer></v-spacer>
             <v-btn
               size="small"

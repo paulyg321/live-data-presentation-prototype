@@ -1,3 +1,4 @@
+import type { Timer } from "d3";
 import * as d3 from "d3";
 import _ from "lodash";
 import { isInBound } from "../../calculations";
@@ -9,6 +10,7 @@ import {
   type ModifyContextStyleArgs,
 } from "../../drawing";
 import { ForeshadowingAreaSubjectType } from "../../gestures";
+import { startTimerInstance } from "../../timer";
 import type {
   ChartRangeType,
   Coordinate2D,
@@ -58,6 +60,10 @@ export class BarChart {
   xScale: ScaleFn = defaultScale;
   yScale: ScaleFn = defaultScale;
 
+  highlightPosition?: Coordinate2D;
+  timer?: Timer;
+  foreshadowingAnimationExtent = 1;
+
   constructor({
     items,
     canvasDimensions,
@@ -84,8 +90,10 @@ export class BarChart {
     drawingUtils,
     extent,
     position,
+    highlightPosition,
   }: Partial<BarChartConstructorArgs> & {
     extent?: number;
+    highlightPosition?: Coordinate2D;
   }) {
     if (chartDimensions) {
       this.chartDimensions = {
@@ -107,10 +115,45 @@ export class BarChart {
     if (extent) {
       this.animationExtent = extent;
     }
+    if (highlightPosition) {
+      this.highlightPosition = highlightPosition;
+    }
   }
 
   setForeshadowing(foreshadowingSettings?: ForeshadowingSettings) {
+    if (this.timer) return;
     this.foreshadowingSettings = foreshadowingSettings;
+    this.foreshadowingAnimationExtent = 0;
+    this.timer = startTimerInstance({
+      onTick: (timeStep?: number) => {
+        if (!timeStep) return;
+        this.foreshadowingAnimationExtent = timeStep;
+      },
+      onCompletion: () => {
+        this.foreshadowingAnimationExtent = 1;
+        this.timer?.stop();
+        this.timer = undefined;
+      },
+      timeout: 1000,
+    });
+    return;
+  }
+
+  getHighlightInfo() {
+    const highlightExists =
+      this.highlightPosition &&
+      this.highlightPosition.x !== 0 &&
+      this.highlightPosition.y !== 0;
+    return {
+      isHighlighted: (bounds: {
+        position: Coordinate2D;
+        dimensions?: Dimensions;
+        radius?: number;
+      }) => {
+        if (!highlightExists) return false;
+        return isInBound(this.highlightPosition!, bounds);
+      },
+    };
   }
 
   getForeshadowingInfo() {
@@ -453,6 +496,7 @@ export class BarChart {
       color: string;
       nextState?: Coordinate2D;
       isForeshadowed: boolean;
+      isHighlighted: boolean;
     }[];
     isSelected: boolean;
     xScale: ScaleFn;
@@ -465,12 +509,14 @@ export class BarChart {
         nextState,
         currentState,
         isForeshadowed,
+        isHighlighted,
       }: {
         label: string;
         color: string;
         nextState?: Coordinate2D;
         currentState: Coordinate2D;
         isForeshadowed: boolean;
+        isHighlighted: boolean;
       }) => {
         const { fill, stroke, ...settings } = this.getRectSettings({
           isSelected,
@@ -494,7 +540,10 @@ export class BarChart {
         });
 
         this.drawingUtils.modifyContextStyleAndDraw(
-          settings,
+          {
+            ...settings,
+            ...(isHighlighted ? { opacity: 1 } : {}),
+          },
           (context, key) => {
             this.clipDrawingArea(context);
             this.drawingUtils.drawRect({
@@ -505,19 +554,21 @@ export class BarChart {
               context,
               key,
             });
-          },
-          ["preview"]
+          }
         );
 
         const textPosition = {
           x: currentTopLeft.x + currentRectDimensions.height * 1.25,
-          y: currentTopLeft.y + currentRectDimensions.height * 0.625,
+          y:
+            currentTopLeft.y +
+            currentRectDimensions.height * (isHighlighted ? 0.725 : 0.625),
         };
 
         this.drawingUtils.modifyContextStyleAndDraw(
           {
             fillStyle: "white",
-            fontSize: this.chartDimensions.width * 0.04,
+            fontSize:
+              this.chartDimensions.width * (isHighlighted ? 0.06 : 0.04),
             opacity: 1,
             textAlign: "left",
           },
@@ -530,6 +581,47 @@ export class BarChart {
             });
           }
         );
+
+        if (isHighlighted) {
+          this.drawingUtils.modifyContextStyleAndDraw(
+            {
+              fillStyle: "white",
+            },
+            (context) => {
+              this.drawingUtils.drawRect({
+                coordinates: {
+                  x: currentTopRight.x + 20,
+                  y: currentTopLeft.y + currentRectDimensions.height * 0.35,
+                },
+                dimensions: {
+                  width: 60,
+                  height: 20,
+                },
+                context,
+                fill: true,
+              });
+            }
+          );
+
+          this.drawingUtils.modifyContextStyleAndDraw(
+            {
+              fillStyle: color,
+              fontSize: this.chartDimensions.width * 0.04,
+              opacity: 1,
+              textAlign: "left",
+            },
+            (context) => {
+              this.drawingUtils.drawText({
+                coordinates: {
+                  x: currentTopRight.x + 20 + 5,
+                  y: currentTopLeft.y + currentRectDimensions.height * 0.35 + 15,
+                },
+                text: currentState.x.toLocaleString(),
+                context,
+              });
+            }
+          );
+        }
 
         const circleRadius = currentRectDimensions.height * 0.325;
         const rankLabelPosition = {
@@ -588,7 +680,7 @@ export class BarChart {
           });
 
           const margin = 30;
-          const arrowLength = 50;
+          const arrowLength = 20;
           let arrowTo = {
             x: nextTopRight.x + margin,
             y: nextTopRight.y + nextDimensions.height * 0.5,
@@ -615,14 +707,17 @@ export class BarChart {
 
           this.drawingUtils.modifyContextStyleAndDraw(
             {
-              strokeStyle: "white",
-              opacity: 1,
+              strokeStyle: color,
+              opacity: d3.interpolate(
+                0,
+                0.7
+              )(this.foreshadowingAnimationExtent),
             },
             (context) => {
               this.drawingUtils.drawArrow({
                 from: arrowFrom,
                 to: arrowTo,
-                arrowWidth: nextDimensions.height * 0.6,
+                arrowWidth: nextDimensions.height * 0.1,
                 context,
               });
             }
@@ -630,14 +725,14 @@ export class BarChart {
 
           this.drawingUtils.modifyContextStyleAndDraw(
             {
-              strokeStyle: color,
-              opacity: 0.7,
+              strokeStyle: "white",
+              opacity: d3.interpolate(0, 1)(this.foreshadowingAnimationExtent),
             },
             (context) => {
               this.drawingUtils.drawArrow({
                 from: arrowFrom,
                 to: arrowTo,
-                arrowWidth: nextDimensions.height * 0.5,
+                arrowWidth: nextDimensions.height * 0.05,
                 context,
               });
             }
@@ -663,6 +758,7 @@ export class BarChart {
             {
               strokeStyle: "white",
               lineWidth: 6,
+              opacity: d3.interpolate(0, 1)(this.foreshadowingAnimationExtent),
             },
             (context) => {
               this.drawingUtils.drawLine({
@@ -676,6 +772,7 @@ export class BarChart {
             {
               strokeStyle: color,
               lineWidth: 2,
+              opacity: d3.interpolate(0, 1)(this.foreshadowingAnimationExtent),
             },
             (context) => {
               this.drawingUtils.drawLine({
@@ -702,6 +799,7 @@ export class BarChart {
     range: ChartRangeType;
   }) {
     const { isInBound: isInForeshadowingBounds } = this.getForeshadowingInfo();
+    const { isHighlighted: highlightWithinRect } = this.getHighlightInfo();
 
     const isSelected = true;
     const selectedItems = _.pick(this.items, keys);
@@ -740,7 +838,7 @@ export class BarChart {
           nextState: nextStateData?.data,
         });
 
-        const { topLeft, topRight, bottomRight, bottomLeft } =
+        const { topLeft, topRight, bottomRight, bottomLeft, rectDimensions } =
           this.createRectDataFromCoordinate({
             coordinate: currentStateData.data,
             xScale,
@@ -757,10 +855,16 @@ export class BarChart {
           return isForeshadowed && isInForeshadowingBounds(corner);
         }, true);
 
+        const isHighlighted = highlightWithinRect({
+          position: topLeft,
+          dimensions: rectDimensions,
+        });
+
         const rectData = {
           currentState: interpolatedData,
           nextState: nextStateData?.data,
           isForeshadowed,
+          isHighlighted,
           color,
           label,
         };

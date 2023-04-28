@@ -10,6 +10,8 @@ import {
   startTimeoutInstance,
   type Dimensions,
   DrawingUtils,
+  legendSubject,
+  gestureSubject,
 } from "@/utils";
 import type { Subject } from "rxjs";
 
@@ -20,7 +22,7 @@ export interface LegendConstructorArgs {
   canvasDimensions: Dimensions;
   color: string;
   gestureTracker?: GestureTracker;
-  legendSubject?: Subject<any>;
+  drawingUtils: DrawingUtils;
 }
 
 const selectionWaitTime = 500;
@@ -31,8 +33,8 @@ export class LegendItem {
   private position: Coordinate2D | undefined;
   private dimensions: Dimensions | undefined;
   private canvasDimensions: Dimensions;
-  gestureTracker: GestureTracker | undefined;
-  legendSubject: Subject<any> | undefined;
+  gestureSubject: Subject<any>;
+  legendSubject: Subject<any>;
   private previousHandPositionInRange: boolean | undefined = false;
   private timer: d3.Timer | undefined;
   private context: CanvasRenderingContext2D | undefined;
@@ -54,10 +56,8 @@ export class LegendItem {
     color,
     dimensions,
     position,
-    // passing the subject so all legends can share the same subject and push their keys when they're in range
-    legendSubject,
     canvasDimensions,
-    gestureTracker,
+    drawingUtils,
   }: LegendConstructorArgs) {
     if (dimensions) {
       this.dimensions = dimensions;
@@ -65,30 +65,17 @@ export class LegendItem {
     if (position) {
       this.position = position;
     }
-    if (legendSubject) {
-      this.legendSubject = legendSubject;
-    }
+    this.legendSubject = legendSubject;
     this.label = label;
     this.color = color;
     this.canvasDimensions = canvasDimensions;
-    if (gestureTracker) {
-      this.setGestureTracker(gestureTracker);
-    }
-  }
-
-  setGestureTracker(gestureTracker: GestureTracker) {
-    this.gestureTracker = gestureTracker;
-    if (this.gestureTracker) {
-      this.gestureTracker.gestureSubject.subscribe({
-        next: (gestureData: GestureTrackerValues) => {
-          this.gestureListener(gestureData);
-        },
-      });
-    }
-  }
-
-  setLegendSubject(legendSubject: Subject<any>) {
-    this.legendSubject = legendSubject;
+    this.drawingUtils = drawingUtils;
+    this.gestureSubject = gestureSubject;
+    gestureSubject.subscribe({
+      next: (gestureData: any) => {
+        this.gestureListener(gestureData);
+      },
+    });
   }
 
   updateState({
@@ -183,38 +170,28 @@ export class LegendItem {
   }
 
   drawLegend() {
-    if (this.context && this.position) {
-      this.drawingUtils?.modifyContextStyleAndDraw(
-        {
-          fillStyle: this.color,
-        },
-        (context) => {
-          this.drawingUtils?.drawRect({
-            coordinates: this.position!,
-            dimensions: {
-              width: 20,
-              height: 20,
-            },
-            fill: true,
-            context
-          });
-        }
-      );
-
-      this.drawingUtils?.modifyContextStyleAndDraw(
-        {
-          fontSize: 20,
-          fillStyle: this.color,
-        },
-        (context) => {
-          this.drawingUtils?.drawText({
-            coordinates: { x: this.position!.x + 40, y: this.position!.y + 17 },
-            text: this.label,
-            context
-          });
-        }
-      );
-    }
+    this.drawingUtils?.modifyContextStyleAndDraw(
+      {
+        fontSize: 20,
+        fillStyle: this.color,
+      },
+      (context) => {
+        this.drawingUtils?.drawRect({
+          coordinates: this.position!,
+          dimensions: {
+            width: 20,
+            height: 20,
+          },
+          fill: true,
+          context,
+        });
+        this.drawingUtils?.drawText({
+          coordinates: { x: this.position!.x + 40, y: this.position!.y + 17 },
+          text: this.label,
+          context,
+        });
+      }
+    );
   }
 
   isInRange(position: PartialCoordinate2D): boolean {

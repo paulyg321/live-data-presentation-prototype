@@ -1,12 +1,15 @@
 import _ from "lodash";
 import { ChartTypeValue, Chart, type Coordinate2D } from "../../chart";
+import type { DrawingUtils } from "../../drawing";
 import {
   ForeshadowingGestureListener,
   ListenerType,
   RadialPlaybackGestureListener,
   LinearPlaybackGestureListener,
+  getGestureListenerResetKeys,
 } from "../../gestures";
 import { CanvasEvent } from "../../interactions";
+import { parse, stringify, toJSON, fromJSON } from "flatted";
 
 export type StoryLayer =
   | ForeshadowingGestureListener
@@ -28,36 +31,63 @@ export class Story {
     id: string;
     layer: StoryLayer;
   };
+  drawingUtils: DrawingUtils;
+  thumbNail: any;
 
-  constructor({ title }: { title: string }) {
+  constructor({
+    title,
+    drawingUtils,
+  }: {
+    title: string;
+    drawingUtils: DrawingUtils;
+  }) {
     this.title = title;
-    this.loadStoredLayers;
+    this.drawingUtils = drawingUtils;
   }
 
-  private loadStoredLayers() {
+  loadStoredLayers() {
     const storedLayerString = localStorage.getItem(this.title);
     if (storedLayerString) {
-      this.layers = JSON.parse(storedLayerString).map(
-        ({ layer, type }: any) => {
-          switch (type) {
-            case ChartTypeValue.BAR:
-            case ChartTypeValue.LINE:
-            case ChartTypeValue.SCATTER:
-              return new Chart(layer);
-            case ListenerType.FORESHADOWING: {
-              return new ForeshadowingGestureListener(layer);
-            }
-            case ListenerType.TEMPORAL: {
-              return new LinearPlaybackGestureListener(layer);
-            }
-            case ListenerType.RADIAL: {
-              return new RadialPlaybackGestureListener(layer);
-            }
-            default:
-              return {};
+      this.layers = parse(storedLayerString).map(({ layer, type, id }: any) => {
+        const arg = {
+          ...layer,
+          drawingUtils: this.drawingUtils,
+          resetKeys: getGestureListenerResetKeys("Space"),
+        };
+        switch (type) {
+          case ChartTypeValue.BAR:
+          case ChartTypeValue.LINE:
+          case ChartTypeValue.SCATTER:
+            return {
+              type,
+              id,
+              layer: new Chart(arg),
+            };
+          case ListenerType.FORESHADOWING: {
+            return {
+              type,
+              id,
+              layer: new ForeshadowingGestureListener(arg),
+            };
           }
+          case ListenerType.TEMPORAL: {
+            return {
+              type,
+              id,
+              layer: new LinearPlaybackGestureListener(arg),
+            };
+          }
+          case ListenerType.RADIAL: {
+            return {
+              type,
+              id,
+              layer: new RadialPlaybackGestureListener(arg),
+            };
+          }
+          default:
+            return {};
         }
-      );
+      });
     } else {
       this.layers = [];
     }
@@ -90,12 +120,12 @@ export class Story {
   }
 
   addLayer(type: LayerType, layer: StoryLayer) {
-    const id = _.uniqueId();
+    const id = crypto.randomUUID();
     if (type) {
       this.layers = [{ type, id, layer }, ...this.layers];
     }
 
-    // localStorage.setItem(this.title, JSON.stringify(this.layers));
+    localStorage.setItem(this.title, stringify(this.layers));
 
     return {
       type,
@@ -117,10 +147,12 @@ export class Story {
     });
   }
 
-  getChart() {
-    return this.layers.find(({ type }) => {
-      return this.isChartLayer(type as ChartTypeValue);
-    })?.layer as Chart;
+  getCharts() {
+    return this.layers
+      .filter(({ type }) => {
+        return this.isChartLayer(type as ChartTypeValue);
+      })
+      .map(({ layer }) => layer) as Chart[];
   }
 
   handleDeleteCurrentLayer(id: string) {
@@ -144,6 +176,15 @@ export class Story {
         listener?.handleEvent(eventType, eventData);
       }
     }
+
+    localStorage.setItem(this.title, stringify(this.layers));
+  }
+
+  saveThumbnail() {
+    //TODO: store in local storage
+    this.thumbNail = this.drawingUtils
+      ?.getContexts(["preview"])[0]
+      .context.getImageData(0, 0, 640, 640 * (3 / 4));
   }
 
   draw() {
@@ -153,5 +194,6 @@ export class Story {
       }
       layer.draw();
     });
+    // this.saveThumbnail();
   }
 }

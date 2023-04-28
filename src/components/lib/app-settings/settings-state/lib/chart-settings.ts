@@ -1,18 +1,20 @@
 import * as d3 from "d3";
 import { reactive } from "vue";
-import type {
+import {
   Affect,
+  AnimationExtentVisualizer,
   // AnimatedCircle,
   // AnimatedLine,
-  Chart,
+  type Chart,
   // DrawingMode,
   // AnimatedLineDrawingModeToEaseFunctionMap,
   // AnimatedCircleDrawingModeToEaseFunctionMap,
-   Coordinate2D,
-   Dimensions,
-   PartialCoordinate2D,
+  type Coordinate2D,
+  type Dimensions,
+  type PartialCoordinate2D,
 } from "@/utils";
 import { StorySettings } from "./stories-settings";
+import { CanvasSettings } from "./canvas-settings";
 
 export const initialChartWidth = 400;
 export const initialChartDimensions = {
@@ -32,14 +34,6 @@ export enum PlaybackType {
 }
 
 export const ChartSettings = reactive<{
-  dimensions: Dimensions;
-  changeDimensions: (width: number) => void;
-  position: Coordinate2D;
-  changePosition: (coord: PartialCoordinate2D) => void;
-  charts: Chart[];
-  currentChart?: Chart;
-  setCurrentChart: () => void;
-  changeMargins: (margin: number) => void;
   canvasKeys: string[];
   setCanvasKeys: () => void;
   // animationMode: DrawingMode;
@@ -56,6 +50,8 @@ export const ChartSettings = reactive<{
   // isItemSelected: (itemKey: AnimatedCircle | AnimatedLine | string) => boolean;
   playbackExtent: number;
   setPlaybackExtent: (value: number) => void;
+  extentVisualizer?: AnimationExtentVisualizer;
+  setExtentVisualizer: () => void;
   playbackTimer?: d3.Timer;
   resetTimer: () => void;
   playbackType: PlaybackType;
@@ -70,95 +66,30 @@ export const ChartSettings = reactive<{
      */
     this.canvasKeys = ["preview", "legend"];
   },
-  dimensions: initialChartDimensions,
-  changeDimensions(width: number) {
-    const newDimensions = {
-      ...this.dimensions,
-      width,
-      height: width * (3 / 4),
-    };
-
-    this.dimensions = newDimensions;
-
-    if (this.currentChart) {
-      this.currentChart.updateState({
-        dimensions: newDimensions,
-      });
-    }
-  },
-  changeMargins(margin: number) {
-    const newDimensions = {
-      ...this.dimensions,
-      margin: {
-        left: margin,
-        right: margin,
-        top: margin,
-        bottom: margin,
-      },
-    };
-
-    this.dimensions = newDimensions;
-
-    if (this.currentChart) {
-      this.currentChart.updateState({
-        dimensions: newDimensions,
-      });
-    }
-  },
-  position: {
-    x: 0,
-    y: 0,
-  },
-  changePosition(coords: PartialCoordinate2D) {
-    const newPosition = {
-      ...this.position,
-      ...(coords.x ? { x: coords.x } : {}),
-      ...(coords.y ? { y: coords.y } : {}),
-    };
-
-    this.position = newPosition;
-
-    if (this.currentChart) {
-      this.currentChart.updateState({
-        position: newPosition,
-      });
-    }
-  },
-  charts: localStorage.getItem("charts")
-    ? JSON.parse(localStorage.getItem("charts") || "")
-    : [],
-  currentChart: undefined,
-  setCurrentChart() {
-    this.currentChart = StorySettings.currentStory?.getChart();
-
-    // Effects
-    // this.setCanvasKeys();
-  },
   // States for drawing
   // animationMode: DrawingMode.BASELINE_ANIMATION,
   // setAnimationMode(mode: DrawingMode) {
   //   this.animationMode = mode;
   // },
-  handlePlay(
-    type: string,
-    callbackFn?: any,
-    affect?: Affect,
-    duration?: number
-  ) {
-    const playbackDuration = duration ?? 3000;
-
-    if (affect) {
-      this.currentChart?.chart?.updateState({
-        affect,
-      });
-    }
+  handlePlay(type: string, callbackFn?: any, affect?: Affect) {
+    const affectPlaybackSettings = {
+      [Affect.JOY]: { duration: 2000, easeFn: d3.easeBounce },
+      [Affect.EXCITEMENT]: { duration: 3000, easeFn: d3.easeLinear },
+      [Affect.TENDERNESS]: { duration: 5000, easeFn: d3.easeQuadIn },
+    };
 
     this.resetTimer();
     const play = (timestep: number) => {
       this.setPlaybackExtent(timestep);
-      this.currentChart?.chart?.updateState({
-        extent: timestep,
-      });
+      if (timestep === 1) {
+        this.extentVisualizer?.updateState({
+          extent: 0,
+        });
+      } else {
+        this.extentVisualizer?.updateState({
+          extent: timestep,
+        });
+      }
       if (callbackFn) {
         callbackFn(timestep);
       }
@@ -174,29 +105,41 @@ export const ChartSettings = reactive<{
       this.playbackTimer = d3.timer((elapsed: number) => {
         // TODO_Paul - Try this!
         // const startingPoint = this.playbackExtent + elapsed / playbackDuration;
+        const playbackSettings = affect
+          ? affectPlaybackSettings[affect]
+          : { duration: 3000, easeFn: d3.easeLinear };
         const startingPoint = Math.max(
           this.playbackExtent,
-          elapsed / playbackDuration
+          elapsed / playbackSettings.duration
         );
 
         const boundedTimeStep = Math.min(startingPoint, 1);
-        play(boundedTimeStep);
+
+        play(playbackSettings.easeFn(boundedTimeStep));
         if (boundedTimeStep === 1) {
-          this.currentChart?.chart?.setStates("increment");
+          StorySettings.currentStory?.getCharts().map((chart: Chart) => {
+            chart.chart?.setStates("increment");
+          });
           this.setPlaybackExtent(0);
           this.resetTimer();
         }
       });
     } else if (type === PlaybackType.ALL) {
       this.playbackTimer = d3.timer((elapsed: number) => {
+        const playbackSettings = affect
+          ? affectPlaybackSettings[affect]
+          : { duration: 3000, easeFn: d3.easeLinear };
+
         const startingPoint = Math.max(
           this.playbackExtent,
-          elapsed / playbackDuration
+          elapsed / playbackSettings.duration
         );
         const boundedTimeStep = Math.min(startingPoint, 1);
-        play(boundedTimeStep);
+        play(playbackSettings.easeFn(boundedTimeStep));
         if (boundedTimeStep === 1) {
-          this.currentChart?.chart?.setStates("increment");
+          StorySettings.currentStory?.getCharts().map((chart: Chart) => {
+            chart.chart?.setStates("increment");
+          });
           this.setPlaybackExtent(0);
           this.handlePlay("all", callbackFn);
         }
@@ -218,10 +161,20 @@ export const ChartSettings = reactive<{
       return;
     }
 
-    this.currentChart?.chart?.updateState({
-      extent: value,
+    StorySettings.currentStory?.getCharts().map((chart: Chart) => {
+      chart.chart?.updateState({
+        extent: value,
+      });
     });
     this.playbackExtent = value;
+  },
+  extentVisualizer: undefined,
+  setExtentVisualizer() {
+    if (!CanvasSettings.generalDrawingUtils) return;
+    this.extentVisualizer = new AnimationExtentVisualizer({
+      drawingUtils: CanvasSettings.generalDrawingUtils,
+      canvasDimensions: CanvasSettings.dimensions,
+    });
   },
   playbackTimer: undefined,
   resetTimer() {

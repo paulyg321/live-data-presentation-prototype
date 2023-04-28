@@ -1,6 +1,6 @@
 import _ from "lodash";
+import type { Subject } from "rxjs";
 import type { Coordinate2D } from "../../chart";
-import type { CanvasElementListener } from "../../interactions";
 import { HANDS } from "./gesture-utils";
 import {
   GestureListener,
@@ -8,7 +8,7 @@ import {
   type ListenerProcessedFingerData,
 } from "./GestureListener";
 import { SupportedGestures } from "./handGestures";
-import { PlaybackSubjectType } from "./subjects";
+import { playbackSubject, PlaybackSubjectType } from "./subjects";
 
 export interface LinearListenerEmitRange {
   start: Coordinate2D;
@@ -18,6 +18,7 @@ export interface LinearListenerEmitRange {
 export interface LinearPlaybackGestureListenerConstructorArgs
   extends GestureListenerConstructorArgs {
   emitRange?: LinearListenerEmitRange;
+  subjects?: Record<string, Subject<any>>;
 }
 
 export class LinearPlaybackGestureListener extends GestureListener {
@@ -42,11 +43,9 @@ export class LinearPlaybackGestureListener extends GestureListener {
         leftHand: SupportedGestures.POINTING,
       },
     ],
-    gestureSubject,
     canvasDimensions,
     emitRange,
     resetKeys,
-    subjects,
     drawingUtils,
   }: LinearPlaybackGestureListenerConstructorArgs) {
     super({
@@ -54,10 +53,11 @@ export class LinearPlaybackGestureListener extends GestureListener {
       dimensions,
       handsToTrack,
       gestureTypes,
-      gestureSubject,
       canvasDimensions,
       resetKeys,
-      subjects,
+      subjects: {
+        [LinearPlaybackGestureListener.playbackSubjectKey]: playbackSubject,
+      },
       drawingUtils,
     });
 

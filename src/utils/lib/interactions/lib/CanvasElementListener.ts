@@ -25,13 +25,6 @@ export class CanvasElementListener {
   private position: Coordinate2D;
   private dimensions: Dimensions;
   private isCircle: boolean;
-  private canvasElement:
-    | LinearPlaybackGestureListener
-    | Chart
-    | RadialPlaybackGestureListener
-    | ForeshadowingGestureListener
-    | GestureListener
-    | EmphasisGestureListener;
   private dragSettings = {
     active: false,
     lastPosition: { x: 0, y: 0 },
@@ -42,32 +35,27 @@ export class CanvasElementListener {
   };
   private drawingUtils: DrawingUtils;
   private anchorPadding: number;
+  private parentUpdateFn: (value: any) => void;
 
   constructor({
     position,
     dimensions,
     isCircle,
-    canvasElement,
     drawingUtils,
+    updateFn,
   }: {
     position: Coordinate2D;
     dimensions: Dimensions;
     isCircle: boolean;
-    canvasElement:
-      | LinearPlaybackGestureListener
-      | Chart
-      | RadialPlaybackGestureListener
-      | ForeshadowingGestureListener
-      | GestureListener
-      | EmphasisGestureListener;
-      drawingUtils: DrawingUtils;
+    drawingUtils: DrawingUtils;
+    updateFn: (value: any) => void;
   }) {
     this.position = position;
     this.dimensions = dimensions;
     this.isCircle = isCircle;
-    this.canvasElement = canvasElement;
     this.anchorPadding = 10;
     this.drawingUtils = drawingUtils;
+    this.parentUpdateFn = updateFn;
   }
 
   updateState({
@@ -143,7 +131,7 @@ export class CanvasElementListener {
     this.updateState({
       position: newPosition,
     });
-    this.canvasElement.updateState({
+    this.parentUpdateFn({
       position: newPosition,
     });
     this.dragSettings.lastPosition = mousePosition;
@@ -167,7 +155,7 @@ export class CanvasElementListener {
         height: newHeight,
       },
     });
-    this.canvasElement.updateState({
+    this.parentUpdateFn({
       dimensions: {
         width: newWidth,
         height: newHeight,
@@ -235,9 +223,10 @@ export class CanvasElementListener {
           coordinates: this.position,
           dimensions: this.dimensions,
           stroke: true,
-          context
+          context,
         });
-      }
+      },
+      ["presenter", "preview"]
     );
     this.drawingUtils.modifyContextStyleAndDraw(
       {
@@ -248,9 +237,10 @@ export class CanvasElementListener {
           coordinates: this.getResizeAnchorData().position,
           radius: this.getResizeAnchorData().radius,
           fill: true,
-          context
+          context,
         });
-      }
+      },
+      ["presenter", "preview"]
     );
     this.drawingUtils.modifyContextStyleAndDraw(
       {
@@ -261,9 +251,10 @@ export class CanvasElementListener {
           coordinates: this.getDeleteAnchorData().position,
           radius: this.getDeleteAnchorData().radius,
           fill: true,
-          context
+          context,
         });
-      }
+      },
+      ["presenter", "preview"]
     );
   }
 }

@@ -1,3 +1,4 @@
+import type { Timer } from "d3";
 import * as d3 from "d3";
 import dayjs from "dayjs";
 import _ from "lodash";
@@ -9,6 +10,7 @@ import {
   type ModifyContextStyleArgs,
 } from "../../drawing";
 import { ForeshadowingAreaSubjectType } from "../../gestures";
+import { startTimerInstance } from "../../timer";
 import type {
   ChartRangeType,
   Coordinate2D,
@@ -68,6 +70,12 @@ export class LineChart {
   xScale: ScaleFn = defaultScale;
   yScale: ScaleFn = defaultScale;
 
+  highlightPosition?: Coordinate2D;
+  limitExtent = false;
+
+  timer?: Timer;
+  foreshadowingAnimationExtent = 1;
+
   constructor({
     items,
     canvasDimensions,
@@ -92,8 +100,10 @@ export class LineChart {
     extent,
     position,
     drawingUtils,
+    highlightPosition,
   }: Partial<LineChartConstructorArgs> & {
     extent?: number;
+    highlightPosition?: Coordinate2D;
   }) {
     if (chartDimensions) {
       this.chartDimensions = {
@@ -115,10 +125,81 @@ export class LineChart {
     if (extent) {
       this.animationExtent = extent;
     }
+    if (highlightPosition) {
+      this.highlightPosition = highlightPosition;
+    }
+  }
+
+  updateAnimation(animation: LineInterpolateStrategy) {
+    this.interpolateStrategy = animation;
+  }
+
+  toggleLimitExtent() {
+    this.limitExtent = !this.limitExtent;
   }
 
   setForeshadowing(foreshadowingSettings?: ForeshadowingSettings) {
-    this.foreshadowingSettings = foreshadowingSettings;
+    if (this.timer) return;
+    if (foreshadowingSettings?.type === ForeshadowingAreaSubjectType.RANGE) {
+      const startDimensions =
+        this.foreshadowingSettings?.type === ForeshadowingAreaSubjectType.RANGE
+          ? this.foreshadowingSettings.area.dimensions
+          : this.chartDimensions;
+      const endDimensions = foreshadowingSettings.area.dimensions;
+      const startPosition =
+        this.foreshadowingSettings?.type === ForeshadowingAreaSubjectType.RANGE
+          ? this.foreshadowingSettings.area.position
+          : this.position;
+      const endPosition = foreshadowingSettings.area.position;
+
+      this.timer = startTimerInstance({
+        onTick: (timeStep?: number) => {
+          if (!timeStep) return;
+          if (
+            foreshadowingSettings?.type === ForeshadowingAreaSubjectType.RANGE
+          ) {
+            if (!endDimensions || !startDimensions) return;
+            this.foreshadowingSettings = {
+              ...foreshadowingSettings,
+              area: {
+                position: {
+                  x: d3.interpolate(startPosition.x, endPosition.x)(timeStep),
+                  y: endPosition.y,
+                },
+                dimensions: {
+                  width: d3.interpolate(
+                    startDimensions.width,
+                    endDimensions?.width
+                  )(timeStep),
+                  height: endDimensions?.height,
+                },
+              },
+            };
+          }
+        },
+        onCompletion: () => {
+          this.foreshadowingSettings = foreshadowingSettings;
+          this.timer?.stop();
+          this.timer = undefined;
+        },
+        timeout: 1000,
+      });
+    } else {
+      this.foreshadowingSettings = foreshadowingSettings;
+      this.timer = startTimerInstance({
+        onTick: (timeStep?: number) => {
+          if (!timeStep) return;
+          this.foreshadowingAnimationExtent = timeStep;
+        },
+        onCompletion: () => {
+          this.foreshadowingAnimationExtent = 1;
+          this.timer?.stop();
+          this.timer = undefined;
+        },
+        timeout: 1000,
+      });
+      return;
+    }
   }
 
   toggleSelection(key: string) {
@@ -389,6 +470,47 @@ export class LineChart {
   }
 
   // -------------------------------------- GETTERS --------------------------------------
+  getHighlightInfo() {
+    const highlightExists =
+      this.highlightPosition &&
+      this.highlightPosition.x !== 0 &&
+      this.highlightPosition.y !== 0;
+    return {
+      isHighlighted: (bounds: {
+        position: Coordinate2D;
+        dimensions?: Dimensions;
+        radius?: number;
+      }) => {
+        if (!highlightExists) return false;
+        return isInBound(this.highlightPosition!, bounds);
+      },
+    };
+  }
+
+  getForeshadowingInfo() {
+    const isRectGesture =
+      this.foreshadowingSettings?.type ===
+      ForeshadowingAreaSubjectType.RECTANGLE;
+    const isRangeGesture =
+      this.foreshadowingSettings?.type === ForeshadowingAreaSubjectType.RANGE;
+    const isCircleGesture =
+      this.foreshadowingSettings?.type === ForeshadowingAreaSubjectType.CIRCLE;
+
+    const bounds = this.foreshadowingSettings?.area;
+
+    const info = {
+      bounds,
+      isRangeGesture,
+      isRectGesture,
+      isCircleGesture,
+      isInBound: (coordinate: Coordinate2D) => {
+        if (!bounds) return false;
+        return isInBound(coordinate, bounds);
+      },
+    };
+
+    return info;
+  }
 
   private getDataTypeForValues(values: { x: any; y: any }) {
     const { x, y } = values;
@@ -513,17 +635,22 @@ export class LineChart {
     const chartBounds = this.getBounds();
 
     if (type === "small-multiple") {
-      const halfChartWidth = (chartBounds.x.end - chartBounds.x.start) / 2;
-      const halfChartHeight = (chartBounds.y.start - chartBounds.y.end) / 2;
+      const chartWidth = chartBounds.x.end - chartBounds.x.start;
+      const halfChartWidth = chartWidth / 2;
+      const interpolatedWidth = d3.interpolate(
+        chartWidth,
+        halfChartWidth
+      )(this.foreshadowingAnimationExtent);
+      // const halfChartHeight = (chartBounds.y.start - chartBounds.y.end) / 2;
       const leftMargin = this.chartDimensions.margin?.left ?? 0;
       const rangeData: ChartRangeType = {
         xRange: [
           chartBounds.x.start,
-          chartBounds.x.start + halfChartWidth - leftMargin,
+          chartBounds.x.start + interpolatedWidth - leftMargin,
         ],
-        yRange: [halfChartHeight, chartBounds.y.end],
+        yRange: [chartBounds.y.start, chartBounds.y.end],
         xRangeNext: [
-          chartBounds.x.start + leftMargin + halfChartWidth,
+          chartBounds.x.start + leftMargin + interpolatedWidth,
           chartBounds.x.end,
         ],
       };
@@ -653,6 +780,7 @@ export class LineChart {
 
   getExtentBasedOnInterpolateStrategy(coordCount?: number) {
     const currentExtent = this.animationExtent;
+
     switch (this.interpolateStrategy) {
       case LineInterpolateStrategy.BASIC:
         return [d3.easeLinear(currentExtent)];
@@ -666,7 +794,7 @@ export class LineChart {
           const modifiedExtent = currentExtent * coordCount;
           extentArray = Array.from(Array(coordCount)).map(
             (_: any, index: number) => {
-              return d3.easeBounce(Math.min(modifiedExtent / (index + 1), 1));
+              return d3.easeLinear(Math.min(modifiedExtent / (index + 1), 1));
             }
           );
         }
@@ -681,15 +809,14 @@ export class LineChart {
     xScale,
     xScaleNext,
     yScale,
-    range,
-    isRectGesture,
   }: {
     xScale: ScaleFn;
     xScaleNext: ScaleFn;
     yScale: ScaleFn;
-    range: ChartRangeType;
-    isRectGesture: boolean;
   }) {
+    const { isRectGesture } = this.getForeshadowingInfo();
+    const axesRangeArg = isRectGesture ? "small-multiple" : "default";
+    const range = this.getRange(axesRangeArg);
     /**
      * -------------------- DRAW AXES --------------------
      * */
@@ -740,35 +867,105 @@ export class LineChart {
       isCurrent,
       color,
     });
-    this.drawingUtils.modifyContextStyleAndDraw(settings, (context) => {
-      if (range !== undefined) {
-        const dimensions = {
-          width: range.xRange[1] - range.xRange[0],
-          height: range.yRange[0] - range.yRange[1],
-        };
-        const coordinates = {
-          x: range.xRange[0],
-          y: range.yRange[1],
-        };
-        this.drawingUtils.clipRect({
-          dimensions,
-          coordinates,
-          context
+    this.drawingUtils.modifyContextStyleAndDraw(
+      {
+        ...settings,
+      },
+      (context) => {
+        if (range !== undefined) {
+          const dimensions = {
+            width: range.xRange[1] - range.xRange[0],
+            height: range.yRange[0] - range.yRange[1],
+          };
+          const coordinates = {
+            x: range.xRange[0],
+            y: range.yRange[1],
+          };
+          this.drawingUtils.clipRect({
+            dimensions,
+            coordinates,
+            context,
+          });
+        }
+        coordinates.map((coordinate: Coordinate2D) => {
+          const { isHighlighted: compareHighlight } = this.getHighlightInfo();
+          const scaledPointPosition = {
+            x: xScale(coordinate.x),
+            y: yScale(coordinate.y),
+          };
+
+          const isHighlighted = compareHighlight({
+            position: scaledPointPosition,
+            radius: 20,
+          });
+
+          // draw our current state line
+          this.drawingUtils.drawCircle({
+            coordinates: coordinate,
+            xScale,
+            yScale,
+            radius: isHighlighted ? radius * 2 : radius,
+            fill,
+            stroke,
+            context,
+          });
+
+          if (isHighlighted) {
+            const rectPosition = {
+              x: scaledPointPosition.x + 20,
+              y: scaledPointPosition.y + 20,
+            };
+            this.drawingUtils.modifyContextStyleAndDraw(
+              {
+                opacity: 1,
+                fillStyle: "white",
+              },
+              (context) => {
+                this.drawingUtils.drawRect({
+                  coordinates: rectPosition,
+                  dimensions: {
+                    width: 90,
+                    height: 30,
+                  },
+                  context,
+                  fill: true,
+                });
+              }
+            );
+            this.drawingUtils.modifyContextStyleAndDraw(
+              {
+                opacity: 1,
+                fontSize: this.chartDimensions.width * 0.04,
+                textAlign: "left",
+                fillStyle: color,
+              },
+              (context) => {
+                this.drawingUtils.drawText({
+                  coordinates: {
+                    x: rectPosition.x + 5,
+                    y: rectPosition.y + 20,
+                  },
+                  text: `(${coordinate.x.toLocaleString()}, ${coordinate.y.toLocaleString()})`,
+                  context,
+                });
+              }
+            );
+          }
         });
       }
-      coordinates.map((coordinate: Coordinate2D) => {
-        // draw our current state line
-        this.drawingUtils.drawCircle({
-          coordinates: coordinate,
-          xScale,
-          yScale,
-          radius,
-          fill,
-          stroke,
-          context
-        });
-      });
-    });
+    );
+  }
+
+  getInterpolateStrategyInfo() {
+    const isBaseline =
+      this.interpolateStrategy === LineInterpolateStrategy.BASELINE;
+    const isDrop = this.interpolateStrategy === LineInterpolateStrategy.DROP;
+    const isBasic = this.interpolateStrategy === LineInterpolateStrategy.BASIC;
+    return {
+      isBaseline,
+      isDrop,
+      isBasic,
+    };
   }
 
   drawSelectedLineItems({
@@ -776,28 +973,26 @@ export class LineChart {
     xScale,
     xScaleNext,
     yScale,
-    range,
-    isForeshadowing,
-    isRangeGesture,
-    isRectGesture,
   }: {
     keys: string[];
     xScale: ScaleFn;
     xScaleNext: ScaleFn;
     yScale: ScaleFn;
-    range: ChartRangeType;
-    isForeshadowing: boolean;
-    isRangeGesture: boolean;
-    isRectGesture: boolean;
   }) {
-    const isSelected = true;
     const selectedItems = _.pick(this.items, keys);
-    const isBaseline =
-      this.interpolateStrategy === LineInterpolateStrategy.BASELINE;
-    const isDrop = this.interpolateStrategy === LineInterpolateStrategy.DROP;
+    const { isBaseline, isDrop } = this.getInterpolateStrategyInfo();
 
     let currentStateRange: ChartRangeType;
     let foreshadowingRange: ChartRangeType;
+
+    const { isRectGesture, isRangeGesture } = this.getForeshadowingInfo();
+    const isForeshadowing = isRectGesture || isRangeGesture;
+
+    let lineRangeArg: "default" | "small-multiple" | "foreshadow-range" =
+      "default";
+    if (isRectGesture) lineRangeArg = "small-multiple";
+    if (isRangeGesture) lineRangeArg = "foreshadow-range";
+    const range = this.getRange(lineRangeArg);
 
     if (range) {
       currentStateRange = range;
@@ -824,7 +1019,7 @@ export class LineChart {
             }
           ]
         ) => {
-          const [_, { color, points: coordinates }] = selectedItem;
+          const [label, { color, points: coordinates }] = selectedItem;
           const parsedCoordinates = coordinates.map(
             this.convertPointsBasedOnTypes(
               this.dataType?.xType,
@@ -833,8 +1028,6 @@ export class LineChart {
           );
 
           const extent = this.getExtentBasedOnInterpolateStrategy().at(-1) ?? 1;
-          // TODO: Decide how to turn this on & off
-          const LIMIT_EXTENT_TO_STATES = false;
 
           let currentBaselineXRange: [number, number] = [
             range.xRange[0],
@@ -861,7 +1054,7 @@ export class LineChart {
           const chartWidth = range.xRange[1] - range.xRange[0];
           const statesSectionWidth = chartWidth / (this.lastStateIndex + 1);
 
-          if (LIMIT_EXTENT_TO_STATES) {
+          if (this.limitExtent) {
             currentBaselineXRange = [
               range.xRange[0],
               range.xRange[0] +
@@ -903,7 +1096,7 @@ export class LineChart {
               ...this.getLineSettings({
                 color,
                 isCurrent: true,
-                isSelected: isSelected,
+                isSelected: true,
               }),
             },
             (context) => {
@@ -922,7 +1115,7 @@ export class LineChart {
             coordinates: parsedCoordinates,
             xScale,
             yScale,
-            isSelected,
+            isSelected: true,
             isCurrent: true,
             color,
             range: currentStateRange,
@@ -935,7 +1128,7 @@ export class LineChart {
                 ...this.getLineSettings({
                   color,
                   isCurrent: false,
-                  isSelected: isSelected,
+                  isSelected: true,
                 }),
               },
               (context) => {
@@ -955,7 +1148,7 @@ export class LineChart {
               coordinates: parsedCoordinates,
               xScale: xScaleNext,
               yScale,
-              isSelected,
+              isSelected: true,
               isCurrent: false,
               color,
               range: foreshadowingRange,
@@ -1018,7 +1211,7 @@ export class LineChart {
             ...this.getLineSettings({
               color,
               isCurrent: true,
-              isSelected: isSelected,
+              isSelected: true,
             }),
           },
           (context) => {
@@ -1034,12 +1227,16 @@ export class LineChart {
           }
         );
 
+        const defaultCoords = isForeshadowing
+          ? currentStateData
+          : primaryLineCoords;
+
         this.drawPoints({
           // If we're foreshadowing we want to see the currentState not interpolated state
-          coordinates: isForeshadowing ? currentStateData : primaryLineCoords,
+          coordinates: primaryLineCoords,
           xScale,
           yScale,
-          isSelected,
+          isSelected: true,
           isCurrent: true,
           color,
           range: currentStateRange,
@@ -1048,23 +1245,23 @@ export class LineChart {
         // ------------- DRAW NEXT STATE ----------------------
         if (isForeshadowing && nextStateData) {
           // Only do this for range gesture - otherwise extent doesn't affect foreshadowing
-          if (isRangeGesture) {
-            const foreshadowItemsBaselineXRange: [number, number] = [
-              range.xRangeNext[1] * (extent.at(-1) ?? 1),
-              range.xRangeNext[1],
-            ];
-            foreshadowingRange = {
-              ...range,
-              xRange: foreshadowItemsBaselineXRange,
-            };
-          }
+          // if (isRangeGesture) {
+          //   const foreshadowItemsBaselineXRange: [number, number] = [
+          //     range.xRangeNext[1] * (extent.at(-1) ?? 1),
+          //     range.xRangeNext[1],
+          //   ];
+          //   foreshadowingRange = {
+          //     ...range,
+          //     // xRange: foreshadowItemsBaselineXRange,
+          //   };
+          // }
 
           this.drawingUtils.modifyContextStyleAndDraw(
             {
               ...this.getLineSettings({
                 color,
                 isCurrent: false,
-                isSelected,
+                isSelected: true,
               }),
             },
             (context) => {
@@ -1087,7 +1284,7 @@ export class LineChart {
             coordinates: nextStateData,
             xScale: xScaleNext,
             yScale,
-            isSelected,
+            isSelected: true,
             isCurrent: false,
             color,
             range: foreshadowingRange,
@@ -1155,11 +1352,7 @@ export class LineChart {
 
   draw() {
     const { selectedItemsKeys, unselectedItemsKeys } = this.getItemKeys();
-    const foreshadowing = this.foreshadowingSettings;
-    const isRectGesture =
-      foreshadowing?.type === ForeshadowingAreaSubjectType.RECTANGLE;
-    const isRangeGesture =
-      foreshadowing?.type === ForeshadowingAreaSubjectType.RANGE;
+    const { isRectGesture, isRangeGesture } = this.getForeshadowingInfo();
 
     let xScale = this.xScale;
     let yScale = this.yScale;
@@ -1169,34 +1362,19 @@ export class LineChart {
       ({ xScale, yScale, xScaleNext } = this.getForeshadowingScales());
     }
 
-    const axesRangeArg = isRectGesture ? "small-multiple" : "default";
-    const axesRange = this.getRange(axesRangeArg);
     this.drawAxes({
       xScale,
       yScale,
       xScaleNext,
-      isRectGesture,
-      range: axesRange,
     });
-
-    // Draw Lines
-    let lineRangeArg: "default" | "small-multiple" | "foreshadow-range" =
-      "default";
-    if (isRectGesture) lineRangeArg = "small-multiple";
-    if (isRangeGesture) lineRangeArg = "foreshadow-range";
-    const lineRange = this.getRange(lineRangeArg);
 
     this.drawSelectedLineItems({
       keys: selectedItemsKeys,
       xScale,
       yScale,
       xScaleNext,
-      range: lineRange,
-      isForeshadowing: !!foreshadowing,
-      isRangeGesture,
-      isRectGesture,
     });
-    if (!foreshadowing) {
+    if (!isRectGesture && !isRangeGesture) {
       this.drawUnselectedLineItems({
         keys: unselectedItemsKeys,
         xScale,

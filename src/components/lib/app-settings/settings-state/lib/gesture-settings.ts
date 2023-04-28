@@ -2,6 +2,7 @@
  * TODO: To have widgets, all the things here can be made dynamic under a gestureSettings object
  */
 import {
+  DollarRecognizer,
   emphasisSubject,
   foreshadowingAreaSubject,
   ForeshadowingGestureListener,
@@ -14,10 +15,13 @@ import {
   RadialTrackerMode,
   SupportedGestures,
 } from "@/utils";
-import { shallowRef, watchEffect } from "vue";
+import { ref, shallowRef, watchEffect } from "vue";
 import { CanvasSettings } from "./canvas-settings";
 import { ChartSettings } from "./chart-settings";
 import { PlaybackComponentSettings } from "./playback-component-settings";
+
+export const addGesture = ref<boolean>(false);
+export const gestureName = ref<string>();
 
 export const gestureCanvasKeys = [
   "dialing",
@@ -25,17 +29,6 @@ export const gestureCanvasKeys = [
   "foreshadowing",
   "linear",
 ];
-
-export const RESET_ALL_KEY = "Space";
-export function getGestureListenerResetKeys(
-  keys: string | string[]
-): Set<string> {
-  if (Array.isArray(keys)) {
-    return new Set([RESET_ALL_KEY, ...keys]);
-  }
-
-  return new Set([RESET_ALL_KEY, ...keys]);
-}
 
 // // -------------------------- GENERAL GESTURE TRACKING --------------------------
 

@@ -1,4 +1,4 @@
-import { DrawingUtils, type Dimensions } from "@/utils";
+import { DrawingUtils, snackbarSubject, type Dimensions } from "@/utils";
 import { reactive } from "vue";
 import { CameraSettings } from "./camera-settings";
 
@@ -74,9 +74,17 @@ export const CanvasSettings = reactive<{
     const context = this.canvasCtx[key];
     if (context) {
       this.upsertGeneralDrawingUtils(key, context);
-      console.log(`Successfully added ${key}`);
+      snackbarSubject.next({
+        open: true,
+        text: `Successfully added ${key} context`,
+        variant: "success",
+      });
     } else {
-      console.log(`Failed to add ${key}`);
+      snackbarSubject.next({
+        open: true,
+        text: `Failed to add ${key} context`,
+        variant: "error",
+      });
     }
   },
 });

@@ -1,10 +1,14 @@
 import {
   EmphasisGestureListener,
+  emphasisSubject,
+  foreshadowingAreaSubject,
   ForeshadowingAreaSubjectType,
   LineShape,
+  playbackSubject,
   startTimeoutInstance,
   type EmphasisGestureListenerConstructorArgs,
 } from "@/utils";
+import type { Subject } from "rxjs";
 import {
   calculateDistance,
   containsValueLargerThanMax,
@@ -26,6 +30,7 @@ export interface ForeshadowingGestureListenerConstructorArgs
   extends GestureListenerConstructorArgs {
   mode?: ForeshadowingShapes;
   playbackControllerType?: "absolute" | "relative";
+  subjects?: Record<string, Subject<any>>;
 }
 
 type ForeshadowingResetKeys = "KeyC" | "KeyA" | "KeyE";
@@ -61,7 +66,6 @@ export class ForeshadowingGestureListener extends GestureListener {
   private initialShapePositions: ForeshadowingShapePosition | undefined;
   private recentShapePositions: ForeshadowingShapePosition | undefined;
 
-  private initialRangePositions: ForeshadowingRangePosition | undefined;
   private recentRangePositions: ForeshadowingRangePosition | undefined;
 
   private currentShape: ForeshadowingShapes | undefined;
@@ -94,10 +98,8 @@ export class ForeshadowingGestureListener extends GestureListener {
         leftHand: SupportedGestures.OPEN_HAND,
       },
     ],
-    gestureSubject,
     canvasDimensions,
     resetKeys,
-    subjects,
     mode = ForeshadowingShapes.RANGE,
     playbackControllerType,
     drawingUtils,
@@ -106,10 +108,14 @@ export class ForeshadowingGestureListener extends GestureListener {
       position,
       dimensions,
       handsToTrack,
-      gestureSubject,
       canvasDimensions,
       resetKeys,
-      subjects,
+      subjects: {
+        [ForeshadowingGestureListener.playbackSubjectKey]: playbackSubject,
+        [ForeshadowingGestureListener.foreshadowingAreaSubjectKey]:
+          foreshadowingAreaSubject,
+        [ForeshadowingGestureListener.emphasisSubjectKey]: emphasisSubject,
+      },
       drawingUtils,
     });
 
@@ -181,7 +187,6 @@ export class ForeshadowingGestureListener extends GestureListener {
       const emphasisControllerState: EmphasisGestureListenerConstructorArgs = {
         position: coordinates,
         dimensions,
-        gestureSubject: this.gestureSubject,
         canvasDimensions: this.canvasDimensions,
         resetKeys: this.resetKeys,
         ...(emphasisSubject
@@ -246,7 +251,6 @@ export class ForeshadowingGestureListener extends GestureListener {
         {
           position,
           dimensions,
-          gestureSubject: this.gestureSubject,
           canvasDimensions: this.canvasDimensions ?? { width: 0, height: 0 },
           emitRange: {
             start: this.recentRangePositions.leftFingerPosition,
@@ -277,7 +281,6 @@ export class ForeshadowingGestureListener extends GestureListener {
   private resetRangeGestureState() {
     this.resetTimer();
     this.currentShape = undefined;
-    this.initialRangePositions = undefined;
     this.recentRangePositions = undefined;
   }
 
@@ -432,9 +435,9 @@ export class ForeshadowingGestureListener extends GestureListener {
 
   private getForeshadowingData() {
     const shape = this.currentShape;
-    const isRect = shape === ForeshadowingShapes.RECTANGLE && this.recentShapePositions;
-    const isCircle = shape === ForeshadowingShapes.CIRCLE && this.recentShapePositions;
-    const isRange = shape === ForeshadowingShapes.RANGE && this.recentShapePositions;
+    const isRect = shape === ForeshadowingShapes.RECTANGLE;
+    const isCircle = shape === ForeshadowingShapes.CIRCLE;
+    const isRange = shape === ForeshadowingShapes.RANGE;
 
     return {
       shape,
@@ -448,7 +451,13 @@ export class ForeshadowingGestureListener extends GestureListener {
   }
 
   private publishToSubject() {
-    const { isRect, isCircle, isRange, rectData, circleData, rangeData } = this.getForeshadowingData();
+    const { isRect, isCircle, isRange, rectData, circleData, rangeData } =
+      this.getForeshadowingData();
+
+    console.log({
+      isRange,
+      rangeData,
+    });
 
     if (isRect && rectData) {
       const { coordinates, dimensions } = rectData;
@@ -527,9 +536,10 @@ export class ForeshadowingGestureListener extends GestureListener {
             coordinates,
             dimensions,
             fill: true,
-            context
+            context,
           });
-        }
+        },
+        ["presenter", "preview"]
       );
     }
     if (shape === ForeshadowingShapes.CIRCLE && this.recentShapePositions) {
@@ -548,9 +558,10 @@ export class ForeshadowingGestureListener extends GestureListener {
             radius,
             coordinates,
             fill: true,
-            context
+            context,
           });
-        }
+        },
+        ["presenter", "preview"]
       );
     }
 
@@ -572,9 +583,10 @@ export class ForeshadowingGestureListener extends GestureListener {
           this.drawingUtils?.drawLine({
             coordinates: [startCoordinates, endCoordinates],
             shape: LineShape.SHARP,
-            context
+            context,
           });
-        }
+        },
+        ["presenter", "preview"]
       );
     }
   }
@@ -618,39 +630,39 @@ export class ForeshadowingGestureListener extends GestureListener {
 
     const canEmit = leftFingerInRange && rightFingerInRange;
 
-    // EMIT NEW TRACKING VALUE
-    if (canEmit) {
-      if (!this.timer) {
-        this.recentRangePositions = newRangePosition;
-        this.initialRangePositions = newRangePosition;
-        this.currentShape = ForeshadowingShapes.RANGE;
-        this.timer = startTimeoutInstance({
-          onCompletion: () => {
-            if (this.initialRangePositions && this.recentRangePositions) {
-              const diffs = distanceBetweenPoints(
-                Object.values(this.initialRangePositions),
-                Object.values(this.recentRangePositions)
-              ).map((diff: any) => diff.euclideanDistance);
+    if (!canEmit) {
+      this.recentRangePositions = undefined;
+      this.currentShape = undefined;
+    } else {
+      this.recentRangePositions = newRangePosition;
+      this.currentShape = ForeshadowingShapes.RANGE;
 
-              if (!containsValueLargerThanMax(diffs, 30)) {
-                if (this.currentShape === ForeshadowingShapes.RANGE) {
-                  if (this.currentShape) {
-                    this.showVisualIndicators = true;
-                    this.publishToSubject();
-                    this.placeListenerInPosition(this.currentShape);
-                  }
-                }
+      if (this.timer) return;
 
-                this.resetRangeGestureState();
+      this.timer = startTimeoutInstance({
+        onCompletion: () => {
+          if (this.recentRangePositions) {
+            const diffs = distanceBetweenPoints(
+              Object.values(newRangePosition),
+              Object.values(this.recentRangePositions)
+            ).map((diff: any) => diff.euclideanDistance);
+
+            if (containsValueLargerThanMax(diffs, 30)) {
+              this.resetRangeGestureState();
+              this.resetTimer();
+            } else {
+              if (this.currentShape === ForeshadowingShapes.RANGE) {
+                this.showVisualIndicators = true;
+                this.publishToSubject();
+                // this.placeListenerInPosition(this.currentShape);
               }
+              // Reset timer after 2 seconds so users have time to move hands out of frame;
+              this.resetTimer(2000);
             }
-            this.timer = undefined;
-          },
-          timeout: 1000,
-        });
-      } else {
-        this.recentRangePositions = newRangePosition;
-      }
+          }
+        },
+        timeout: 1000,
+      });
     }
   }
 
@@ -696,69 +708,61 @@ export class ForeshadowingGestureListener extends GestureListener {
       );
     }
 
-    const leftIndexInRange = this.isWithinObjectBounds(leftIndex);
-    const leftThumbInRange = this.isWithinObjectBounds(leftThumb);
-    const rightIndexInRange = this.isWithinObjectBounds(rightIndex);
-    const rightThumbInRange = this.isWithinObjectBounds(rightThumb);
-
-    const canEmit =
-      leftIndexInRange &&
-      leftThumbInRange &&
-      rightIndexInRange &&
-      rightThumbInRange;
-
-    const newShapePosition = {
+    const newPosition = {
       leftIndex,
       leftThumb,
       rightIndex,
       rightThumb,
     } as ForeshadowingShapePosition;
 
-    let isRectangle = false;
-    let isCircleShape = false;
+    const leftIndexInRange = this.isWithinObjectBounds(newPosition.leftIndex);
+    const leftThumbInRange = this.isWithinObjectBounds(newPosition.leftThumb);
+    const rightIndexInRange = this.isWithinObjectBounds(newPosition.rightIndex);
+    const rightThumbInRange = this.isWithinObjectBounds(newPosition.rightThumb);
+    const isRectangle = this.isRectShape(newPosition);
+    //const isCircleShape = this.isCircleShape(newShapePosition);
 
-    if (canEmit) {
-      isCircleShape =
-        this.isCircleShape(newShapePosition) &&
-        this.mode === ForeshadowingShapes.CIRCLE;
-      isRectangle =
-        this.isRectShape(newShapePosition) &&
-        this.mode === ForeshadowingShapes.RECTANGLE;
-    }
+    const canEmit =
+      leftIndexInRange &&
+      leftThumbInRange &&
+      rightIndexInRange &&
+      rightThumbInRange &&
+      isRectangle;
 
-    if (isRectangle || isCircleShape) {
-      if (!this.timer) {
-        this.recentShapePositions = newShapePosition;
-        this.initialShapePositions = newShapePosition;
-        this.currentShape = isCircleShape
-          ? ForeshadowingShapes.CIRCLE
-          : isRectangle
-          ? ForeshadowingShapes.RECTANGLE
-          : undefined;
+    if (!canEmit) {
+      this.recentShapePositions = undefined;
+      this.currentShape = undefined;
+    } else {
+      this.recentShapePositions = newPosition;
+      this.currentShape = ForeshadowingShapes.RECTANGLE;
 
-        this.timer = startTimeoutInstance({
-          onCompletion: () => {
-            if (this.initialShapePositions && this.recentShapePositions) {
-              const diffs = distanceBetweenPoints(
-                Object.values(this.initialShapePositions),
-                Object.values(this.recentShapePositions)
-              ).map((diff) => diff.euclideanDistance);
+      if (this.timer) return;
 
-              if (!containsValueLargerThanMax(diffs, 30)) {
-                if (this.currentShape) {
-                  this.showVisualIndicators = true;
-                  this.publishToSubject();
-                  this.placeListenerInPosition(this.currentShape);
-                }
+      this.timer = startTimeoutInstance({
+        onCompletion: () => {
+          if (this.recentShapePositions) {
+            const diffs = distanceBetweenPoints(
+              Object.values(newPosition),
+              Object.values(this.recentShapePositions)
+            ).map((diff) => diff.euclideanDistance);
+
+            if (containsValueLargerThanMax(diffs, 30)) {
+              this.resetRangeGestureState();
+              this.resetTimer();
+            } else {
+              if (this.currentShape) {
+                this.showVisualIndicators = true;
+                this.publishToSubject();
+                // this.placeListenerInPosition(this.currentShape);
               }
-            }
-            this.timer = undefined;
-          },
-          timeout: 1000,
-        });
-      } else {
-        this.recentShapePositions = newShapePosition;
-      }
+              // Reset timer after 2 seconds so users have time to move hands out of frame;
+              this.resetTimer(2000);
+            };
+
+          }
+        },
+        timeout: 1000,
+      });
     }
   }
 
@@ -808,6 +812,19 @@ export class ForeshadowingGestureListener extends GestureListener {
     }
   }
 
+  resetTimer(time?: number) {
+    if (time) {
+      this.timer = startTimeoutInstance({
+        onCompletion: () => {
+          this.timer = undefined;
+        },
+        timeout: time,
+      });
+    } else {
+      this.timer = undefined;
+    }
+  }
+
   protected handleNewData(fingerData: ListenerProcessedFingerData): void {
     /**
      * NOTE: Don't use this.handsToTrack for emphasis as each hands needs to perform
@@ -826,16 +843,9 @@ export class ForeshadowingGestureListener extends GestureListener {
     });
 
     if (match) {
-      if (
-        type === ForeshadowingType.RANGE &&
-        this.mode === ForeshadowingShapes.RANGE
-      ) {
+      if (type === ForeshadowingType.RANGE) {
         this.handleRangeGesture(fingerData);
-      } else if (
-        type === ForeshadowingType.SHAPE &&
-        (this.mode === ForeshadowingShapes.CIRCLE ||
-          this.mode === ForeshadowingShapes.RECTANGLE)
-      ) {
+      } else if (type === ForeshadowingType.SHAPE) {
         this.handleShapeGesture(fingerData);
       }
     }

@@ -1,9 +1,10 @@
 <script lang="ts" setup>
-import { ChartTypeValue, type ChartType } from "@/utils";
+import { ChartTypeValue, ListenerType, type ChartType } from "@/utils";
 import { onMounted, watch } from "vue";
 import { StorySettings } from "../settings-state";
 import { widgetIconMap } from "../settings-state";
 import ChartSettingsTab from "./ChartSettingsTab.vue";
+import GestureSettings from "./GestureSettings.vue";
 
 function getChartType(value: ChartTypeValue): ChartType | undefined {
   switch (value) {
@@ -48,7 +49,7 @@ onMounted(() => {
     <v-row>
       <v-col lg="12">
         <div
-          v-for="widget in StorySettings.currentStory?.layers"
+          v-for="(widget, index) in StorySettings.currentStory?.layers"
           :key="widget.id"
           class="w-100 mb-4 mx-auto"
         >
@@ -62,7 +63,7 @@ onMounted(() => {
             :active="
               widget.id === StorySettings.currentStory?.currentWidget?.id
             "
-            >{{ `${widget.type}-${widget.id}` }}</v-btn
+            >{{ `${widget.type}-${index}` }}</v-btn
           >
         </div>
       </v-col>
@@ -82,6 +83,14 @@ onMounted(() => {
             <ChartSettingsTab
               :type="getChartType(StorySettings.currentStory?.currentWidget?.type as ChartTypeValue)"
             />
+          </div>
+          <div
+            v-if="
+              StorySettings.currentStory?.currentWidget?.type ===
+              ListenerType.RADIAL
+            "
+          >
+            <GestureSettings />
           </div>
         </div>
       </v-col>

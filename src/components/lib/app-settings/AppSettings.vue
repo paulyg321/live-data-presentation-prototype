@@ -5,9 +5,7 @@ import PortalView from "../views/PortalView.vue";
 import {
   CameraSettings,
   CanvasSettings,
-  ChartSettings,
   gestureTracker,
-  getGestureListenerResetKeys,
   renderVideoOnCanvas,
   setVideoDimensions,
   StorySettings,
@@ -25,18 +23,15 @@ import { Hands, type Results } from "@mediapipe/hands";
 import { PortalState } from "./settings-state";
 import {
   ChartTypeValue,
-  DrawingUtils,
-  emphasisSubject,
-  foreshadowingAreaSubject,
   ForeshadowingGestureListener,
   ForeshadowingShapes,
   LinearPlaybackGestureListener,
   ListenerType,
-  playbackSubject,
   RadialPlaybackGestureListener,
   RadialTrackerMode,
   SupportedGestures,
   type ChartType,
+getGestureListenerResetKeys,
 } from "@/utils";
 import WidgetSettingsTab from "./nav-drawer-tab/WidgetSettingsTab.vue";
 import PortalSettingsTab from "./nav-drawer-tab/PortalSettingsTab.vue";
@@ -53,11 +48,12 @@ enum AvailableWidgets {
   RADIAL_PLAYBACK = "radial-playback",
   FORESHADOWING = "foreshadowing",
   PORTALS = "portals",
+  // GESTURE = "gesture",
 }
 
 enum SettingsTab {
   CHART_SETTINGS = "chart-settings",
-  GESTURE_SETTINGS = "gesture-settings",
+  // GESTURE_SETTINGS = "gesture-settings",
   PORTALS = "portals",
   VIDEO_SETTINGS = "video-settings",
   WIDGET_SETTINGS = "widget-settings",
@@ -71,7 +67,6 @@ const disableChartType = computed(() => {
 
 function handleSaveChart() {
   currentTab.value = SettingsTab.WIDGET_SETTINGS;
-  ChartSettings.setCurrentChart();
 }
 
 function handleChartWidget(value: SettingsTab, type?: ChartType) {
@@ -94,6 +89,9 @@ function handleAddWidget(value: {
       case AvailableWidgets.VIDEO:
         currentTab.value = SettingsTab.VIDEO_SETTINGS;
         break;
+      // case AvailableWidgets.GESTURE:
+      //   currentTab.value = SettingsTab.GESTURE_SETTINGS;
+      //   break;
       case AvailableWidgets.PORTALS:
         currentTab.value = SettingsTab.PORTALS;
         break;
@@ -157,11 +155,7 @@ function addWidget(type: string) {
             rightHand: SupportedGestures.OPEN_HAND,
           },
         ],
-        gestureSubject: gestureTracker.value.gestureSubject,
         canvasDimensions: CanvasSettings.dimensions,
-        subjects: {
-          [LinearPlaybackGestureListener.playbackSubjectKey]: playbackSubject,
-        },
         resetKeys: getGestureListenerResetKeys("KeyL"),
         drawingUtils,
       });
@@ -174,12 +168,8 @@ function addWidget(type: string) {
       const newListener = new RadialPlaybackGestureListener({
         position: { x: 0, y: 0 },
         dimensions: { width: 100, height: 100 },
-        gestureSubject: gestureTracker.value.gestureSubject,
         canvasDimensions: CanvasSettings.dimensions,
         mode: RadialTrackerMode.NORMAL,
-        subjects: {
-          [RadialPlaybackGestureListener.playbackSubjectKey]: playbackSubject,
-        },
         resetKeys: getGestureListenerResetKeys("KeyR"),
         drawingUtils,
       });
@@ -189,22 +179,10 @@ function addWidget(type: string) {
       break;
     }
     case ListenerType.FORESHADOWING: {
-      const chart = StorySettings.currentStory?.getChart();
-      const chartPosition = chart?.position;
-      const chartDimensions = chart?.dimensions;
-      if (!chartDimensions || !chartPosition) return;
-
       const newListener = new ForeshadowingGestureListener({
-        position: chartPosition,
-        dimensions: chartDimensions,
-        gestureSubject: gestureTracker.value.gestureSubject,
+        position: { x: 0, y: 0 },
+        dimensions: { width: 200, height: 200 },
         canvasDimensions: CanvasSettings.dimensions,
-        subjects: {
-          [ForeshadowingGestureListener.playbackSubjectKey]: playbackSubject,
-          [ForeshadowingGestureListener.emphasisSubjectKey]: emphasisSubject,
-          [ForeshadowingGestureListener.foreshadowingAreaSubjectKey]:
-            foreshadowingAreaSubject,
-        },
         resetKeys: getGestureListenerResetKeys("KeyF"),
         mode: ForeshadowingShapes.RECTANGLE,
         playbackControllerType: "absolute",
@@ -348,6 +326,17 @@ onMounted(() => {
               </v-list-item>
             </template>
           </v-tooltip>
+
+          <!-- <v-tooltip text="Gesture Settings">
+            <template v-slot:activator="{ props }">
+              <v-list-item
+                prepend-icon="mdi-gesture"
+                :value="AvailableWidgets.GESTURE"
+                v-bind="props"
+              >
+              </v-list-item>
+            </template>
+          </v-tooltip> -->
 
           <v-tooltip text="Portals">
             <template v-slot:activator="{ props }">

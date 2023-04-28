@@ -1,10 +1,15 @@
 import {
   calculateDistance,
+  DollarRecognizer,
   PlaybackSubjectType,
   startTimeoutInstance,
   startTimerInstance,
+  getCircleFit,
+  playbackSubject,
+  snackbarSubject,
 } from "@/utils";
 import _ from "lodash";
+import type { Subject } from "rxjs";
 import { Affect, type Coordinate2D } from "../../chart";
 import { HANDS } from "./gesture-utils";
 import {
@@ -14,6 +19,8 @@ import {
 } from "./GestureListener";
 import { SupportedGestures } from "./handGestures";
 
+const CIRCLEFIT = getCircleFit();
+
 export enum RadialTrackerMode {
   NORMAL = "normal",
   TRACKING = "tracking",
@@ -22,6 +29,7 @@ export enum RadialTrackerMode {
 export interface RadialPlaybackGestureListenerConstructorArgs
   extends GestureListenerConstructorArgs {
   mode: RadialTrackerMode;
+  subjects?: Record<string, Subject<any>>;
 }
 
 export interface AnimationState {
@@ -31,6 +39,7 @@ export interface AnimationState {
 
 export class RadialPlaybackGestureListener extends GestureListener {
   static playbackSubjectKey = "playbackSubject";
+  static snackbarSubjectKey = "snackbarSubject";
 
   private rotations = 0;
   private angleStack: number[] = [];
@@ -41,6 +50,8 @@ export class RadialPlaybackGestureListener extends GestureListener {
     isPlaying: false,
   };
   private currentAngle = 0;
+  private strokeRecognizer: DollarRecognizer;
+  private stroke: Coordinate2D[] = [];
 
   constructor({
     position,
@@ -55,12 +66,10 @@ export class RadialPlaybackGestureListener extends GestureListener {
         leftHand: SupportedGestures.POINTING,
       },
     ],
-    gestureSubject,
     canvasDimensions,
     mode,
     resetKeys,
-    subjects,
-    drawingUtils
+    drawingUtils,
   }: RadialPlaybackGestureListenerConstructorArgs) {
     super({
       position,
@@ -70,14 +79,17 @@ export class RadialPlaybackGestureListener extends GestureListener {
       },
       handsToTrack,
       gestureTypes,
-      gestureSubject,
       canvasDimensions,
       resetKeys,
-      subjects,
+      subjects: {
+        [RadialPlaybackGestureListener.playbackSubjectKey]: playbackSubject,
+        [RadialPlaybackGestureListener.snackbarSubjectKey]: snackbarSubject,
+      },
       drawingUtils,
     });
 
     this.mode = mode;
+    this.strokeRecognizer = new DollarRecognizer();
   }
 
   updateState(
@@ -98,8 +110,12 @@ export class RadialPlaybackGestureListener extends GestureListener {
   }
 
   private convertDistanceToAffect(distance: number) {
-    if (distance <= 40) return Affect.TENDERNESS;
-    if (distance > 40 && distance < 100) return Affect.EXCITEMENT;
+    const radius = this.dimensions.width / 2;
+    const oneThirdRadius = radius * (1 / 3);
+    const twoThirdRadius = radius * (2 / 3);
+
+    if (distance <= oneThirdRadius) return Affect.TENDERNESS;
+    if (distance <= twoThirdRadius) return Affect.EXCITEMENT;
     return Affect.JOY;
   }
 
@@ -142,9 +158,10 @@ export class RadialPlaybackGestureListener extends GestureListener {
           yScale: (value: number) => {
             return value + fontSize / 4;
           },
-          context
+          context,
         });
-      }
+      },
+      ["preview", "presenter"]
     );
   }
 
@@ -166,9 +183,10 @@ export class RadialPlaybackGestureListener extends GestureListener {
           endAngle,
           fill: true,
           drawLineToCenter: true,
-          context
+          context,
         });
-      }
+      },
+      ["preview", "presenter"]
     );
   }
 
@@ -190,9 +208,10 @@ export class RadialPlaybackGestureListener extends GestureListener {
           endAngle,
           stroke: true,
           drawLineToCenter: true,
-          context
+          context,
         });
-      }
+      },
+      ["presenter", "preview"]
     );
   }
 
@@ -229,13 +248,23 @@ export class RadialPlaybackGestureListener extends GestureListener {
               RadialPlaybackGestureListener.playbackSubjectKey,
               {
                 type: PlaybackSubjectType.CONTINUOUS,
-                value: (percentComplete: number) =>
-                  this.updateState({
-                    animationState: {
-                      isPlaying: true,
-                      extent: percentComplete,
-                    },
-                  }),
+                value: (percentComplete: number) => {
+                  if (percentComplete === 1) {
+                    this.updateState({
+                      animationState: {
+                        isPlaying: false,
+                        extent: 0,
+                      },
+                    });
+                  } else {
+                    this.updateState({
+                      animationState: {
+                        isPlaying: true,
+                        extent: percentComplete,
+                      },
+                    });
+                  }
+                },
                 affect: this.convertDistanceToAffect(this.fingerDistance),
                 duration,
               }
@@ -274,6 +303,25 @@ export class RadialPlaybackGestureListener extends GestureListener {
     this.mode = mode;
   }
 
+  renderStrokePath() {
+    this.stroke.forEach((stroke) => {
+      this.drawingUtils.modifyContextStyleAndDraw(
+        {
+          // fillStyle: "orange",
+          // opacity: 0.4,
+        },
+        (context) => {
+          this.drawingUtils.drawCircle({
+            coordinates: stroke,
+            radius: 3,
+            context,
+            fill: true,
+          });
+        }
+      );
+    });
+  }
+
   renderBorder() {
     if (this.animationState.isPlaying) return;
 
@@ -287,9 +335,38 @@ export class RadialPlaybackGestureListener extends GestureListener {
           coordinates: centerPoint,
           radius: this.dimensions.width / 2,
           stroke: true,
-          context
+          context,
         });
-      }
+      },
+      ["preview", "presenter"]
+    );
+  }
+
+  renderReferenceCircles() {
+    if (this.animationState.isPlaying) return;
+
+    const radius = this.dimensions.width / 2;
+    const oneThirdRadius = radius * (1 / 3);
+    const twoThirdRadius = radius * (2 / 3);
+
+    const centerPoint = this.getCenterPoint();
+    [oneThirdRadius, twoThirdRadius].forEach(
+      (value: number) => {
+        this.drawingUtils.modifyContextStyleAndDraw(
+          {
+            strokeStyle: "skyblue",
+          },
+          (context) => {
+            this.drawingUtils.drawCircle({
+              coordinates: centerPoint,
+              radius: value,
+              stroke: true,
+              context,
+            });
+          }
+        );
+      },
+      ["preview", "presenter"]
     );
   }
 
@@ -330,22 +407,69 @@ export class RadialPlaybackGestureListener extends GestureListener {
         thumbPosition
       ));
 
-      this.convertDistanceToAffect(distanceBetweenFingers);
+      // this.convertDistanceToAffect(distanceBetweenFingers);
     }
 
     const canEmit = this.isWithinObjectBounds(indexFingerPosition);
 
-    if (canEmit) {
-      // CANCEL THE ANIMATION
+    if (canEmit && distanceBetweenFingers < 25) {
+      this.stroke.push(indexFingerPosition);
+    } else if (canEmit && distanceBetweenFingers > 45) {
+      if (this.stroke.length > 5) {
+        if (this.addGesture) {
+          this.strokeRecognizer.addGesture("radial", this.stroke);
+          this.publishToSubjectIfExists(
+            RadialPlaybackGestureListener.snackbarSubjectKey,
+            {
+              open: true,
+              text: "Added new dialing gesture",
+              variant: "success",
+            }
+          );
+        } else {
+          const result = this.strokeRecognizer.recognize(this.stroke, false);
+          if (result.name === "radial") {
+            this.stroke.forEach((point: Coordinate2D) => {
+              CIRCLEFIT.addPoint(point.x, point.y);
+            });
+            const fit = CIRCLEFIT.compute();
+            const affect = this.convertDistanceToAffect(fit.radius);
 
-      const angle = this.calculateAngleFromCenter(indexFingerPosition);
-      this.currentAngle = angle;
-      this.handleNewAngle(angle, distanceBetweenFingers);
+            console.log({
+              result,
+              affect,
+            });
+            this.publishToSubjectIfExists(
+              RadialPlaybackGestureListener.playbackSubjectKey,
+              {
+                type: PlaybackSubjectType.CONTINUOUS,
+                value: (percentComplete: number) => {
+                  if (percentComplete === 1) {
+                    this.updateState({
+                      animationState: {
+                        isPlaying: false,
+                        extent: 0,
+                      },
+                    });
+                  } else {
+                    this.updateState({
+                      animationState: {
+                        isPlaying: true,
+                        extent: percentComplete,
+                      },
+                    });
+                  }
+                },
+                affect,
+                duration: 3000,
+              }
+            );
+            CIRCLEFIT.resetPoints();
+          }
+        }
+      }
+      this.stroke = [];
     }
-    // else {
-    //   this.resetAngleState();
-    //   this.clearAllVisualIndicators();
-    // }
   }
 
   cancelAnimation() {
@@ -366,5 +490,7 @@ export class RadialPlaybackGestureListener extends GestureListener {
     this.renderCurrentState();
     this.renderBorder();
     this.renderAnimationContext();
+    this.renderStrokePath();
+    this.renderReferenceCircles();
   }
 }

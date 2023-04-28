@@ -1,5 +1,6 @@
-import { EmphasisMeter, startIntervalInstance } from "@/utils";
+import { EmphasisMeter, emphasisSubject, startIntervalInstance } from "@/utils";
 import _ from "lodash";
+import type { Subject } from "rxjs";
 import { DrawingMode, type Coordinate2D } from "../../chart";
 import { HANDS } from "./gesture-utils";
 import {
@@ -9,8 +10,9 @@ import {
 } from "./GestureListener";
 import { SupportedGestures } from "./handGestures";
 
-export type EmphasisGestureListenerConstructorArgs =
-  GestureListenerConstructorArgs;
+export interface EmphasisGestureListenerConstructorArgs extends GestureListenerConstructorArgs {
+  subjects?: Record<string, Subject<any>>;
+};
 
 export type EmphasisListenerAnimationRangeConfig = [
   // Start value
@@ -96,7 +98,6 @@ export class EmphasisGestureListener extends GestureListener {
     ],
     gestureSubject,
     canvasDimensions,
-    subjects,
     resetKeys,
     drawingUtils,
   }: EmphasisGestureListenerConstructorArgs) {
@@ -107,7 +108,9 @@ export class EmphasisGestureListener extends GestureListener {
       gestureSubject,
       canvasDimensions,
       resetKeys,
-      subjects,
+      subjects: {
+        [EmphasisGestureListener.emphasisSubjectKey]: emphasisSubject,
+      },
       drawingUtils,
     });
 
@@ -187,7 +190,6 @@ export class EmphasisGestureListener extends GestureListener {
   }
 
   draw() {
-    this.clearCanvas();
     this.renderVisualIndicators();
   }
 

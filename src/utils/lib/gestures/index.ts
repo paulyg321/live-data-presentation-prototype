@@ -9,3 +9,5 @@ export * from "./lib/RadialPlaybackGestureListener";
 export * from "./lib/LinearPlaybackGestureListener";
 export * from "./lib/EmphasisGestureListener";
 export * from "./lib/ForeshadowingGestureListener";
+export * from "./lib/dollar-recognizer";
+export * from "./lib/circle-fit";

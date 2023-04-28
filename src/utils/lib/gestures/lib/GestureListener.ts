@@ -1,6 +1,7 @@
 import {
   CanvasElementListener,
   DrawingUtils,
+  gestureSubject,
   HANDS,
   HAND_LANDMARK_IDS,
   SupportedGestures,
@@ -26,7 +27,6 @@ export interface GestureListenerConstructorArgs {
   position: Coordinate2D;
   dimensions: Dimensions;
   canvasDimensions: Dimensions;
-  gestureSubject: Subject<any>;
   // Ordered from most dominant to least dominant
   handsToTrack?: {
     dominant: HANDS;
@@ -71,6 +71,7 @@ export abstract class GestureListener {
       }[];
 
   private gestureSubscription: Subscription | undefined;
+  protected addGesture: boolean;
 
   protected drawingUtils: DrawingUtils;
 
@@ -82,7 +83,6 @@ export abstract class GestureListener {
       nonDominant: HANDS.LEFT,
     },
     gestureTypes = [],
-    gestureSubject,
     canvasDimensions,
     subjects,
     // ACCEPTED VALUES - https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_code_values
@@ -95,7 +95,9 @@ export abstract class GestureListener {
       position: this.position,
       dimensions: this.dimensions,
       isCircle: false,
-      canvasElement: this,
+      updateFn: (value) => {
+        this.updateState(value);
+      },
       drawingUtils,
     });
     this.handsToTrack = handsToTrack;
@@ -112,6 +114,7 @@ export abstract class GestureListener {
       this.setResetHandler();
     }
     this.drawingUtils = drawingUtils;
+    this.addGesture = false;
   }
 
   private setResetHandler() {
@@ -227,7 +230,8 @@ export abstract class GestureListener {
           stroke: true,
           context
         });
-      }
+      },
+      ["presenter", "preview"]
     );
   }
 
@@ -270,6 +274,7 @@ export abstract class GestureListener {
     dimensions,
     handsToTrack,
     canvasDimensions,
+    addGesture,
   }: Partial<GestureListenerConstructorArgs> | any) {
     if (position) {
       this.position = position;
@@ -282,6 +287,9 @@ export abstract class GestureListener {
     }
     if (handsToTrack) {
       this.handsToTrack = handsToTrack;
+    }
+    if (addGesture !== undefined) {
+      this.addGesture = addGesture;
     }
   }
 

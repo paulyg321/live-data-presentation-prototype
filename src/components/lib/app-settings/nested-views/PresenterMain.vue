@@ -4,15 +4,17 @@ import {
   PlaybackSubjectType,
   foreshadowingAreaSubject,
   legendSubject,
+  snackbarSubject,
   CanvasEvent,
+  highlightSubject,
+  Chart,
 } from "@/utils";
-import { onMounted, onUnmounted, watch } from "vue";
+import { onMounted, onUnmounted, ref, watch } from "vue";
 import CanvasWrapper from "../../CanvasWrapper.vue";
 import {
   ChartSettings,
   PlaybackType,
   CanvasSettings,
-  gestureCanvasKeys,
   LegendSettings,
   StorySettings,
 } from "../settings-state";
@@ -25,6 +27,28 @@ import AppCanvas from "../../AppCanvas.vue";
 //     ChartSettings.setAnimationMode(animation);
 //   },
 // });
+const snackbar = ref<boolean>(false);
+const snackbarText = ref<string>("");
+const snackbarVariant = ref<string>("");
+
+highlightSubject.subscribe({
+  next(value: any) {
+    StorySettings.currentStory?.getCharts().map((chart: Chart) => {
+      chart.chart?.updateState({
+        highlightPosition: value,
+      });
+    });
+  },
+});
+
+snackbarSubject.subscribe({
+  next(value: any) {
+    snackbar.value = value.open;
+    snackbarText.value = value.text;
+    // success, info, warning, error
+    snackbarVariant.value = value.variant;
+  },
+});
 
 // PLAYBACK CONTROLS
 playbackSubject.subscribe({
@@ -59,31 +83,40 @@ playbackSubject.subscribe({
 // Foreshadowing area
 foreshadowingAreaSubject.subscribe({
   next(foreshadowingAreaValue: any) {
-    ChartSettings.currentChart?.chart?.setForeshadowing(foreshadowingAreaValue);
+    console.log(foreshadowingAreaValue);
+    StorySettings.currentStory?.getCharts().forEach((chart: Chart) => {
+      chart.chart?.setForeshadowing(foreshadowingAreaValue);
+    });
   },
 });
 
 legendSubject.subscribe({
   next(key: any) {
-    ChartSettings.currentChart?.chart?.toggleSelection(key);
+    console.log(key);
+    const charts = StorySettings.currentStory?.getCharts();
+    if (!charts) return;
+
+    charts[0].chart?.toggleSelection(key);
   },
 });
 
 watch(
   () => ChartSettings.playbackExtent,
   (newValue) => {
-    ChartSettings.currentChart?.chart?.updateState({
-      extent: newValue,
+    StorySettings.currentStory?.getCharts().forEach((chart: Chart) => {
+      chart.chart?.updateState({
+        extent: newValue,
+      });
     });
   }
 );
 
-watch(
-  () => ChartSettings.currentChart,
-  () => {
-    LegendSettings.initializeLegendItems();
-  }
-);
+// watch(
+//   () => ChartSettings.currentChart,
+//   () => {
+//     LegendSettings.initializeLegendItems();
+//   }
+// );
 
 // TODO_Paul: Move all the draw functions in here
 function draw() {
@@ -97,7 +130,8 @@ function draw() {
       });
     });
     StorySettings.currentStory?.draw();
-    // LegendSettings.drawLegendItems();
+    ChartSettings.extentVisualizer?.draw();
+    LegendSettings.drawLegendItems();
   }
   requestAnimationFrame(() => draw());
 }
@@ -127,6 +161,7 @@ function initializeCanvasListeners() {
 onMounted(() => {
   initializeCanvasListeners();
   draw();
+  ChartSettings.setExtentVisualizer();
 });
 </script>
 <!---------------------------------------------------------------------------------------------------------->
@@ -210,6 +245,9 @@ onMounted(() => {
       </v-col>
     </v-row>
   </v-container>
+  <v-snackbar :timeout="2000" :color="snackbarVariant" v-model="snackbar">
+    {{ snackbarText }}
+  </v-snackbar>
 </template>
 <!---------------------------------------------------------------------------------------------------------->
 <style></style>

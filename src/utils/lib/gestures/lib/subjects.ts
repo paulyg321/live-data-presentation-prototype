@@ -19,3 +19,5 @@ export const playbackSubject = new Subject();
 export const foreshadowingAreaSubject = new Subject();
 export const legendSubject = new Subject();
 export const axesSubject = new Subject();
+export const snackbarSubject = new Subject();
+export const highlightSubject = new Subject();

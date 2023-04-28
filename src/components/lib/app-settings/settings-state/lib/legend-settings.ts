@@ -24,7 +24,6 @@ export const LegendSettings = reactive<{
   changeDimensions: (newDimensions: Partial<Dimensions>) => void;
   changePosition: (coord: PartialCoordinate2D) => void;
   changePage: (pageNumber: number) => void;
-  initializeLegendItems: () => void;
   drawLegendItems: () => void;
 }>({
   dimensions: {
@@ -58,10 +57,6 @@ export const LegendSettings = reactive<{
     this.page = pageNumber;
     this.drawLegendItems();
   },
-  initializeLegendItems() {
-    const legendItems = ChartSettings.currentChart?.legendItems as LegendItem[];
-    this.legendItems = legendItems ?? [];
-  },
   drawLegendItems() {
     const drawingUtils = CanvasSettings.generalDrawingUtils;
     if (!drawingUtils) return;
@@ -73,8 +68,6 @@ export const LegendSettings = reactive<{
       const isInRange = index >= start && index < end;
       if (isInRange) {
         const displayedItemIndex = index - start;
-        legendItem.setGestureTracker(gestureTracker.value);
-        legendItem.setLegendSubject(legendSubject);
         legendItem.updateState({
           position: LegendItem.getPositionFromIndex(
             this.position,

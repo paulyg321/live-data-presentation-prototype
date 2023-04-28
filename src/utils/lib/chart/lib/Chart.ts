@@ -6,12 +6,14 @@ import {
   LegendItem,
   type Coordinate2D,
   type Dimensions,
+  getGestureListenerResetKeys,
 } from "@/utils";
 // import { AnimatedCircle } from "./AnimatedCircle";
 import _ from "lodash";
 import { LineChart, type LineItemStates } from "./LineChart";
 import { ScatterPlot, type ScatterPlotItemState } from "./ScatterPlot";
 import { BarChart, type BarChartItemState } from "./BarChart";
+import { HighlightGestureListener } from "../../gestures/lib/HighlightGestureListener";
 
 export enum Affect {
   JOY = "joy",
@@ -72,6 +74,7 @@ export interface NewChartArgs {
   dimensions: Dimensions;
   canvasDimensions: Dimensions;
   drawingUtils: DrawingUtils;
+  highlightListener?: HighlightGestureListener;
 }
 
 const colorArray = d3["schemeCategory10"];
@@ -105,9 +108,6 @@ export class Chart {
   dimensions: Dimensions;
   canvasDimensions: Dimensions;
 
-  chart: LineChart | ScatterPlot | BarChart | undefined;
-  legendItems: LegendItem[] | undefined;
-
   xDomain: [any, any] | undefined;
   dataType:
     | {
@@ -118,7 +118,11 @@ export class Chart {
   yDomain: [any, any] | undefined;
   keyframeData: any;
   keyframes: string[] = [];
+
+  chart: LineChart | ScatterPlot | BarChart | undefined;
   drawingUtils: DrawingUtils;
+  legendItems: LegendItem[] | undefined;
+  highlightListener: HighlightGestureListener;
 
   /**
    * @param type the chart type
@@ -157,7 +161,6 @@ export class Chart {
     this.yField = yField;
     this.zField = zField;
     this.useGroups = useGroups;
-
     this.position = position;
     this.dimensions = dimensions;
     this.drawingUtils = drawingUtils;
@@ -165,11 +168,19 @@ export class Chart {
       position: this.position,
       dimensions: this.dimensions,
       isCircle: false,
-      canvasElement: this,
+      updateFn: (value) => {
+        this.updateState(value);
+      },
       drawingUtils,
     });
     this.canvasDimensions = canvasDimensions;
-
+    this.highlightListener = new HighlightGestureListener({
+      position,
+      dimensions: dimensions,
+      canvasDimensions: canvasDimensions,
+      drawingUtils,
+      resetKeys: getGestureListenerResetKeys("KeyL"),
+    });
     this.groupDataIntoKeyFrames();
     this.computeChartItems();
   }
@@ -441,6 +452,7 @@ export class Chart {
               label: item_group,
               color: value.color,
               canvasDimensions: this.canvasDimensions,
+              drawingUtils: this.drawingUtils,
             }),
           ];
         }
@@ -467,6 +479,10 @@ export class Chart {
         ...dimensions,
       };
     }
+    this.highlightListener.updateState({
+      position: this.position,
+      dimensions: this.dimensions,
+    });
     this.computeChartItems();
   }
 
@@ -490,5 +506,6 @@ export class Chart {
 
   draw() {
     this.chart?.draw();
+    this.highlightListener.draw();
   }
 }

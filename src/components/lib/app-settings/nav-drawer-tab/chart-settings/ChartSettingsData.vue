@@ -1,15 +1,26 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import * as monaco from "monaco-editor";
-import { Chart, ChartTypeValue, DrawingUtils, type ChartType } from "@/utils";
+import {
+  Chart,
+  ChartTypeValue,
+  DrawingUtils,
+  gestureSubject,
+  LineChart,
+  LineInterpolateStrategy,
+  type ChartType,
+} from "@/utils";
 import _ from "lodash";
 import {
   CanvasSettings,
   ChartSettings,
+  getGestureListenerResetKeys,
   initialCanvasDimensions,
   initialChartDimensions,
+  LegendSettings,
   StorySettings,
 } from "../../settings-state";
+import { HighlightGestureListener } from "@/utils/lib/gestures/lib/HighlightGestureListener";
 
 type ChartSettingProps = {
   type?: ChartType;
@@ -17,6 +28,43 @@ type ChartSettingProps = {
   tab?: string;
 };
 const props = defineProps<ChartSettingProps>();
+
+const animation = ref<LineInterpolateStrategy>(LineInterpolateStrategy.BASIC);
+function handleAnimationUpdate(animation: any) {
+  const widget = StorySettings.currentStory?.getCurrentWidget();
+  if (!widget?.layer) return;
+
+  const existingChart = widget?.layer as Chart;
+  (existingChart.chart as LineChart).updateAnimation(animation);
+}
+
+const limitExtent = ref<boolean>(false);
+function handleToggleExtent() {
+  const widget = StorySettings.currentStory?.getCurrentWidget();
+  if (!widget?.layer) return;
+
+  const existingChart = widget?.layer as Chart;
+  (existingChart.chart as LineChart).toggleLimitExtent();
+}
+
+const showLegend = ref<boolean>(false);
+function handleShowLegend() {
+  const widget = StorySettings.currentStory?.getCurrentWidget();
+  if (!widget?.layer) return;
+
+  const newValue = !showLegend.value;
+  showLegend.value = newValue;
+
+  if (newValue === false) {
+    LegendSettings.legendItems = [];
+    return;
+  }
+
+  const existingChart = widget?.layer as Chart;
+  if (existingChart.legendItems) {
+    LegendSettings.legendItems = existingChart.legendItems;
+  }
+}
 
 /**
  * Form Inputs
@@ -156,9 +204,11 @@ watch(
   () => props.tab,
   () => {
     if (props.tab) {
-      const existingChart = StorySettings.currentStory?.getChart();
+      const widget = StorySettings.currentStory?.getCurrentWidget();
+      if (!widget?.layer) return;
+
+      const existingChart = widget?.layer as Chart;
       if (existingChart) {
-        ChartSettings.setCurrentChart();
         monacoEditor.setValue(JSON.stringify(existingChart.data, null, 2));
         chartData.value = existingChart.data;
         chartType.value = existingChart.type;
@@ -184,9 +234,11 @@ watch(
 onMounted(() => {
   setJsonEditor();
   if (props.tab) {
-    const existingChart = StorySettings.currentStory?.getChart();
+    const chart = StorySettings.currentStory?.getCurrentWidget();
+    if (!chart?.layer) return;
+
+    const existingChart = chart?.layer as Chart;
     if (existingChart) {
-      ChartSettings.setCurrentChart();
       monacoEditor.setValue(JSON.stringify(existingChart.data, null, 2));
       chartData.value = existingChart.data;
       chartType.value = existingChart.type;
@@ -251,8 +303,10 @@ onMounted(() => {
             ></v-text-field>
           </v-col>
           <v-col lg="12" v-if="zField !== undefined">
-            <input type="checkbox" id="checkbox" v-model="useGroups" />
-            <label for="checkbox">Group Items by Z Field</label>
+            <v-checkbox
+              label="Group Items by Z Field"
+              v-model="useGroups"
+            ></v-checkbox>
           </v-col>
         </v-row>
         <v-row v-if="!props.tab">
@@ -264,6 +318,43 @@ onMounted(() => {
       </v-container>
     </form>
   </v-card>
+  <v-container>
+    <v-row>
+      <v-col>
+        <v-checkbox
+          label="Show Legend"
+          :checked="showLegend"
+          @click="handleShowLegend"
+        ></v-checkbox>
+      </v-col>
+    </v-row>
+  </v-container>
+  <v-container v-if="chartType?.value === ChartTypeValue.LINE">
+    <v-row>
+      <v-col>
+        <v-select
+          v-model="animation"
+          label="Animation"
+          :items="[
+            LineInterpolateStrategy.BASELINE,
+            LineInterpolateStrategy.BASIC,
+            LineInterpolateStrategy.UNDULATE,
+            LineInterpolateStrategy.DROP,
+          ]"
+          @update:modelValue="handleAnimationUpdate"
+        ></v-select>
+      </v-col>
+    </v-row>
+    <v-row>
+      <v-col>
+        <v-checkbox
+          label="Limit Extent to States"
+          v-model="limitExtent"
+          @click="handleToggleExtent"
+        ></v-checkbox>
+      </v-col>
+    </v-row>
+  </v-container>
 </template>
 <!---------------------------------------------------------------------------------------------------------->
 <style>
