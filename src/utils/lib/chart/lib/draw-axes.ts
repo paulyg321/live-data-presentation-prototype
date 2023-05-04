@@ -10,7 +10,8 @@ export function drawXAxis(
   range: number[],
   fontSize: number,
   tickCount?: number,
-  rotateLabels?: boolean
+  rotateLabels?: boolean,
+  drawLine?: boolean
 ) {
   const [startX, endX] = range;
   const tickPadding = 3,
@@ -36,16 +37,18 @@ export function drawXAxis(
         });
       });
 
-      drawingUtils.drawLine({
-        coordinates: [
-          { x: startX, y: Y + tickSize },
-          { x: startX, y: Y },
-          { x: endX, y: Y },
-          { x: endX, y: Y + tickSize },
-        ],
-        shape: LineShape.SHARP,
-        context
-      });
+      if (drawLine) {
+        drawingUtils.drawLine({
+          coordinates: [
+            { x: startX, y: Y + tickSize },
+            { x: startX, y: Y },
+            { x: endX, y: Y },
+            { x: endX, y: Y + tickSize },
+          ],
+          shape: LineShape.SHARP,
+          context
+        });
+      }
     }
   );
 
@@ -116,7 +119,8 @@ export function drawYAxis(
   range: number[],
   fontSize: number,
   tickCount?: number,
-  scaleBand?: boolean
+  scaleBand?: boolean,
+  drawLine?: boolean,
 ) {
   const [startY, endY] = range;
   const tickPadding = 3,
@@ -148,16 +152,18 @@ export function drawYAxis(
         });
       });
 
-      drawingUtils.drawLine({
-        coordinates: [
-          { x: X - tickSize, y: startY },
-          { x: X, y: startY },
-          { x: X, y: endY },
-          { x: X - tickSize, y: endY },
-        ],
-        shape: LineShape.SHARP,
-        context
-      });
+      if (drawLine) {
+        drawingUtils.drawLine({
+          coordinates: [
+            { x: X - tickSize, y: startY },
+            { x: X, y: startY },
+            { x: X, y: endY },
+            { x: X - tickSize, y: endY },
+          ],
+          shape: LineShape.SHARP,
+          context,
+        });
+      }
     }
   );
 

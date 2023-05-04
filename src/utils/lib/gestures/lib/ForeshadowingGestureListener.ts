@@ -1,402 +1,125 @@
-import {
-  EmphasisGestureListener,
-  emphasisSubject,
-  foreshadowingAreaSubject,
-  ForeshadowingAreaSubjectType,
-  LineShape,
-  playbackSubject,
-  startTimeoutInstance,
-  type EmphasisGestureListenerConstructorArgs,
-} from "@/utils";
-import type { Subject } from "rxjs";
-import {
-  calculateDistance,
-  containsValueLargerThanMax,
-} from "../../calculations";
+import { HAND_LANDMARK_IDS, startTimeoutInstance } from "@/utils";
+import { containsValueLargerThanMax } from "../../calculations";
 import { distanceBetweenPoints, type Coordinate2D } from "../../chart";
 import { HANDS } from "./gesture-utils";
 import {
   GestureListener,
+  ListenerMode,
   type GestureListenerConstructorArgs,
   type ListenerProcessedFingerData,
+  type PosePosition,
+  DEFAULT_POSE_DURATION,
+  DEFAULT_RESET_PAUSE_DURATION,
 } from "./GestureListener";
 import { SupportedGestures } from "./handGestures";
-import {
-  LinearPlaybackGestureListener,
-  type LinearPlaybackGestureListenerConstructorArgs,
-} from "./LinearPlaybackGestureListener";
+import { gsap } from "gsap";
 
-export interface ForeshadowingGestureListenerConstructorArgs
-  extends GestureListenerConstructorArgs {
-  mode?: ForeshadowingShapes;
-  playbackControllerType?: "absolute" | "relative";
-  subjects?: Record<string, Subject<any>>;
-}
-
-type ForeshadowingResetKeys = "KeyC" | "KeyA" | "KeyE";
+export type ForeshadowingGestureListenerConstructorArgs =
+  GestureListenerConstructorArgs;
 
 export enum ForeshadowingType {
   SHAPE = "shape",
   RANGE = "range",
 }
 
-export enum ForeshadowingShapes {
-  RECTANGLE = "rectangle",
-  CIRCLE = "circle",
-  RANGE = "range",
+export enum ForeshadowingStatesMode {
+  NEXT = "next",
+  ALL = "all",
+  COUNT = "count",
 }
 
-export interface ForeshadowingRangePosition {
-  leftFingerPosition: Coordinate2D;
-  rightFingerPosition: Coordinate2D;
-}
-
-export interface ForeshadowingShapePosition {
-  leftIndex: Coordinate2D;
-  leftThumb: Coordinate2D;
-  rightIndex: Coordinate2D;
-  rightThumb: Coordinate2D;
-}
+const REFERENCE_POINT_BOUNDS = 30;
 
 export class ForeshadowingGestureListener extends GestureListener {
-  private initialShapePositions: ForeshadowingShapePosition | undefined;
-  private recentShapePositions: ForeshadowingShapePosition | undefined;
-
-  private recentRangePositions: ForeshadowingRangePosition | undefined;
-
-  private currentShape: ForeshadowingShapes | undefined;
-
-  private emphasisController: EmphasisGestureListener | undefined;
-  private mode: ForeshadowingShapes;
-
-  private playbackController: LinearPlaybackGestureListener | undefined;
-  private playbackControllerType: "relative" | "absolute" | undefined;
-  private showVisualIndicators = false;
-
   constructor({
-    position,
-    dimensions,
     handsToTrack = {
       dominant: HANDS.RIGHT,
       nonDominant: HANDS.LEFT,
     },
     gestureTypes = [
       {
-        rightHand: SupportedGestures.FORESHADOWING_RIGHT_L,
-        leftHand: SupportedGestures.FORESHADOWING_LEFT_L,
-      },
-      {
-        rightHand: SupportedGestures.FORESHADOWING_RIGHT_C,
-        leftHand: SupportedGestures.FORESHADOWING_LEFT_C,
+        rightHand: SupportedGestures.POINTING,
+        leftHand: SupportedGestures.POINTING,
       },
       {
         rightHand: SupportedGestures.OPEN_HAND,
         leftHand: SupportedGestures.OPEN_HAND,
       },
     ],
-    canvasDimensions,
-    resetKeys,
-    mode = ForeshadowingShapes.RANGE,
-    playbackControllerType,
-    drawingUtils,
+    mode = ForeshadowingType.RANGE,
+    listenerMode = ListenerMode.POSE,
+    animationState = {
+      referencePointRadius: REFERENCE_POINT_BOUNDS,
+    },
+    poseDuration = DEFAULT_POSE_DURATION,
+    resetPauseDuration = DEFAULT_RESET_PAUSE_DURATION,
+    numHands = 2,
+    foreshadowingStatesCount = 0,
+    foreshadowingStatesMode = ForeshadowingStatesMode.ALL,
+    ...rest
   }: ForeshadowingGestureListenerConstructorArgs) {
     super({
-      position,
-      dimensions,
+      ...rest,
       handsToTrack,
-      canvasDimensions,
-      resetKeys,
-      drawingUtils,
-    });
-
-    this.gestureTypes = gestureTypes;
-    this.mode = mode;
-    this.playbackControllerType = playbackControllerType;
-    this.setModeSwitcher();
-  }
-
-  private keyToModeMap: Record<ForeshadowingResetKeys, ForeshadowingShapes> = {
-    KeyC: ForeshadowingShapes.CIRCLE,
-    KeyA: ForeshadowingShapes.RANGE,
-    KeyE: ForeshadowingShapes.RECTANGLE,
-  };
-
-  private setModeSwitcher() {
-    Object.keys(this.keyToModeMap)?.forEach((modeSwitchKey: string) => {
-      document.addEventListener("keypress", (event) => {
-        if (event.code === modeSwitchKey) {
-          this.mode =
-            this.keyToModeMap[modeSwitchKey as ForeshadowingResetKeys];
-        }
-      });
+      gestureTypes,
+      mode,
+      listenerMode,
+      animationState,
+      poseDuration,
+      resetPauseDuration,
+      numHands,
+      foreshadowingStatesCount,
+      foreshadowingStatesMode,
     });
   }
 
-  private verifyGesturesMatch({
-    left,
-    right,
-  }: {
-    left: SupportedGestures;
-    right: SupportedGestures;
-  }) {
-    let match = false;
-    let type = undefined;
-    if (left === SupportedGestures.FORESHADOWING_LEFT_C) {
-      match = right === SupportedGestures.FORESHADOWING_RIGHT_C;
-      type = ForeshadowingType.SHAPE;
-    }
-
-    if (left === SupportedGestures.FORESHADOWING_LEFT_L) {
-      match = right === SupportedGestures.FORESHADOWING_RIGHT_L;
-      type = ForeshadowingType.SHAPE;
-    }
-
-    if (left === SupportedGestures.OPEN_HAND) {
-      match = right === SupportedGestures.OPEN_HAND;
-      type = ForeshadowingType.RANGE;
-    }
-
-    return {
-      match,
-      type,
-    };
-  }
-
-  private placeListenerInPosition(shape: ForeshadowingShapes) {
-    if (shape === ForeshadowingShapes.RECTANGLE) {
-      const rectData = this.getRectDataFromState();
-
-      if (!rectData) return;
-
-      const { coordinates, dimensions } = rectData;
-
-      const emphasisSubject = this.getSubjectByKey(
-        ForeshadowingGestureListener.emphasisSubjectKey
-      );
-
-      const emphasisControllerState: EmphasisGestureListenerConstructorArgs = {
-        position: coordinates,
-        dimensions,
-        canvasDimensions: this.canvasDimensions,
-        resetKeys: this.resetKeys,
-        ...(emphasisSubject
-          ? {
-              subjects: {
-                [EmphasisGestureListener.emphasisSubjectKey]: emphasisSubject,
-              },
-            }
-          : {}),
-        drawingUtils: this.drawingUtils,
-      };
-
-      if (this.emphasisController) {
-        this.emphasisController.updateState(emphasisControllerState);
-      } else {
-        this.emphasisController = new EmphasisGestureListener(
-          emphasisControllerState
-        );
-      }
-    }
-    if (shape === ForeshadowingShapes.RANGE && this.recentRangePositions) {
-      const playbackSubject = this.getSubjectByKey(
-        ForeshadowingGestureListener.playbackSubjectKey
-      );
-
-      const rangeData = this.getRangeDataFromState();
-
-      if (!rangeData) return;
-
-      let position;
-
-      let dimensions;
-
-      const { startCoordinates, endCoordinates } = rangeData;
-
-      if (this.playbackControllerType === "absolute") {
-        const width = endCoordinates.x - startCoordinates.x;
-
-        if (width <= 0) return;
-
-        position = startCoordinates;
-        dimensions = {
-          width,
-          height: 50,
-        };
-      } else {
-        position = {
-          x: this.position.x,
-          y: Math.min(
-            this.recentRangePositions.leftFingerPosition.y,
-            this.recentRangePositions.rightFingerPosition.y
-          ),
-        };
-
-        dimensions = {
-          width: this.dimensions.width,
-          height: 50,
-        };
-      }
-
-      const playbackControllerState: LinearPlaybackGestureListenerConstructorArgs =
-        {
-          position,
-          dimensions,
-          canvasDimensions: this.canvasDimensions ?? { width: 0, height: 0 },
-          emitRange: {
-            start: this.recentRangePositions.leftFingerPosition,
-            end: this.recentRangePositions.rightFingerPosition,
-          },
-          ...(playbackSubject
-            ? {
-                subjects: {
-                  [LinearPlaybackGestureListener.playbackSubjectKey]:
-                    playbackSubject,
-                },
-              }
-            : {}),
-          resetKeys: this.resetKeys,
-          drawingUtils: this.drawingUtils,
-        };
-
-      if (this.playbackController) {
-        this.playbackController.updateState(playbackControllerState);
-      } else {
-        this.playbackController = new LinearPlaybackGestureListener(
-          playbackControllerState
-        );
-      }
+  draw() {
+    this.renderBorder();
+    if (this.timer) {
+      this.drawForeshadowingState();
     }
   }
 
-  private resetRangeGestureState() {
+  resetHandler(): void {
+    this.publishToSubjectIfExists(
+      GestureListener.foreshadowingAreaSubjectKey,
+      undefined
+    );
+    this.resetGestureState();
+  }
+
+  private resetGestureState() {
     this.resetTimer();
-    this.currentShape = undefined;
-    this.recentRangePositions = undefined;
-  }
-
-  // private resetPlaybackController() {
-  //   this.playbackController?.resetHandler();
-  // }
-
-  private resetShapeGestureState() {
-    this.resetTimer();
-    this.currentShape = undefined;
-    this.initialShapePositions = undefined;
-    this.recentShapePositions = undefined;
-  }
-
-  private resetEmphasisController() {
-    this.emphasisController?.updateState({
-      dimensions: {
-        width: 0,
-        height: 0,
-      },
-    });
-    this.emphasisController?.resetHandler();
-  }
-
-  private resetPlaybackController() {
-    this.playbackController?.updateState({
-      dimensions: {
-        width: 0,
-        height: 0,
-      },
-    });
-    this.playbackController?.resetHandler();
-  }
-
-  private isCircleShape({
-    leftIndex,
-    leftThumb,
-    rightIndex,
-    rightThumb,
-  }: ForeshadowingShapePosition) {
-    const fingerOneDist = calculateDistance(
-      leftIndex as Coordinate2D,
-      rightIndex as Coordinate2D
-    );
-
-    const fingerTwoDist = calculateDistance(
-      leftThumb as Coordinate2D,
-      rightThumb as Coordinate2D
-    );
-
-    if (
-      fingerOneDist.euclideanDistance < 20 &&
-      fingerTwoDist.euclideanDistance < 20
-    ) {
-      return true;
-    }
-
-    return false;
-  }
-
-  private isRectShape({
-    leftIndex,
-    leftThumb,
-    rightIndex,
-    rightThumb,
-  }: ForeshadowingShapePosition) {
-    const leftThumbRightIndexDist = calculateDistance(
-      leftThumb as Coordinate2D,
-      rightIndex as Coordinate2D
-    );
-
-    const rightThumbLeftIndexDist = calculateDistance(
-      rightThumb as Coordinate2D,
-      leftIndex as Coordinate2D
-    );
-
-    if (
-      leftThumbRightIndexDist.euclideanDistance < this.dimensions.height &&
-      rightThumbLeftIndexDist.euclideanDistance < this.dimensions.height
-    ) {
-      return true;
-    }
-
-    return false;
-  }
-
-  private getRangeDataFromState() {
-    if (this.recentRangePositions) {
-      const startCoordinates = {
-        x: this.recentRangePositions.leftFingerPosition.x,
-        y: this.recentRangePositions.leftFingerPosition.y,
-      };
-
-      const endCoordinates = {
-        x: this.recentRangePositions.rightFingerPosition.x,
-        y: this.recentRangePositions.rightFingerPosition.y,
-      };
-
-      return {
-        startCoordinates,
-        endCoordinates,
-      };
-    }
-
-    return undefined;
+    this.posePosition = undefined;
+    this.posePositionToMatch = undefined;
   }
 
   private getRectDataFromState() {
-    if (this.recentShapePositions) {
+    const rightThumb = this.posePosition?.right[HAND_LANDMARK_IDS.thumb_tip];
+    const leftIndex =
+      this.posePosition?.left[HAND_LANDMARK_IDS.index_finger_tip];
+
+    if (leftIndex && rightThumb) {
       const rectDimensions = {
-        width: Math.abs(
-          this.recentShapePositions.leftThumb.x -
-            this.recentShapePositions.rightThumb.x
-        ),
-        height: Math.abs(
-          this.recentShapePositions.leftIndex.y -
-            this.recentShapePositions.rightIndex.y
-        ),
-      };
-      const rectCoordinates = {
-        x: this.recentShapePositions.leftThumb.x,
-        y: this.recentShapePositions.leftIndex.y,
+        width: Math.abs(leftIndex.x - rightThumb.x),
+        height: Math.abs(leftIndex.y - rightThumb.y),
       };
 
+      if (this.mode === ForeshadowingType.RANGE) {
+        return {
+          coordinates: {
+            ...leftIndex,
+            y: 0,
+          },
+          dimensions: {
+            ...rectDimensions,
+            height: this.canvasDimensions.height,
+          },
+        };
+      }
+
       return {
-        coordinates: rectCoordinates,
+        coordinates: leftIndex,
         dimensions: rectDimensions,
       };
     }
@@ -404,409 +127,188 @@ export class ForeshadowingGestureListener extends GestureListener {
   }
 
   private getCircleDataFromState() {
-    if (this.recentShapePositions) {
-      const circleRadius =
-        (this.recentShapePositions.rightThumb.y -
-          this.recentShapePositions.rightIndex.y) /
-        2;
-      const circlePosition = {
-        x: this.recentShapePositions.rightIndex.x,
-        y: this.recentShapePositions.rightIndex.y + circleRadius,
-      };
+    this.stroke.forEach((point: Coordinate2D) => {
+      GestureListener.circleFitter.addPoint(point.x, point.y);
+    });
 
-      return {
-        coordinates: circlePosition,
-        radius: circleRadius,
-      };
-    }
-
-    return undefined;
-  }
-
-  private getForeshadowingData() {
-    const shape = this.currentShape;
-    const isRect = shape === ForeshadowingShapes.RECTANGLE;
-    const isCircle = shape === ForeshadowingShapes.CIRCLE;
-    const isRange = shape === ForeshadowingShapes.RANGE;
-
+    const fit = GestureListener.circleFitter.compute();
+    GestureListener.circleFitter.resetPoints();
     return {
-      shape,
-      isRect,
-      isCircle,
-      isRange,
-      rectData: this.getRectDataFromState(),
-      circleData: this.getCircleDataFromState(),
-      rangeData: this.getRangeDataFromState(),
+      coordinates: fit.center,
+      radius: fit.radius,
     };
   }
 
+  private getForeshadowingData() {
+    if (this.listenerMode === "pose") {
+      return this.getRectDataFromState();
+    }
+
+    return this.getCircleDataFromState();
+  }
+
   private publishToSubject() {
-    const { isRect, isCircle, isRange, rectData, circleData, rangeData } =
-      this.getForeshadowingData();
+    const foreshadowingArea = this.getForeshadowingData();
 
-    if (isRect && rectData) {
-      const { coordinates, dimensions } = rectData;
-
-      const foreshadowingArea = {
-        position: coordinates,
-        dimensions: dimensions,
-      };
-
-      this.publishToSubjectIfExists(
-        ForeshadowingGestureListener.foreshadowingAreaSubjectKey,
-        {
-          type: ForeshadowingAreaSubjectType.RECTANGLE,
-          area: foreshadowingArea,
-        }
-      );
-    } else if (isCircle && circleData) {
-      const { coordinates, radius } = circleData;
-
-      const foreshadowingArea = {
-        position: coordinates,
-        radius,
-      };
-
-      this.publishToSubjectIfExists(
-        ForeshadowingGestureListener.foreshadowingAreaSubjectKey,
-        {
-          type: ForeshadowingAreaSubjectType.CIRCLE,
-          area: foreshadowingArea,
-        }
-      );
-    } else if (isRange && rangeData) {
-      const { startCoordinates, endCoordinates } = rangeData;
-
-      const foreshadowingArea = {
-        position: {
-          x: startCoordinates.x,
-          y: 0,
-        },
-        dimensions: {
-          width: Math.abs(startCoordinates.x - endCoordinates.x),
-          height: this.canvasDimensions.height,
-        },
-      };
-
-      this.publishToSubjectIfExists(
-        ForeshadowingGestureListener.foreshadowingAreaSubjectKey,
-        {
-          type: ForeshadowingAreaSubjectType.RANGE,
-          area: foreshadowingArea,
-        }
-      );
-    }
+    this.publishToSubjectIfExists(GestureListener.foreshadowingAreaSubjectKey, {
+      area: foreshadowingArea,
+      count: this.foreshadowingStatesCount,
+      mode: this.foreshadowingStatesMode,
+    });
   }
 
-  private renderVisualIndicators() {
-    if (!this.showVisualIndicators) return;
+  private handlePoseGesture(
+    rightHandCoords: Coordinate2D[],
+    leftHandCoords: Coordinate2D[]
+  ) {
+    const FINGER_IDS = [
+      HAND_LANDMARK_IDS.index_finger_tip,
+      HAND_LANDMARK_IDS.thumb_tip,
+    ];
 
-    const shape = this.currentShape;
-    const fillStyle = "black";
-    const opacity = 0.2;
+    const { newPosePosition, isInBounds } = FINGER_IDS.reduce(
+      (
+        results: { newPosePosition: PosePosition; isInBounds: boolean },
+        currentFingerId: number
+      ) => {
+        const leftFinger = leftHandCoords[currentFingerId];
+        const rightFinger = rightHandCoords[currentFingerId];
 
-    if (shape === ForeshadowingShapes.RECTANGLE && this.recentShapePositions) {
-      const rectData = this.getRectDataFromState();
+        const bothInBounds =
+          this.isWithinObjectBounds(rightFinger) &&
+          this.isWithinObjectBounds(leftFinger);
 
-      if (!rectData) return;
-
-      const { coordinates, dimensions } = rectData;
-      this.drawingUtils?.modifyContextStyleAndDraw(
-        {
-          fillStyle,
-          opacity,
-        },
-        (context) => {
-          this.drawingUtils?.drawRect({
-            coordinates,
-            dimensions,
-            fill: true,
-            context,
-          });
-        },
-        ["presenter", "preview"]
-      );
-    }
-    if (shape === ForeshadowingShapes.CIRCLE && this.recentShapePositions) {
-      const circleData = this.getCircleDataFromState();
-
-      if (!circleData) return;
-
-      const { radius, coordinates } = circleData;
-      this.drawingUtils?.modifyContextStyleAndDraw(
-        {
-          fillStyle,
-          opacity,
-        },
-        (context) => {
-          this.drawingUtils?.drawCircle({
-            radius,
-            coordinates,
-            fill: true,
-            context,
-          });
-        },
-        ["presenter", "preview"]
-      );
-    }
-
-    if (shape === ForeshadowingShapes.RANGE && this.recentRangePositions) {
-      const lineWidth = 15;
-      const rangeData = this.getRangeDataFromState();
-
-      if (!rangeData) return;
-
-      const { startCoordinates, endCoordinates } = rangeData;
-
-      this.drawingUtils?.modifyContextStyleAndDraw(
-        {
-          lineWidth,
-          strokeStyle: "red",
-          opacity,
-        },
-        (context) => {
-          this.drawingUtils?.drawLine({
-            coordinates: [startCoordinates, endCoordinates],
-            shape: LineShape.SHARP,
-            context,
-          });
-        },
-        ["presenter", "preview"]
-      );
-    }
-  }
-
-  private handleRangeGesture(fingerData: ListenerProcessedFingerData) {
-    const leftHandData = fingerData[HANDS.LEFT];
-    const rightHandData = fingerData[HANDS.RIGHT];
-
-    if (!leftHandData || !rightHandData) {
-      return;
-    }
-
-    const [leftFingerToTrack] = leftHandData.fingersToTrack;
-    const leftFingerPosition = leftHandData.fingerPositions[
-      leftFingerToTrack
-    ] as Coordinate2D;
-
-    const [rightFingerToTrack] = rightHandData.fingersToTrack;
-    const rightFingerPosition = rightHandData.fingerPositions[
-      rightFingerToTrack
-    ] as Coordinate2D;
-
-    if (
-      leftFingerPosition.x === undefined ||
-      leftFingerPosition.y === undefined ||
-      rightFingerPosition.x === undefined ||
-      rightFingerPosition.y === undefined
-    ) {
-      throw new Error(
-        "handleRangeGesture - one of the finger positions is undefined"
-      );
-    }
-
-    const newRangePosition = {
-      leftFingerPosition,
-      rightFingerPosition,
-    } as ForeshadowingRangePosition;
-
-    const leftFingerInRange = this.isWithinObjectBounds(leftFingerPosition);
-    const rightFingerInRange = this.isWithinObjectBounds(rightFingerPosition);
-
-    const canEmit = leftFingerInRange && rightFingerInRange;
-
-    if (!canEmit) {
-      this.recentRangePositions = undefined;
-      this.currentShape = undefined;
-    } else {
-      this.recentRangePositions = newRangePosition;
-      this.currentShape = ForeshadowingShapes.RANGE;
-
-      if (this.timer) return;
-
-      this.timer = startTimeoutInstance({
-        onCompletion: () => {
-          if (this.recentRangePositions) {
-            const diffs = distanceBetweenPoints(
-              Object.values(newRangePosition),
-              Object.values(this.recentRangePositions)
-            ).map((diff: any) => diff.euclideanDistance);
-
-            if (containsValueLargerThanMax(diffs, 30)) {
-              this.resetRangeGestureState();
-              this.resetTimer();
-            } else {
-              if (this.currentShape === ForeshadowingShapes.RANGE) {
-                this.showVisualIndicators = true;
-                this.publishToSubject();
-                // this.placeListenerInPosition(this.currentShape);
-              }
-              // Reset timer after 2 seconds so users have time to move hands out of frame;
-              this.resetTimer(2000);
-            }
-          }
-        },
-        timeout: 1000,
-      });
-    }
-  }
-
-  private handleShapeGesture(fingerData: ListenerProcessedFingerData) {
-    // this.renderReferencePoints();
-    const leftHandData = fingerData[HANDS.LEFT];
-    const rightHandData = fingerData[HANDS.RIGHT];
-
-    if (!leftHandData || !rightHandData) {
-      return;
-    }
-
-    const [leftIndexLandmarkId, leftThumbLandmarkId] =
-      leftHandData.fingersToTrack;
-    const leftIndex = leftHandData.fingerPositions[
-      leftIndexLandmarkId
-    ] as Coordinate2D;
-    const leftThumb = leftHandData.fingerPositions[
-      leftThumbLandmarkId
-    ] as Coordinate2D;
-
-    const [rightIndexLandmarkId, rightThumbLandmarkId] =
-      rightHandData.fingersToTrack;
-    const rightIndex = rightHandData.fingerPositions[
-      rightIndexLandmarkId
-    ] as Coordinate2D;
-    const rightThumb = rightHandData.fingerPositions[
-      rightThumbLandmarkId
-    ] as Coordinate2D;
-
-    if (
-      leftIndex.x === undefined ||
-      leftIndex.y === undefined ||
-      leftThumb.x === undefined ||
-      leftThumb.y === undefined ||
-      rightIndex.x === undefined ||
-      rightIndex.y === undefined ||
-      rightThumb.x === undefined ||
-      rightThumb.y === undefined
-    ) {
-      throw new Error(
-        "handleShapeGesture - one of the finger positions is undefined"
-      );
-    }
-
-    const newPosition = {
-      leftIndex,
-      leftThumb,
-      rightIndex,
-      rightThumb,
-    } as ForeshadowingShapePosition;
-
-    const leftIndexInRange = this.isWithinObjectBounds(newPosition.leftIndex);
-    const leftThumbInRange = this.isWithinObjectBounds(newPosition.leftThumb);
-    const rightIndexInRange = this.isWithinObjectBounds(newPosition.rightIndex);
-    const rightThumbInRange = this.isWithinObjectBounds(newPosition.rightThumb);
-    const isRectangle = this.isRectShape(newPosition);
-    //const isCircleShape = this.isCircleShape(newShapePosition);
-
-    const canEmit =
-      leftIndexInRange &&
-      leftThumbInRange &&
-      rightIndexInRange &&
-      rightThumbInRange &&
-      isRectangle;
-
-    if (!canEmit) {
-      this.recentShapePositions = undefined;
-      this.currentShape = undefined;
-    } else {
-      this.recentShapePositions = newPosition;
-      this.currentShape = ForeshadowingShapes.RECTANGLE;
-
-      if (this.timer) return;
-
-      this.timer = startTimeoutInstance({
-        onCompletion: () => {
-          if (this.recentShapePositions) {
-            const diffs = distanceBetweenPoints(
-              Object.values(newPosition),
-              Object.values(this.recentShapePositions)
-            ).map((diff) => diff.euclideanDistance);
-
-            if (containsValueLargerThanMax(diffs, 30)) {
-              this.resetRangeGestureState();
-              this.resetTimer();
-            } else {
-              if (this.currentShape) {
-                this.showVisualIndicators = true;
-                this.publishToSubject();
-                // this.placeListenerInPosition(this.currentShape);
-              }
-              // Reset timer after 2 seconds so users have time to move hands out of frame;
-              this.resetTimer(2000);
-            }
-          }
-        },
-        timeout: 1000,
-      });
-    }
-  }
-
-  private clearAllVisualIndicators() {
-    this.showVisualIndicators = false;
-    this.publishToSubjectIfExists(
-      ForeshadowingGestureListener.foreshadowingAreaSubjectKey,
-      undefined
+        return {
+          newPosePosition: {
+            left: {
+              ...results.newPosePosition?.left,
+              [currentFingerId]: leftFinger,
+            },
+            right: {
+              ...results.newPosePosition?.right,
+              [currentFingerId]: rightFinger,
+            },
+          },
+          isInBounds: results.isInBounds && bothInBounds,
+        };
+      },
+      {
+        isInBounds: true,
+      } as { newPosePosition: PosePosition; isInBounds: boolean }
     );
-  }
 
-  draw() {
-    this.renderBorder();
-    // this.renderVisualIndicators();
-  }
+    if (!isInBounds) {
+      this.resetGestureState();
+    } else {
+      this.posePosition = newPosePosition;
 
-  resetHandler(): void {
-    this.resetRangeGestureState();
-    this.resetShapeGestureState();
-    this.resetPlaybackController();
-    this.resetEmphasisController();
-    this.clearAllVisualIndicators();
-  }
+      if (this.timer) return;
+      this.posePositionToMatch = newPosePosition;
 
-  updateState({
-    position,
-    dimensions,
-    handsToTrack,
-    canvasDimensions,
-    mode,
-  }: Partial<ForeshadowingGestureListenerConstructorArgs>) {
-    if (position) {
-      this.position = position;
-    }
-    if (dimensions) {
-      this.dimensions = dimensions;
-    }
-    if (canvasDimensions) {
-      this.canvasDimensions = canvasDimensions;
-    }
-    if (handsToTrack) {
-      this.handsToTrack = handsToTrack;
-    }
-
-    if (mode) {
-      this.mode = mode;
-    }
-  }
-
-  resetTimer(time?: number) {
-    if (time) {
       this.timer = startTimeoutInstance({
         onCompletion: () => {
-          this.timer = undefined;
+          const [isInPlaceLeft, isInPlaceRight] = [HANDS.LEFT, HANDS.RIGHT].map(
+            (hand: HANDS) => {
+              if (this.posePosition && this.posePositionToMatch) {
+                const diff = distanceBetweenPoints(
+                  Object.values(this.posePositionToMatch[hand]),
+                  Object.values(this.posePosition[hand])
+                ).map((diff: any) => diff.euclideanDistance);
+
+                return !containsValueLargerThanMax(
+                  diff,
+                  REFERENCE_POINT_BOUNDS
+                );
+              }
+              return false;
+            }
+          );
+
+          if (isInPlaceRight && isInPlaceLeft) {
+            this.publishToSubject();
+            this.resetTimer(this.resetPauseDuration);
+          } else {
+            this.resetTimer();
+          }
+          this.resetGestureState();
         },
-        timeout: time,
+        timeout: this.poseDuration ?? DEFAULT_POSE_DURATION,
       });
-    } else {
-      this.timer = undefined;
+
+      gsap.to(this.animationState, {
+        referencePointRadius: REFERENCE_POINT_BOUNDS,
+        duration: this.poseDuration ? this.poseDuration / 1000 : 2,
+        onComplete: () => {
+          this.animationState.referencePointRadius = 0;
+        },
+      });
     }
+  }
+
+  private drawForeshadowingState() {
+    // DRAW REFERENCE POINTS
+    [HANDS.LEFT, HANDS.RIGHT].forEach((hand: HANDS) => {
+      this.trackedFingers.forEach((fingerId: number) => {
+        if (!this.posePositionToMatch) return;
+
+        const positionToMatch = this.posePositionToMatch[hand][fingerId];
+
+        if (!positionToMatch) return;
+
+        this.drawingUtils.modifyContextStyleAndDraw(
+          {
+            strokeStyle: "green",
+            opacity: 0.5,
+            lineWidth: 2,
+            lineDash: [4, 4],
+          },
+          (context) => {
+            this.drawingUtils.drawCircle({
+              coordinates: positionToMatch,
+              radius: REFERENCE_POINT_BOUNDS,
+              stroke: true,
+              context,
+            });
+          }
+        );
+
+        this.drawingUtils.modifyContextStyleAndDraw(
+          {
+            fillStyle: "green",
+            opacity: 0.5,
+          },
+          (context) => {
+            this.drawingUtils.drawCircle({
+              coordinates: positionToMatch,
+              radius: this.animationState.referencePointRadius,
+              fill: true,
+              context,
+            });
+          }
+        );
+
+        if (!this.posePosition) return;
+
+        const currentPosition = this.posePosition[hand][fingerId];
+
+        if (!currentPosition) return;
+
+        this.drawingUtils.modifyContextStyleAndDraw(
+          {
+            fillStyle: "skyBlue",
+            opacity: 0.5,
+          },
+          (context) => {
+            this.drawingUtils.drawCircle({
+              coordinates: currentPosition,
+              radius: 5,
+              fill: true,
+              context,
+            });
+          }
+        );
+      });
+    });
   }
 
   protected handleNewData(fingerData: ListenerProcessedFingerData): void {
@@ -821,17 +323,13 @@ export class ForeshadowingGestureListener extends GestureListener {
       return;
     }
 
-    const { match, type } = this.verifyGesturesMatch({
-      left: leftHand.detectedGesture,
-      right: rightHand.detectedGesture,
-    });
-
-    if (match) {
-      if (type === ForeshadowingType.RANGE) {
-        this.handleRangeGesture(fingerData);
-      } else if (type === ForeshadowingType.SHAPE) {
-        this.handleShapeGesture(fingerData);
-      }
+    if (this.listenerMode === ListenerMode.POSE) {
+      this.handlePoseGesture(
+        rightHand.fingerPositions,
+        leftHand.fingerPositions
+      );
+    } else if (this.listenerMode === ListenerMode.STROKE) {
+      // this.handleShapeGesture(fingerData);
     }
   }
 }

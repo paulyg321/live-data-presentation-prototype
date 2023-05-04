@@ -21,3 +21,4 @@ export const legendSubject = new Subject();
 export const axesSubject = new Subject();
 export const snackbarSubject = new Subject();
 export const highlightSubject = new Subject();
+export const selectionSubject = new Subject();

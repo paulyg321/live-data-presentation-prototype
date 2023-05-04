@@ -8,6 +8,7 @@ import {
   CanvasEvent,
   highlightSubject,
   Chart,
+  selectionSubject,
 } from "@/utils";
 import { onMounted, onUnmounted, ref, watch } from "vue";
 import CanvasWrapper from "../../CanvasWrapper.vue";
@@ -20,7 +21,10 @@ import {
 } from "../settings-state";
 import VideoViews from "../../views/VideoViews.vue";
 import AppCanvas from "../../AppCanvas.vue";
-
+import * as d3 from "d3";
+import { gsap } from "gsap";
+import { MorphSVGPlugin } from "gsap/MorphSVGPlugin";
+gsap.registerPlugin(MorphSVGPlugin);
 // EMPHASIS CONTROLS ANIMATION
 // emphasisSubject.subscribe({
 //   next(animation: any) {
@@ -34,9 +38,9 @@ const snackbarVariant = ref<string>("");
 highlightSubject.subscribe({
   next(value: any) {
     StorySettings.currentStory?.getCharts().map((chart: Chart) => {
-      chart.chart?.updateState({
-        highlightPosition: value,
-      });
+      // chart.chart?.updateState({
+      //   highlightPosition: value,
+      // });
     });
   },
 });
@@ -47,6 +51,15 @@ snackbarSubject.subscribe({
     snackbarText.value = value.text;
     // success, info, warning, error
     snackbarVariant.value = value.variant;
+  },
+});
+
+selectionSubject.subscribe({
+  next(value: any) {
+    const charts = StorySettings.currentStory?.getCharts();
+    if (!charts) return;
+
+    // charts[0].chart?.setSelection(value);
   },
 });
 
@@ -83,29 +96,20 @@ playbackSubject.subscribe({
 // Foreshadowing area
 foreshadowingAreaSubject.subscribe({
   next(foreshadowingAreaValue: any) {
-    StorySettings.currentStory?.getCharts().forEach((chart: Chart) => {
-      chart.chart?.setForeshadowing(foreshadowingAreaValue);
-    });
-  },
-});
-
-legendSubject.subscribe({
-  next(key: any) {
-    const charts = StorySettings.currentStory?.getCharts();
-    if (!charts) return;
-
-    charts[0].chart?.toggleSelection(key);
+    // StorySettings.currentStory?.getCharts().forEach((chart: Chart) => {
+    //   chart.state.chart?.setForeshadowing(foreshadowingAreaValue);
+    // });
   },
 });
 
 watch(
   () => ChartSettings.playbackExtent,
   (newValue) => {
-    StorySettings.currentStory?.getCharts().forEach((chart: Chart) => {
-      chart.chart?.updateState({
-        extent: newValue,
-      });
-    });
+    // StorySettings.currentStory?.getCharts().forEach((chart: Chart) => {
+    //   chart.state.chart?.updateState({
+    //     extent: newValue,
+    //   });
+    // });
   }
 );
 
@@ -130,6 +134,39 @@ function draw() {
     StorySettings.currentStory?.draw();
     ChartSettings.extentVisualizer?.draw();
     LegendSettings.drawLegendItems();
+
+    // const circle = d3
+    // .select("#temp-circle")
+    // .attr("cx", 100)
+    // .attr("cy", 50)
+    // .attr("r", 5).node();
+    // const rect = d3
+    // .select("#temp-rect")
+    // .attr("x", 100)
+    // .attr("y", 120)
+    // .attr("width", 60)
+    // .attr("height", 40).node();
+
+    // const circlePath = MorphSVGPlugin.convertToPath(rect);
+    // const data = MorphSVGPlugin.getRawPath(circlePath[0]);
+    // const p = data[0];
+
+    // console.log({
+    //   circlePath,
+    //   data,
+    //   p
+    // })
+    // const numPoints = data.totalPoints;
+    // generalDrawingUtils.modifyContextStyleAndDraw({}, (context) => {
+    //   context.beginPath();
+    //   context.moveTo(p[0], p[1]);
+    //   for (let i = 2; i < numPoints; ) {
+    //     context.bezierCurveTo(p[i++], p[i++], p[i++], p[i++], p[i++], p[i++]);
+    //   }
+    //   context.closePath();
+    //   context.fillStyle = "skyblue";
+    //   context.fill();
+    // })
   }
   requestAnimationFrame(() => draw());
 }
@@ -246,6 +283,11 @@ onMounted(() => {
   <v-snackbar :timeout="2000" :color="snackbarVariant" v-model="snackbar">
     {{ snackbarText }}
   </v-snackbar>
+  <svg
+    id="test-svg"
+    :width="CanvasSettings.dimensions.width"
+    :height="CanvasSettings.dimensions.height"
+  ></svg>
 </template>
 <!---------------------------------------------------------------------------------------------------------->
 <style></style>

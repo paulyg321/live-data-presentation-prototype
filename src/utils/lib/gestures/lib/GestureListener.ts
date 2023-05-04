@@ -5,7 +5,6 @@ import {
   HANDS,
   HAND_LANDMARK_IDS,
   SupportedGestures,
-  type FingerPositionsData,
   type GestureTrackerValues,
   calculateDistance,
   DollarRecognizer,
@@ -15,15 +14,24 @@ import {
   playbackSubject,
   snackbarSubject,
   startTimerInstance,
+  getCircleFit,
+  startTimeoutInstance,
+  selectionSubject,
+  ForeshadowingStatesMode,
 } from "@/utils";
 import type { Timer } from "d3";
 import type { Subject, Subscription } from "rxjs";
 import type { Coordinate2D, Dimensions } from "../../chart";
 
+export const DEFAULT_TRIGGER_DURATION = 5000; // 5 SECONDS
+export const DEFAULT_POSE_DURATION = 1000; // 1 second
+export const DEFAULT_RESET_PAUSE_DURATION = 2000; // 2 seconds
+
 export enum ListenerType {
   TEMPORAL = "temporal",
   RADIAL = "radial",
   FORESHADOWING = "foreshadowing",
+  SELECTION = "selection",
 }
 
 export type ListenerProcessedFingerData = Record<
@@ -45,16 +53,35 @@ export interface GestureListenerConstructorArgs {
     leftHand: SupportedGestures;
   }[];
   resetKeys?: Set<string>;
-  subjects?: GestureListenerSubjectMap;
   drawingUtils: DrawingUtils;
+  mode?: any;
+  listenerMode?: ListenerMode;
+  trackedFingers?: number[];
+  animationState?: Record<string, any>;
+  strokeTriggerName?: string;
+  poseDuration?: number;
+  resetPauseDuration?: number;
+  addGesture?: boolean;
+  gestureName?: string;
+  triggerDuration?: number;
+  selectionKeys?: string[];
+  numHands?: number;
+  foreshadowingStatesMode?: ForeshadowingStatesMode;
+  foreshadowingStatesCount?: number;
 }
 
 export type GestureListenerSubjectMap = { [key: string]: Subject<any> };
 
 export interface ProcessedGestureListenerFingerData {
   detectedGesture: SupportedGestures;
-  fingersToTrack: number[];
-  fingerPositions: FingerPositionsData;
+  fingerPositions: Coordinate2D[];
+}
+
+export type PosePosition = Record<HANDS, Record<number, Coordinate2D>>;
+
+export enum ListenerMode {
+  POSE = "pose",
+  STROKE = "stroke",
 }
 
 export abstract class GestureListener {
@@ -63,6 +90,8 @@ export abstract class GestureListener {
   static emphasisSubjectKey = "emphasisSubject";
   static foreshadowingAreaSubjectKey = "foreshadowingAreaSubject";
   static highlighSubjectKey = "highlightSubject";
+  static selectionSubjectKey = "selectionSubject";
+  static circleFitter = getCircleFit();
 
   canvasListener?: CanvasElementListener;
   position: Coordinate2D;
@@ -88,10 +117,27 @@ export abstract class GestureListener {
   strokeRecognizer = new DollarRecognizer();
   addGesture: boolean;
   gestureName?: string;
+  strokeTriggerName?: string;
 
   detectionTimer: Timer | undefined;
   startDetecting = false;
-  detectionExtent = 0;
+
+  listenerMode?: ListenerMode;
+  posePosition?: PosePosition;
+  posePositionToMatch?: PosePosition;
+  trackedFingers: number[];
+  mode: any;
+
+  poseDuration?: number;
+  resetPauseDuration?: number;
+  triggerDuration?: number;
+
+  animationState: Record<string, any>;
+
+  selectionKeys: string[] = [];
+  numHands?: number;
+  foreshadowingStatesMode?: ForeshadowingStatesMode;
+  foreshadowingStatesCount?: number;
 
   private gestureSubscription: Subscription | undefined;
 
@@ -106,16 +152,24 @@ export abstract class GestureListener {
     },
     gestureTypes = [],
     canvasDimensions,
-    subjects = {
-      [GestureListener.highlighSubjectKey]: highlightSubject,
-      [GestureListener.emphasisSubjectKey]: emphasisSubject,
-      [GestureListener.playbackSubjectKey]: playbackSubject,
-      [GestureListener.foreshadowingAreaSubjectKey]: foreshadowingAreaSubject,
-      [GestureListener.snackbarSubjectKey]: snackbarSubject,
-    },
     // ACCEPTED VALUES - https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_code_values
     resetKeys,
     drawingUtils,
+    trackedFingers = [
+      HAND_LANDMARK_IDS.index_finger_tip,
+      HAND_LANDMARK_IDS.thumb_tip,
+    ],
+    listenerMode,
+    mode,
+    animationState = {},
+    poseDuration,
+    resetPauseDuration,
+    triggerDuration,
+    numHands,
+    strokeTriggerName,
+    selectionKeys,
+    foreshadowingStatesMode,
+    foreshadowingStatesCount,
   }: GestureListenerConstructorArgs) {
     this.position = position;
     this.dimensions = dimensions;
@@ -136,7 +190,14 @@ export abstract class GestureListener {
       next: (data: any) => this.handler(data),
     });
     this.canvasDimensions = canvasDimensions;
-    this.subjects = subjects;
+    this.subjects = {
+      [GestureListener.highlighSubjectKey]: highlightSubject,
+      [GestureListener.emphasisSubjectKey]: emphasisSubject,
+      [GestureListener.playbackSubjectKey]: playbackSubject,
+      [GestureListener.foreshadowingAreaSubjectKey]: foreshadowingAreaSubject,
+      [GestureListener.snackbarSubjectKey]: snackbarSubject,
+      [GestureListener.selectionSubjectKey]: selectionSubject,
+    };
     if (resetKeys && resetKeys.size > 0) {
       this.resetKeys = resetKeys;
       this.setResetHandler();
@@ -144,6 +205,94 @@ export abstract class GestureListener {
     this.drawingUtils = drawingUtils;
     this.addGesture = false;
     this.strokeRecognizer = new DollarRecognizer();
+    this.trackedFingers = trackedFingers;
+    this.listenerMode = listenerMode;
+    this.mode = mode;
+    this.animationState = animationState;
+    this.poseDuration = poseDuration;
+    this.resetPauseDuration = resetPauseDuration;
+    this.triggerDuration = triggerDuration;
+    this.numHands = numHands;
+    this.strokeTriggerName = strokeTriggerName;
+    this.selectionKeys = selectionKeys ?? [];
+    this.foreshadowingStatesMode = foreshadowingStatesMode;
+    this.foreshadowingStatesCount = foreshadowingStatesCount;
+  }
+
+  updateState({
+    position,
+    dimensions,
+    handsToTrack,
+    canvasDimensions,
+    addGesture,
+    gestureName,
+    mode,
+    listenerMode,
+    resetKeys,
+    trackedFingers,
+    strokeTriggerName,
+    poseDuration,
+    resetPauseDuration,
+    triggerDuration,
+    selectionKeys,
+    numHands,
+    foreshadowingStatesMode,
+    foreshadowingStatesCount
+  }: Partial<GestureListenerConstructorArgs>) {
+    if (position) {
+      this.position = position;
+    }
+    if (dimensions) {
+      this.dimensions = dimensions;
+    }
+    if (canvasDimensions) {
+      this.canvasDimensions = canvasDimensions;
+    }
+    if (handsToTrack) {
+      this.handsToTrack = handsToTrack;
+    }
+    if (addGesture !== undefined) {
+      this.addGesture = addGesture;
+    }
+    if (gestureName) {
+      this.gestureName = gestureName;
+    }
+    if (listenerMode) {
+      this.listenerMode = listenerMode;
+    }
+    if (mode) {
+      this.mode = mode;
+    }
+    if (resetKeys) {
+      this.resetKeys = resetKeys;
+    }
+    if (trackedFingers) {
+      this.trackedFingers = trackedFingers;
+    }
+    if (strokeTriggerName) {
+      this.strokeTriggerName = strokeTriggerName;
+    }
+    if (resetPauseDuration) {
+      this.resetPauseDuration = resetPauseDuration;
+    }
+    if (poseDuration) {
+      this.poseDuration = poseDuration;
+    }
+    if (triggerDuration) {
+      this.triggerDuration = triggerDuration;
+    }
+    if (selectionKeys) {
+      this.selectionKeys = selectionKeys;
+    }
+    if (numHands) {
+      this.numHands = numHands;
+    }
+    if (foreshadowingStatesMode) {
+      this.foreshadowingStatesMode = foreshadowingStatesMode;
+    }
+    if (foreshadowingStatesCount) {
+      this.foreshadowingStatesCount = foreshadowingStatesCount;
+    }
   }
 
   private setResetHandler() {
@@ -156,7 +305,7 @@ export abstract class GestureListener {
     });
   }
 
-  static convertGestureAndLandmarksToPositions({
+  private validateGesture({
     landmarkData,
     gestureData,
     gestureType,
@@ -165,55 +314,21 @@ export abstract class GestureListener {
     gestureData: any;
     gestureType: SupportedGestures;
   }): ProcessedGestureListenerFingerData | undefined {
-    let fingersToTrack = [HAND_LANDMARK_IDS.index_finger_tip];
+    const matchesSpecifiedGesture = gestureData.gestures.some(
+      (gesture: any) => gesture.name === gestureType
+    );
 
-    if (gestureType === SupportedGestures.POINTING) {
-      /**
-       * TODO: make fingerstotrack a field variable for the class and make this method non-static
-       * - this allows the gesture listener to decide itself on the fingers it wants to track
-       * we also won't need to pass fingersToTrack with the object
-       *  */
-      fingersToTrack = [
-        HAND_LANDMARK_IDS.index_finger_tip,
-        HAND_LANDMARK_IDS.thumb_tip,
-      ];
-    } else if (gestureType === SupportedGestures.OPEN_HAND) {
-      fingersToTrack = [HAND_LANDMARK_IDS.middle_finger_tip];
-    } else if (
-      gestureType === SupportedGestures.FORESHADOWING_LEFT_L ||
-      gestureType === SupportedGestures.FORESHADOWING_RIGHT_L ||
-      gestureType === SupportedGestures.FORESHADOWING_RIGHT_C ||
-      gestureType === SupportedGestures.FORESHADOWING_LEFT_C
-    ) {
-      fingersToTrack = [
-        HAND_LANDMARK_IDS.index_finger_tip,
-        HAND_LANDMARK_IDS.thumb_tip,
-      ];
-    }
-
-    if (landmarkData && gestureData) {
-      const matchesSpecifiedGesture = gestureData.gestures.some(
-        (gesture: any) => gesture.name === gestureType
-      );
-      if (gestureData.gestures.length > 0 && matchesSpecifiedGesture) {
-        const fingerPositions = fingersToTrack.reduce(
-          (currentPositionMap, nextFinger) => {
-            return {
-              ...currentPositionMap,
-              [nextFinger]: {
-                x: landmarkData[nextFinger].x ?? undefined,
-                y: landmarkData[nextFinger].y ?? undefined,
-              },
-            };
-          },
-          {} as FingerPositionsData
-        );
+    if (matchesSpecifiedGesture) {
+      const fingerPositions = landmarkData.map((finger: any) => {
         return {
-          detectedGesture: gestureType,
-          fingersToTrack,
-          fingerPositions,
+          x: finger.x ?? undefined,
+          y: finger.y ?? undefined,
         };
-      }
+      });
+      return {
+        detectedGesture: gestureType,
+        fingerPositions,
+      };
     }
 
     return undefined;
@@ -240,9 +355,15 @@ export abstract class GestureListener {
     return undefined;
   }
 
-  protected resetTimer() {
-    if (this.timer) {
-      this.timer.stop();
+  resetTimer(time?: number) {
+    if (time) {
+      startTimeoutInstance({
+        onCompletion: () => {
+          this.timer = undefined;
+        },
+        timeout: time,
+      });
+    } else {
       this.timer = undefined;
     }
   }
@@ -284,22 +405,6 @@ export abstract class GestureListener {
     });
   }
 
-  // protected clearCanvas() {
-  //   this.drawingUtils?.clearArea({
-  //     coordinates: { x: 0, y: 0 },
-  //     dimensions: this.canvasDimensions,
-  //   });
-  // }
-
-  // protected clearListenerArea() {
-  //   this.drawingUtils?.clearArea({
-  //     coordinates: this.position,
-  //     dimensions: this.dimensions,
-  //   });
-  // }
-
-  // Add method to linearListener called "canEmit" that checks if limit field variable is set
-  // if its set then we compare positions to the limit to see if we're good to emit.
   unsubscribe() {
     this.gestureSubscription?.unsubscribe();
   }
@@ -315,34 +420,6 @@ export abstract class GestureListener {
       }
 
       return this.subjects[key];
-    }
-  }
-
-  updateState({
-    position,
-    dimensions,
-    handsToTrack,
-    canvasDimensions,
-    addGesture,
-    gestureName,
-  }: Partial<GestureListenerConstructorArgs> | any) {
-    if (position) {
-      this.position = position;
-    }
-    if (dimensions) {
-      this.dimensions = dimensions;
-    }
-    if (canvasDimensions) {
-      this.canvasDimensions = canvasDimensions;
-    }
-    if (handsToTrack) {
-      this.handsToTrack = handsToTrack;
-    }
-    if (addGesture !== undefined) {
-      this.addGesture = addGesture;
-    }
-    if (gestureName) {
-      this.gestureName = gestureName;
     }
   }
 
@@ -373,37 +450,75 @@ export abstract class GestureListener {
     return false;
   }
 
-  triggerDetection(duration: number, onComplete: () => void) {
+  triggerDetection(onComplete: () => void) {
+    if (this.detectionTimer) return;
     this.startDetecting = true;
     this.detectionTimer = startTimerInstance({
       onTick: (elapsed?: number) => {
         if (!elapsed) return;
-        this.detectionExtent = elapsed;
+        this.animationState.detectionExtent = elapsed;
       },
       onCompletion: () => {
         this.startDetecting = false;
         this.detectionTimer = undefined;
-        this.detectionExtent = 0;
+        this.animationState.detectionExtent = 0;
         onComplete();
       },
-      timeout: duration,
+      timeout: this.triggerDuration ?? DEFAULT_TRIGGER_DURATION,
     });
   }
 
-  protected thumbsTouch(
-    fingerData: ListenerProcessedFingerData,
-    nonDominantHand: HANDS,
-    dominantHand: HANDS
-  ) {
-    const handOne = fingerData[nonDominantHand];
-    const handTwo = fingerData[dominantHand];
+  renderDetectionState() {
+    if (!this.startDetecting) return;
+
+    this.drawingUtils.modifyContextStyleAndDraw(
+      {
+        strokeStyle: "#90EE90",
+        opacity: 0.7,
+      },
+      (context) => {
+        this.drawingUtils.drawRect({
+          coordinates: this.position,
+          dimensions: this.dimensions,
+          stroke: true,
+          context,
+        });
+      },
+      ["presenter", "preview"]
+    );
+
+    this.drawingUtils.modifyContextStyleAndDraw(
+      {
+        fillStyle: "#90EE90",
+        opacity: 0.3,
+      },
+      (context) => {
+        this.drawingUtils.drawRect({
+          coordinates: this.position,
+          dimensions: {
+            ...this.dimensions,
+            width: this.dimensions.width * this.animationState.detectionExtent,
+          },
+          fill: true,
+          context,
+        });
+      },
+      ["presenter", "preview"]
+    );
+  }
+
+  protected thumbsTouch(fingerData: ListenerProcessedFingerData) {
+    const handOne = fingerData[this.handsToTrack.dominant];
+    const handTwo = fingerData[this.handsToTrack.nonDominant];
 
     if (!handOne || !handTwo) return false;
 
-    const [_, thumbOne] = handOne.fingersToTrack;
-    const [__, thumbTwo] = handTwo.fingersToTrack;
-    const thumbOnePosition = handOne.fingerPositions[thumbOne] as Coordinate2D;
-    const thumbTwoPosition = handTwo.fingerPositions[thumbTwo] as Coordinate2D;
+    const thumbOnePosition = handOne.fingerPositions[
+      HAND_LANDMARK_IDS.thumb_tip
+    ] as Coordinate2D;
+    const thumbTwoPosition = handTwo.fingerPositions[
+      HAND_LANDMARK_IDS.thumb_tip
+    ] as Coordinate2D;
 
     const { euclideanDistance } = calculateDistance(
       thumbOnePosition,
@@ -413,19 +528,17 @@ export abstract class GestureListener {
     return euclideanDistance < 30;
   }
 
-  protected isPinchGesture(
-    fingerData: ListenerProcessedFingerData,
-    handToTrack: HANDS
-  ) {
-    const hand = fingerData[handToTrack];
+  protected isPinchGesture(fingerData: ListenerProcessedFingerData) {
+    const hand = fingerData[this.handsToTrack.dominant];
 
     if (!hand) return false;
 
-    const [indexFinger, thumb] = hand.fingersToTrack;
     const indexFingerPosition = hand.fingerPositions[
-      indexFinger
+      HAND_LANDMARK_IDS.index_finger_tip
     ] as Coordinate2D;
-    const thumbPosition = hand.fingerPositions[thumb] as Coordinate2D;
+    const thumbPosition = hand.fingerPositions[
+      HAND_LANDMARK_IDS.thumb_tip
+    ] as Coordinate2D;
 
     const { euclideanDistance } = calculateDistance(
       indexFingerPosition,
@@ -457,17 +570,21 @@ export abstract class GestureListener {
         rightHand: SupportedGestures;
         leftHand: SupportedGestures;
       }) => {
-        rightHandData = GestureListener.convertGestureAndLandmarksToPositions({
-          landmarkData: rightHandLandmarks,
-          gestureData: rightHandGestures,
-          gestureType: gestureType.rightHand,
-        });
+        if (rightHandGestures && rightHandLandmarks) {
+          rightHandData = this.validateGesture({
+            landmarkData: rightHandLandmarks,
+            gestureData: rightHandGestures,
+            gestureType: gestureType.rightHand,
+          });
+        }
 
-        leftHandData = GestureListener.convertGestureAndLandmarksToPositions({
-          landmarkData: leftHandLandmarks,
-          gestureData: leftHandGestures,
-          gestureType: gestureType.leftHand,
-        });
+        if (leftHandGestures && leftHandLandmarks) {
+          leftHandData = this.validateGesture({
+            landmarkData: leftHandLandmarks,
+            gestureData: leftHandGestures,
+            gestureType: gestureType.leftHand,
+          });
+        }
 
         this.handleNewData(
           {

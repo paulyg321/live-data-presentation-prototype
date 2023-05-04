@@ -1,4 +1,4 @@
-import { highlightSubject } from "@/utils";
+import { HAND_LANDMARK_IDS, highlightSubject } from "@/utils";
 import type { Subject } from "rxjs";
 import { calculateDistance } from "../../calculations";
 import type { Coordinate2D } from "../../chart";
@@ -79,9 +79,8 @@ export class HighlightGestureListener extends GestureListener {
       return;
     }
 
-    const [indexFinger] = dominantHand.fingersToTrack;
     const indexFingerPosition = dominantHand.fingerPositions[
-      indexFinger
+      HAND_LANDMARK_IDS.index_finger_tip
     ] as Coordinate2D;
 
     if (

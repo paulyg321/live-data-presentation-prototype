@@ -1,5 +1,5 @@
 import _ from "lodash";
-import { ChartTypeValue, Chart, type Coordinate2D } from "../../chart";
+import { ChartType, Chart, type Coordinate2D } from "../../chart";
 import type { DrawingUtils } from "../../drawing";
 import {
   ForeshadowingGestureListener,
@@ -7,17 +7,19 @@ import {
   RadialPlaybackGestureListener,
   LinearPlaybackGestureListener,
   getGestureListenerResetKeys,
+  SelectionGestureListener,
 } from "../../gestures";
 import { CanvasEvent } from "../../interactions";
-import { parse, stringify, toJSON, fromJSON } from "flatted";
+import { parse, stringify } from "flatted";
 
 export type StoryLayer =
   | ForeshadowingGestureListener
   | RadialPlaybackGestureListener
   | LinearPlaybackGestureListener
+  | SelectionGestureListener
   | Chart;
 
-export type LayerType = ChartTypeValue | ListenerType;
+export type LayerType = ChartType | ListenerType;
 
 export class Story {
   title: string;
@@ -52,16 +54,18 @@ export class Story {
         const arg = {
           ...layer,
           drawingUtils: this.drawingUtils,
-          resetKeys: getGestureListenerResetKeys("Space"),
         };
         switch (type) {
-          case ChartTypeValue.BAR:
-          case ChartTypeValue.LINE:
-          case ChartTypeValue.SCATTER:
+          case ChartType.BAR:
+          case ChartType.LINE:
+          case ChartType.SCATTER:
             return {
               type,
               id,
-              layer: new Chart(arg),
+              layer: new Chart({
+                ...arg.state,
+                drawingUtils: this.drawingUtils,
+              }),
             };
           case ListenerType.FORESHADOWING: {
             return {
@@ -84,6 +88,13 @@ export class Story {
               layer: new RadialPlaybackGestureListener(arg),
             };
           }
+          case ListenerType.SELECTION: {
+            return {
+              type,
+              id,
+              layer: new SelectionGestureListener(arg),
+            };
+          }
           default:
             return {};
         }
@@ -95,10 +106,10 @@ export class Story {
 
   isChartLayer(type: string) {
     return [
-      ChartTypeValue.BAR,
-      ChartTypeValue.SCATTER,
-      ChartTypeValue.LINE,
-    ].includes(type as ChartTypeValue);
+      ChartType.BAR,
+      ChartType.SCATTER,
+      ChartType.LINE,
+    ].includes(type as ChartType);
   }
 
   getCurrentWidget() {
@@ -150,12 +161,12 @@ export class Story {
   getCharts() {
     return this.layers
       .filter(({ type }) => {
-        return this.isChartLayer(type as ChartTypeValue);
+        return this.isChartLayer(type as ChartType);
       })
       .map(({ layer }) => layer) as Chart[];
   }
 
-  handleDeleteCurrentLayer(id: string) {
+  handleDeleteLayer(id: string) {
     this.removeLayer(id);
     this.setCurrentWidget();
   }
@@ -164,14 +175,14 @@ export class Story {
     const currentWidget = this.currentWidget;
     if (!currentWidget) return;
 
-    const listener = currentWidget?.layer.canvasListener;
+    const listener = currentWidget?.layer?.state?.canvasListener;
     const boundsInformation = listener?.isInBounds(eventData);
 
     if (boundsInformation) {
       const { isInDeleteBounds } = boundsInformation;
 
       if (isInDeleteBounds && eventType === CanvasEvent.CLICK) {
-        this.handleDeleteCurrentLayer(currentWidget.id);
+        this.handleDeleteLayer(currentWidget.id);
       } else {
         listener?.handleEvent(eventType, eventData);
       }
@@ -190,7 +201,7 @@ export class Story {
   draw() {
     this.layers.forEach(({ layer, id }) => {
       if (id === this.currentWidget?.id) {
-        this.currentWidget.layer.canvasListener?.draw();
+        this.currentWidget.layer.state.canvasListener?.draw();
       }
       layer.draw();
     });

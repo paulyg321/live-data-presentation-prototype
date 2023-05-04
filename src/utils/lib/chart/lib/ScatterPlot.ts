@@ -187,14 +187,9 @@ export class ScatterPlot {
       return;
     }
   }
-  toggleSelection(key: string) {
-    if (this.selectedItems.includes(key)) {
-      this.selectedItems = this.selectedItems.filter((item: string) => {
-        return item !== key;
-      });
-    } else {
-      this.selectedItems = [...this.selectedItems, key];
-    }
+
+  setSelection(keys: string[]) {
+    this.selectedItems = keys;
   }
 
   private interpolateBetweenStates({
@@ -565,8 +560,26 @@ export class ScatterPlot {
     /**
      * -------------------- DRAW AXES --------------------
      * */
-    drawXAxis(this.drawingUtils, xScale, range.yRange[0], range.xRange, 10, 4);
-    drawYAxis(this.drawingUtils, yScale, range.xRange[0], range.yRange, 12, 5);
+    drawXAxis(
+      this.drawingUtils,
+      xScale,
+      range.yRange[0],
+      range.xRange,
+      16,
+      3,
+      undefined,
+      false
+    );
+    drawYAxis(
+      this.drawingUtils,
+      yScale,
+      range.xRange[0],
+      range.yRange,
+      16,
+      3,
+      undefined,
+      false
+    );
 
     // Draw extra axes for small multiple view
     if (isRectGesture) {
@@ -575,125 +588,177 @@ export class ScatterPlot {
         xScaleNext,
         range.yRange[0],
         range.xRangeNext,
-        10,
-        4
+        16,
+        3,
+        undefined,
+        false
       );
       drawYAxis(
         this.drawingUtils,
         yScale,
         range.xRangeNext[0],
         range.yRange,
-        12,
-        5
+        16,
+        3,
+        undefined,
+        false
       );
     }
   }
 
-  drawPoints({
-    pointsData,
+  drawItem({
+    currentState,
+    nextState,
+    color,
+    label,
+    isHighlighted,
+    isForeshadowed,
     xScale,
+    xScaleNext,
     yScale,
-    isSelected,
-    isCurrent,
-    allowHighlight = true,
   }: {
-    pointsData: {
-      coordinates: Coordinate2D;
-      color: string;
-      label: string;
-      isHighlighted: boolean;
-    }[];
-    isSelected: boolean;
-    isCurrent: boolean;
+    currentState: Coordinate2D;
+    nextState?: Coordinate2D;
+    color: string;
+    label: string;
+    isHighlighted: boolean;
+    isForeshadowed: boolean;
     xScale: ScaleFn;
+    xScaleNext: ScaleFn;
     yScale: ScaleFn;
-    allowHighlight?: boolean;
   }) {
-    pointsData.forEach(
-      ({
-        isHighlighted,
-        color,
-        label,
-        coordinates,
-      }: {
-        isHighlighted: boolean;
-        color: string;
-        label: string;
-        coordinates: Coordinate2D;
-      }) => {
-        const { fill, radius, stroke, ...settings } = this.getPointSettings({
-          isSelected,
-          isCurrent,
-          color,
+    const currentRadius = this.chartDimensions.width * 0.02;
+    const futureRadius = this.chartDimensions.width * 0.015;
+    const opacity = 0.7;
+    /**
+     * CIRCLE
+     */
+
+    // CURRENT
+    this.drawingUtils.modifyContextStyleAndDraw(
+      {
+        fillStyle: color,
+        opacity,
+      },
+      (context) => {
+        this.drawingUtils.drawCircle({
+          coordinates: currentState,
+          xScale,
+          yScale,
+          radius: currentRadius,
+          fill: true,
+          context,
         });
-        this.drawingUtils.modifyContextStyleAndDraw(
-          {
-            ...settings,
-          },
-          (context) => {
-            this.clipDrawingArea(context, isCurrent);
-            this.drawingUtils.drawCircle({
-              coordinates: coordinates,
-              xScale,
-              yScale,
-              radius: isHighlighted && allowHighlight ? radius * 2 : radius,
-              fill,
-              stroke,
-              context,
-            });
-          }
-        );
-        if (isHighlighted && allowHighlight) {
-          const rectPosition = {
-            x: xScale(coordinates.x) + 20,
-            y: yScale(coordinates.y) + 20,
-          };
-          this.drawingUtils.modifyContextStyleAndDraw(
-            {
-              opacity: 1,
-              fillStyle: "white",
-            },
-            (context) => {
-              this.drawingUtils.drawRect({
-                coordinates: rectPosition,
-                dimensions: {
-                  width: 120,
-                  height: 60,
-                },
-                context,
-                fill: true,
-              });
-            }
-          );
-          this.drawingUtils.modifyContextStyleAndDraw(
-            {
-              opacity: 1,
-              fontSize: this.chartDimensions.width * 0.04,
-              textAlign: "left",
-              fillStyle: color,
-            },
-            (context) => {
-              this.drawingUtils.drawText({
-                coordinates: {
-                  x: rectPosition.x + 10,
-                  y: rectPosition.y + 20,
-                },
-                text: `(${coordinates.x.toLocaleString()}, ${coordinates.y.toLocaleString()})`,
-                context,
-              });
-              this.drawingUtils.drawText({
-                coordinates: {
-                  x: rectPosition.x + 10,
-                  y: rectPosition.y + 50,
-                },
-                text: label,
-                context,
-              });
-            }
-          );
-        }
       }
     );
+
+    if (isHighlighted) {
+      const tooltipBackgroundPosition = {
+        x: xScale(currentState.x) + 20,
+        y: yScale(currentState.y) + 20,
+      };
+
+      this.drawingUtils.modifyContextStyleAndDraw(
+        {
+          opacity: 1,
+          fillStyle: "white",
+        },
+        (context) => {
+          this.drawingUtils.drawRect({
+            coordinates: tooltipBackgroundPosition,
+            dimensions: {
+              width: 120,
+              height: 60,
+            },
+            context,
+            fill: true,
+          });
+        }
+      );
+
+      this.drawingUtils.modifyContextStyleAndDraw(
+        {
+          opacity: 1,
+          fontSize: this.chartDimensions.width * 0.04,
+          textAlign: "left",
+          fillStyle: color,
+        },
+        (context) => {
+          this.drawingUtils.drawText({
+            coordinates: {
+              x: tooltipBackgroundPosition.x + 10,
+              y: tooltipBackgroundPosition.y + 20,
+            },
+            text: `(${currentState.x.toLocaleString()}, ${currentState.y.toLocaleString()})`,
+            context,
+          });
+          this.drawingUtils.drawText({
+            coordinates: {
+              x: currentState.x + 10,
+              y: currentState.y + 50,
+            },
+            text: label,
+            context,
+          });
+        }
+      );
+    }
+
+    if (nextState) {
+      // FORESHADOW
+      this.drawingUtils.modifyContextStyleAndDraw(
+        {
+          fillStyle: "white",
+          strokeStyle: color,
+          opacity,
+        },
+        (context) => {
+          this.drawingUtils.drawCircle({
+            coordinates: nextState,
+            xScale: xScaleNext,
+            yScale,
+            radius: futureRadius,
+            fill: true,
+            stroke: true,
+            context,
+          });
+        }
+      );
+    }
+  }
+
+  getStateData(keys: string[]) {
+    const items = _.pick(this.items, keys);
+
+    return Object.entries(items)
+      .map(
+        (item: [string, { color: string; states: ScatterPlotItemState[] }]) => {
+          const [label, { color, states }] = item;
+          const startKeyFrame = this.keyframes.at(this.currentStateIndex);
+          const startState = states.find(
+            (state: ScatterPlotItemState) => state.keyframe === startKeyFrame
+          );
+
+          if (!startState) return;
+
+          let endState: ScatterPlotItemState | undefined;
+
+          if (this.nextStateIndex) {
+            const endKeyframe = this.keyframes.at(this.nextStateIndex);
+            endState = states.find(
+              (state: ScatterPlotItemState) => state.keyframe === endKeyframe
+            );
+          }
+
+          return {
+            startState,
+            endState,
+            color,
+            label,
+          };
+        }
+      )
+      .filter((point) => point !== undefined);
   }
 
   drawSelectedPoints({
@@ -707,104 +772,41 @@ export class ScatterPlot {
     xScaleNext: ScaleFn;
     yScale: ScaleFn;
   }) {
-    const { isRangeGesture, isRectGesture } = this.getForeshadowingInfo();
-    const { isHighlighted } = this.getHighlightInfo();
-    const isForeshadowing = isRangeGesture || isRectGesture;
-    const isSelected = true;
-    const selectedItems = _.pick(this.items, keys);
-
-    let hasNextState = false;
-    let keyframe: string | undefined;
+    const { isInBound: isInForeshadowingBounds } = this.getForeshadowingInfo();
+    const { isHighlighted: highlightInsideRadius } = this.getHighlightInfo();
 
     const extent = this.getExtentBasedOnAffect();
+    this.getStateData(keys).forEach(
+      ({ startState, endState, color, label }: any) => {
+        const interpolatedData = this.interpolateBetweenStates({
+          interpolateStep: extent,
+          currentState: startState?.data,
+          nextState: endState?.data,
+        });
 
-    const pointsToDraw = Object.entries(selectedItems)
-      .map(
-        (
-          selectedItem: [
-            string,
-            { color: string; states: ScatterPlotItemState[] }
-          ]
-        ) => {
-          const [label, { color, states }] = selectedItem;
-          const currentKeyframe = this.keyframes.at(this.currentStateIndex);
-          const currentState = states.find(
-            (state: ScatterPlotItemState) => state.keyframe === currentKeyframe
-          );
-
-          if (!currentState) return;
-
-          let nextState: ScatterPlotItemState | undefined;
-
-          if (this.nextStateIndex) {
-            const nextKeyframe = this.keyframes.at(this.nextStateIndex);
-            nextState = states.find(
-              (state: ScatterPlotItemState) => state.keyframe === nextKeyframe
-            );
-            hasNextState = true;
-          }
-
-          const interpolatedData = this.interpolateBetweenStates({
-            interpolateStep: extent,
-            currentState: currentState.data,
-            nextState: nextState?.data,
-          });
-
-          return {
-            currentStateData: currentState.data,
-            nextStateData: nextState?.data,
-            interpolatedData,
-            color,
-            label,
-          };
-        }
-      )
-      .filter((point) => point !== undefined);
-
-    // ------------- DRAW NORMAL ----------------------
-    this.drawPoints({
-      // If we're foreshadowing we want to see the currentState not interpolated state
-      pointsData: pointsToDraw.map((point) => ({
-        color: point!.color,
-        coordinates: point!.interpolatedData,
-        label: point!.label,
-        isHighlighted: isHighlighted({
+        const isHighlighted = highlightInsideRadius({
           position: {
-            x: xScale(point!.interpolatedData.x),
-            y: yScale(point!.interpolatedData.y),
+            x: xScale(interpolatedData.x),
+            y: yScale(interpolatedData.y),
           },
           radius: this.chartDimensions.width * 0.02,
-        }),
-      })),
-      xScale,
-      yScale,
-      isSelected,
-      isCurrent: true,
-    });
+        });
 
-    // ------------- DRAW NEXT STATE ----------------------
-    if (isForeshadowing && hasNextState) {
-      this.drawPoints({
-        pointsData: pointsToDraw.map((point) => ({
-          color: point!.color,
-          label: point!.label,
-          coordinates: point!.nextStateData as Coordinate2D,
-          isHighlighted: isHighlighted({
-            position: {
-              x: xScaleNext(point!.nextStateData!.x),
-              y: yScale(point!.nextStateData!.y),
-            },
-            radius: this.chartDimensions.width * 0.02,
-          }),
-        })),
-        xScale: xScaleNext,
-        yScale,
-        isSelected,
-        isCurrent: false,
-      });
-    }
+        const isForeshadowed = isInForeshadowingBounds(startState?.data);
 
-    return keyframe;
+        this.drawItem({
+          currentState: startState.data,
+          nextState: endState?.data,
+          color,
+          label,
+          isForeshadowed,
+          isHighlighted,
+          xScale,
+          xScaleNext,
+          yScale,
+        });
+      }
+    );
   }
 
   drawUnselectedPoints({
@@ -816,79 +818,30 @@ export class ScatterPlot {
     xScale: ScaleFn;
     yScale: ScaleFn;
   }) {
-    const { isHighlighted } = this.getHighlightInfo();
-    const isSelected = false;
-    const unselectedItems = _.pick(this.items, keys);
-
-    let keyframe: string | undefined;
-
     const extent = this.getExtentBasedOnAffect();
+    this.getStateData(keys).forEach(({ startState, endState }: any) => {
+      const interpolatedData = this.interpolateBetweenStates({
+        interpolateStep: extent,
+        currentState: startState?.data,
+        nextState: endState?.data,
+      });
 
-    const pointsToDraw = Object.entries(unselectedItems)
-      .map(
-        (
-          unselectedItem: [
-            string,
-            { color: string; states: ScatterPlotItemState[] }
-          ]
-        ) => {
-          const [label, { states }] = unselectedItem;
-          const currentKeyframe = this.keyframes.at(this.currentStateIndex);
-          const currentState = states.find(
-            (state: ScatterPlotItemState) => state.keyframe === currentKeyframe
-          );
-
-          if (!currentState) return;
-
-          let nextState: ScatterPlotItemState | undefined;
-
-          if (this.nextStateIndex) {
-            const nextKeyframe = this.keyframes.at(this.nextStateIndex);
-            nextState = states.find(
-              (state: ScatterPlotItemState) => state.keyframe === nextKeyframe
-            );
-          }
-
-          const interpolatedData = this.interpolateBetweenStates({
-            interpolateStep: extent,
-            currentState: currentState.data,
-            nextState: nextState?.data,
+      this.drawingUtils.modifyContextStyleAndDraw(
+        {
+          fillStyle: "grey",
+        },
+        (context: CanvasRenderingContext2D) => {
+          this.drawingUtils.drawCircle({
+            coordinates: interpolatedData,
+            radius: 3,
+            fill: true,
+            context,
+            xScale,
+            yScale
           });
-
-          return {
-            currentStateData: currentState.data,
-            nextStateData: nextState?.data,
-            interpolatedData,
-            color: "grey",
-            label,
-          };
         }
-      )
-      .filter((point) => point !== undefined);
-
-    // ------------- DRAW NORMAL ----------------------
-    this.drawPoints({
-      // If we're foreshadowing we want to see the currentState not interpolated state
-      pointsData: pointsToDraw.map((point) => ({
-        color: point!.color,
-        coordinates: point!.interpolatedData,
-        label: point!.label,
-        isHighlighted: isHighlighted({
-          position: {
-            x: xScale(point!.interpolatedData.x),
-            y: yScale(point!.interpolatedData.y),
-          },
-          radius: this.chartDimensions.width * 0.02,
-        }),
-      })),
-      xScale,
-      yScale,
-      isSelected,
-      isCurrent: true,
-      allowHighlight: false,
+      );
     });
-
-    return keyframe;
   }
 
   drawKeyframeValue() {

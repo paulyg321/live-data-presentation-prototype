@@ -1,26 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { onMounted, ref, watch } from "vue";
 import * as monaco from "monaco-editor";
-import {
-  Chart,
-  ChartTypeValue,
-  DrawingUtils,
-  gestureSubject,
-  LineChart,
-  LineInterpolateStrategy,
-  type ChartType,
-} from "@/utils";
+import { Chart, ChartType, LineChart, LineInterpolateStrategy } from "@/utils";
 import _ from "lodash";
 import {
   CanvasSettings,
-  ChartSettings,
-  getGestureListenerResetKeys,
   initialCanvasDimensions,
   initialChartDimensions,
-  LegendSettings,
   StorySettings,
 } from "../../settings-state";
-import { HighlightGestureListener } from "@/utils/lib/gestures/lib/HighlightGestureListener";
 
 type ChartSettingProps = {
   type?: ChartType;
@@ -31,39 +19,20 @@ const props = defineProps<ChartSettingProps>();
 
 const animation = ref<LineInterpolateStrategy>(LineInterpolateStrategy.BASIC);
 function handleAnimationUpdate(animation: any) {
-  const widget = StorySettings.currentStory?.getCurrentWidget();
+  const widget = StorySettings.currentStory?.currentWidget;
   if (!widget?.layer) return;
 
   const existingChart = widget?.layer as Chart;
-  (existingChart.chart as LineChart).updateAnimation(animation);
+  // (existingChart.state.chart as LineChart).updateAnimation(animation);
 }
 
 const limitExtent = ref<boolean>(false);
 function handleToggleExtent() {
-  const widget = StorySettings.currentStory?.getCurrentWidget();
+  const widget = StorySettings.currentStory?.currentWidget;
   if (!widget?.layer) return;
 
   const existingChart = widget?.layer as Chart;
-  (existingChart.chart as LineChart).toggleLimitExtent();
-}
-
-const showLegend = ref<boolean>(false);
-function handleShowLegend() {
-  const widget = StorySettings.currentStory?.getCurrentWidget();
-  if (!widget?.layer) return;
-
-  const newValue = !showLegend.value;
-  showLegend.value = newValue;
-
-  if (newValue === false) {
-    LegendSettings.legendItems = [];
-    return;
-  }
-
-  const existingChart = widget?.layer as Chart;
-  if (existingChart.legendItems) {
-    LegendSettings.legendItems = existingChart.legendItems;
-  }
+  // (existingChart.chart as LineChart).toggleLimitExtent();
 }
 
 /**
@@ -83,7 +52,7 @@ const useGroups = ref<boolean>(false);
 const columnOptions = ref<any>([]);
 
 function resetForm() {
-  monacoEditor.setValue("");
+  monacoEditor.setValue("[]");
   chartData.value = undefined;
   keyframe_field.value = undefined;
   unique_key.value = undefined;
@@ -108,21 +77,19 @@ function createChart() {
     if (!drawingUtils) return;
 
     StorySettings.currentStory.addLayer(
-      chartType.value.value,
+      chartType.value,
       new Chart({
         title: StorySettings.currentStory?.title,
         type: chartType.value,
         data: chartData.value,
         field: keyframe_field.value,
         key: unique_key.value,
-        dataAccessor: dataAccessor.value,
         xField: xField.value,
         yField: yField.value,
         zField: zField.value,
         position: { x: 0, y: 0 },
         dimensions: initialChartDimensions,
         canvasDimensions: initialCanvasDimensions,
-        useGroups: useGroups.value,
         drawingUtils,
       })
     );
@@ -136,7 +103,7 @@ async function handleSave() {
   // check all fields are valid
   let hasRequiredFields = false;
 
-  if (chartType.value?.value === "line") {
+  if (chartType.value === "line") {
     if (dataAccessor.value && xField.value && yField.value) {
       if (
         chartData.value[0][dataAccessor?.value] &&
@@ -148,10 +115,7 @@ async function handleSave() {
     }
   }
 
-  if (
-    chartType.value?.value === "scatter" ||
-    chartType.value?.value === "bar"
-  ) {
+  if (chartType.value === "scatter" || chartType.value === "bar") {
     if (xField.value && yField.value) {
       if (
         chartData.value[0][xField.value] !== undefined &&
@@ -175,6 +139,7 @@ watch([keyframe_field, unique_key, chartData], () => {
 });
 
 function updateFieldOptions() {
+  if (!chartData.value?.length) return;
   try {
     columnOptions.value = _.keys(chartData.value[0]).filter(
       (objKey) => objKey !== unique_key.value && objKey !== keyframe_field.value
@@ -200,29 +165,29 @@ function setJsonEditor() {
   }
 }
 
-watch(
-  () => props.tab,
-  () => {
-    if (props.tab) {
-      const widget = StorySettings.currentStory?.getCurrentWidget();
-      if (!widget?.layer) return;
+// watch(
+//   () => props.tab,
+//   () => {
+//     if (props.tab) {
+//       const widget = StorySettings.currentStory?.currentWidget;
+//       if (!widget?.layer) return;
 
-      const existingChart = widget?.layer as Chart;
-      if (existingChart) {
-        monacoEditor.setValue(JSON.stringify(existingChart.data, null, 2));
-        chartData.value = existingChart.data;
-        chartType.value = existingChart.type;
-        keyframe_field.value = existingChart.field;
-        unique_key.value = existingChart.key;
-        dataAccessor.value = existingChart.dataAccessor;
-        xField.value = existingChart.xField;
-        yField.value = existingChart.yField;
-        zField.value = existingChart.zField;
-        useGroups.value = existingChart.useGroups;
-      }
-    }
-  }
-);
+//       const existingChart = widget?.layer as Chart;
+//       if (existingChart) {
+//         monacoEditor.setValue(JSON.stringify(existingChart.data, null, 2));
+//         chartData.value = existingChart.data;
+//         chartType.value = existingChart.type;
+//         keyframe_field.value = existingChart.field;
+//         unique_key.value = existingChart.key;
+//         dataAccessor.value = existingChart.dataAccessor;
+//         xField.value = existingChart.xField;
+//         yField.value = existingChart.yField;
+//         zField.value = existingChart.zField;
+//         useGroups.value = existingChart.useGroups;
+//       }
+//     }
+//   }
+// );
 
 watch(
   () => props.type,
@@ -234,21 +199,19 @@ watch(
 onMounted(() => {
   setJsonEditor();
   if (props.tab) {
-    const chart = StorySettings.currentStory?.getCurrentWidget();
+    const chart = StorySettings.currentStory?.currentWidget;
     if (!chart?.layer) return;
 
     const existingChart = chart?.layer as Chart;
     if (existingChart) {
-      monacoEditor.setValue(JSON.stringify(existingChart.data, null, 2));
-      chartData.value = existingChart.data;
-      chartType.value = existingChart.type;
-      keyframe_field.value = existingChart.field;
-      unique_key.value = existingChart.key;
-      dataAccessor.value = existingChart.dataAccessor;
-      xField.value = existingChart.xField;
-      yField.value = existingChart.yField;
-      zField.value = existingChart.zField;
-      useGroups.value = existingChart.useGroups;
+      monacoEditor.setValue(JSON.stringify(existingChart.state.data, null, 2));
+      chartData.value = existingChart.state.data;
+      chartType.value = existingChart.state.type;
+      keyframe_field.value = existingChart.state.field;
+      unique_key.value = existingChart.state.key;
+      xField.value = existingChart.state.xField;
+      yField.value = existingChart.state.yField;
+      zField.value = existingChart.state.zField;
     }
   }
 });
@@ -282,7 +245,7 @@ onMounted(() => {
           </v-col>
           <v-col lg="12">
             <v-select
-              v-if="chartType?.value === ChartTypeValue.LINE"
+              v-if="chartType === ChartType.LINE"
               label="Data Accessor"
               :hint="`${dataAccessor}`"
               :items="columnOptions"
@@ -297,7 +260,7 @@ onMounted(() => {
           </v-col>
           <v-col lg="12">
             <v-text-field
-              v-if="chartType?.value === ChartTypeValue.SCATTER"
+              v-if="chartType === ChartType.SCATTER"
               label="Z Field"
               v-model="zField"
             ></v-text-field>
@@ -318,18 +281,7 @@ onMounted(() => {
       </v-container>
     </form>
   </v-card>
-  <v-container>
-    <v-row>
-      <v-col>
-        <v-checkbox
-          label="Show Legend"
-          :checked="showLegend"
-          @click="handleShowLegend"
-        ></v-checkbox>
-      </v-col>
-    </v-row>
-  </v-container>
-  <v-container v-if="chartType?.value === ChartTypeValue.LINE">
+  <v-container v-if="chartType === ChartType.LINE">
     <v-row>
       <v-col>
         <v-select

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import * as monaco from "monaco-editor";
-import { Chart, ChartTypeValue, type ChartType } from "@/utils";
+import { Chart, ChartType } from "@/utils";
 import _ from "lodash";
 import { CanvasSettings, ChartSettings } from "../settings-state";
 

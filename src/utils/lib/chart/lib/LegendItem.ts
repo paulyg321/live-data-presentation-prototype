@@ -119,41 +119,41 @@ export class LegendItem {
   }
 
   gestureListener(gestureData: GestureTrackerValues) {
-    const {
-      rightHandLandmarks,
-      rightHandGestures,
-      leftHandLandmarks,
-      leftHandGestures,
-    } = gestureData;
+    // const {
+    //   rightHandLandmarks,
+    //   rightHandGestures,
+    //   leftHandLandmarks,
+    //   leftHandGestures,
+    // } = gestureData;
 
-    const rightHandPosition =
-      GestureListener.convertGestureAndLandmarksToPositions({
-        landmarkData: rightHandLandmarks,
-        gestureData: rightHandGestures,
-        gestureType: SupportedGestures.POINTING,
-      });
+    // const rightHandPosition =
+    //   GestureListener.convertGestureAndLandmarksToPositions({
+    //     landmarkData: rightHandLandmarks,
+    //     gestureData: rightHandGestures,
+    //     gestureType: SupportedGestures.POINTING,
+    //   });
 
-    const leftHandPosition =
-      GestureListener.convertGestureAndLandmarksToPositions({
-        landmarkData: leftHandLandmarks,
-        gestureData: leftHandGestures,
-        gestureType: SupportedGestures.POINTING,
-      });
+    // const leftHandPosition =
+    //   GestureListener.convertGestureAndLandmarksToPositions({
+    //     landmarkData: leftHandLandmarks,
+    //     gestureData: leftHandGestures,
+    //     gestureType: SupportedGestures.POINTING,
+    //   });
 
-    if (rightHandPosition) {
-      if (
-        this.isInRange(
-          rightHandPosition.fingerPositions[HAND_LANDMARK_IDS.index_finger_tip]
-        )
-      ) {
-        if (!this.timer) {
-          this.initializeSelectionTimer();
-        }
-        this.previousHandPositionInRange = true;
-      } else {
-        this.previousHandPositionInRange = false;
-      }
-    }
+    // if (rightHandPosition) {
+    //   if (
+    //     this.isInRange(
+    //       rightHandPosition.fingerPositions[HAND_LANDMARK_IDS.index_finger_tip]
+    //     )
+    //   ) {
+    //     if (!this.timer) {
+    //       this.initializeSelectionTimer();
+    //     }
+    //     this.previousHandPositionInRange = true;
+    //   } else {
+    //     this.previousHandPositionInRange = false;
+    //   }
+    // }
   }
 
   initializeSelectionTimer() {

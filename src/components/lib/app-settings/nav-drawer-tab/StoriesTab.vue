@@ -26,29 +26,30 @@ function closeMenu() {
         <v-card
           :theme="index === StorySettings.currentStoryIndex ? 'dark' : 'light'"
         >
-          <v-img
+          <!-- <v-img
             src=""
             class="align-end"
-            gradient="to bottom, rgba(0,0,0,.1), rgba(0,0,0,.5)"
             height="100px"
             cover
           >
-            <v-card-title class="text-white">{{ story.title }}</v-card-title>
-          </v-img>
+        </v-img> -->
+          <v-card-title class="text-deep-purple-lighten-2">{{
+            story.title
+          }}</v-card-title>
 
           <v-card-actions>
+            <v-spacer></v-spacer>
             <v-btn
-              size="small"
-              color="surface-variant"
-              variant="text"
+              density="compact"
+              color="deep-purple-lighten-2"
+              variant="elevated"
               icon="mdi-delete"
               @click="StorySettings.deleteStory(story.title)"
             ></v-btn>
-            <v-spacer></v-spacer>
             <v-btn
-              size="small"
-              color="surface-variant"
-              variant="text"
+              density="compact"
+              color="deep-purple-lighten-2"
+              variant="elevated"
               icon="mdi-play"
               @click="StorySettings.setCurrentStory(index)"
             ></v-btn>

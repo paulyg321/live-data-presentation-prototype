@@ -1,16 +1,17 @@
-import { ChartTypeValue, DrawingUtils, ListenerType, Story } from "@/utils";
+import { ChartType, DrawingUtils, ListenerType, Story } from "@/utils";
 import { reactive, watch } from "vue";
 import { CanvasSettings } from "./canvas-settings";
 import { ChartSettings } from "./chart-settings";
 import { parse, stringify } from "flatted";
 
 export const widgetIconMap = {
-  [ChartTypeValue.BAR]: "mdi-chart-bar",
-  [ChartTypeValue.LINE]: "mdi-chart-line",
-  [ChartTypeValue.SCATTER]: "mdi-chart-scatter-plot",
+  [ChartType.BAR]: "mdi-chart-bar",
+  [ChartType.LINE]: "mdi-chart-line",
+  [ChartType.SCATTER]: "mdi-chart-scatter-plot",
   [ListenerType.TEMPORAL]: "mdi-play-box",
   [ListenerType.RADIAL]: "mdi-play-circle",
   [ListenerType.FORESHADOWING]: "mdi-crystal-ball",
+  [ListenerType.SELECTION]: "mdi-select-group",
 };
 
 watch(() => CanvasSettings.generalDrawingUtils, initializeStories);

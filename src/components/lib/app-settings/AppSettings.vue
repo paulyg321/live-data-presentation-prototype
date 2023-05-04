@@ -22,19 +22,17 @@ import { Hands, type Results } from "@mediapipe/hands";
 // STATE
 import { PortalState } from "./settings-state";
 import {
-  ChartTypeValue,
   ForeshadowingGestureListener,
-  ForeshadowingShapes,
   LinearPlaybackGestureListener,
   ListenerType,
   RadialPlaybackGestureListener,
   RadialTrackerMode,
-  SupportedGestures,
-  type ChartType,
-getGestureListenerResetKeys,
+  ChartType,
+  getGestureListenerResetKeys,
 } from "@/utils";
 import WidgetSettingsTab from "./nav-drawer-tab/WidgetSettingsTab.vue";
 import PortalSettingsTab from "./nav-drawer-tab/PortalSettingsTab.vue";
+import { SelectionGestureListener } from "@/utils/lib/gestures/lib/SelectionGestureListener";
 
 enum AvailableWidgets {
   // Not really widgets
@@ -48,6 +46,7 @@ enum AvailableWidgets {
   RADIAL_PLAYBACK = "radial-playback",
   FORESHADOWING = "foreshadowing",
   PORTALS = "portals",
+  SELECTION = "selection",
   // GESTURE = "gesture",
 }
 
@@ -99,22 +98,13 @@ function handleAddWidget(value: {
         currentTab.value = SettingsTab.WIDGET_SETTINGS;
         break;
       case AvailableWidgets.BAR_CHART:
-        handleChartWidget(SettingsTab.CHART_SETTINGS, {
-          title: "Bar Chart",
-          value: ChartTypeValue.BAR,
-        });
+        handleChartWidget(SettingsTab.CHART_SETTINGS, ChartType.BAR);
         break;
       case AvailableWidgets.SCATTER_PLOT:
-        handleChartWidget(SettingsTab.CHART_SETTINGS, {
-          title: "Scatter Plot",
-          value: ChartTypeValue.SCATTER,
-        });
+        handleChartWidget(SettingsTab.CHART_SETTINGS, ChartType.SCATTER);
         break;
       case AvailableWidgets.LINE_CHART:
-        handleChartWidget(SettingsTab.CHART_SETTINGS, {
-          title: "Line Chart",
-          value: ChartTypeValue.LINE,
-        });
+        handleChartWidget(SettingsTab.CHART_SETTINGS, ChartType.LINE);
         break;
       case AvailableWidgets.LINEAR_PLAYBACK:
         handleGestureWidget(SettingsTab.WIDGET_SETTINGS, ListenerType.TEMPORAL);
@@ -126,6 +116,12 @@ function handleAddWidget(value: {
         handleGestureWidget(
           SettingsTab.WIDGET_SETTINGS,
           ListenerType.FORESHADOWING
+        );
+        break;
+      case AvailableWidgets.SELECTION:
+        handleGestureWidget(
+          SettingsTab.WIDGET_SETTINGS,
+          ListenerType.SELECTION
         );
         break;
       default:
@@ -150,7 +146,7 @@ function addWidget(type: string) {
           height: 50,
         },
         canvasDimensions: CanvasSettings.dimensions,
-        resetKeys: getGestureListenerResetKeys("KeyL"),
+        resetKeys: getGestureListenerResetKeys(),
         drawingUtils,
       });
 
@@ -164,7 +160,7 @@ function addWidget(type: string) {
         dimensions: { width: 100, height: 100 },
         canvasDimensions: CanvasSettings.dimensions,
         mode: RadialTrackerMode.NORMAL,
-        resetKeys: getGestureListenerResetKeys("KeyR"),
+        resetKeys: getGestureListenerResetKeys(),
         drawingUtils,
       });
 
@@ -177,9 +173,19 @@ function addWidget(type: string) {
         position: { x: 0, y: 0 },
         dimensions: { width: 200, height: 200 },
         canvasDimensions: CanvasSettings.dimensions,
-        resetKeys: getGestureListenerResetKeys("KeyF"),
-        mode: ForeshadowingShapes.RECTANGLE,
-        playbackControllerType: "absolute",
+        resetKeys: getGestureListenerResetKeys(),
+        drawingUtils,
+      });
+
+      StorySettings.currentStory?.addLayer(type, newListener);
+      break;
+    }
+    case ListenerType.SELECTION: {
+      const newListener = new SelectionGestureListener({
+        position: { x: 0, y: 0 },
+        dimensions: { width: 200, height: 200 },
+        canvasDimensions: CanvasSettings.dimensions,
+        resetKeys: getGestureListenerResetKeys(),
         drawingUtils,
       });
 
@@ -301,6 +307,18 @@ onMounted(() => {
               <v-list-item
                 :prepend-icon="widgetIconMap.foreshadowing"
                 :value="AvailableWidgets.FORESHADOWING"
+                v-bind="props"
+                :disabled="disableChartType"
+              >
+              </v-list-item>
+            </template>
+          </v-tooltip>
+
+          <v-tooltip text="Selection Widget">
+            <template v-slot:activator="{ props }">
+              <v-list-item
+                :prepend-icon="widgetIconMap.selection"
+                :value="AvailableWidgets.SELECTION"
                 v-bind="props"
                 :disabled="disableChartType"
               >

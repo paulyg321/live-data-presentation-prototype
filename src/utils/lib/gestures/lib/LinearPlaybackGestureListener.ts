@@ -1,32 +1,26 @@
-import _ from "lodash";
-import type { Subject } from "rxjs";
 import type { Coordinate2D } from "../../chart";
 import { HANDS } from "./gesture-utils";
 import {
   GestureListener,
+  ListenerMode,
   type GestureListenerConstructorArgs,
   type ListenerProcessedFingerData,
+  DEFAULT_TRIGGER_DURATION,
 } from "./GestureListener";
 import { SupportedGestures } from "./handGestures";
-import { playbackSubject, PlaybackSubjectType } from "./subjects";
-import { calculateDistance } from "../../calculations";
-import { startTimeoutInstance, startTimerInstance } from "../../timer";
+import { PlaybackSubjectType } from "./subjects";
+import { HAND_LANDMARK_IDS } from "../../media-pipe";
 
 export interface LinearListenerEmitRange {
   start: Coordinate2D;
   end: Coordinate2D;
 }
 
-export interface LinearPlaybackGestureListenerConstructorArgs
-  extends GestureListenerConstructorArgs {
-  emitRange?: LinearListenerEmitRange;
-  subjects?: Record<string, Subject<any>>;
-}
+export type LinearPlaybackGestureListenerConstructorArgs =
+  GestureListenerConstructorArgs;
 
 export class LinearPlaybackGestureListener extends GestureListener {
   constructor({
-    position,
-    dimensions,
     handsToTrack = {
       dominant: HANDS.RIGHT,
       nonDominant: HANDS.LEFT,
@@ -37,18 +31,21 @@ export class LinearPlaybackGestureListener extends GestureListener {
         leftHand: SupportedGestures.POINTING,
       },
     ],
-    canvasDimensions,
-    resetKeys,
-    drawingUtils,
+    strokeTriggerName = "temporal",
+    listenerMode = ListenerMode.STROKE,
+    triggerDuration = DEFAULT_TRIGGER_DURATION,
+    // We use 2 hands to trigger;
+    numHands = 1,
+    ...rest
   }: LinearPlaybackGestureListenerConstructorArgs) {
     super({
-      position,
-      dimensions,
+      ...rest,
       handsToTrack,
       gestureTypes,
-      canvasDimensions,
-      resetKeys,
-      drawingUtils,
+      strokeTriggerName,
+      listenerMode,
+      triggerDuration,
+      numHands,
     });
   }
 
@@ -56,48 +53,9 @@ export class LinearPlaybackGestureListener extends GestureListener {
     this.stroke = [];
   }
 
-  renderDetectionState() {
-    if (!this.startDetecting) return;
-
-    this.drawingUtils.modifyContextStyleAndDraw(
-      {
-        strokeStyle: "#90EE90",
-        opacity: 0.7,
-      },
-      (context) => {
-        this.drawingUtils.drawRect({
-          coordinates: this.position,
-          dimensions: this.dimensions,
-          stroke: true,
-          context,
-        });
-      },
-      ["presenter", "preview"]
-    );
-
-    this.drawingUtils.modifyContextStyleAndDraw(
-      {
-        fillStyle: "#90EE90",
-        opacity: 0.3,
-      },
-      (context) => {
-        this.drawingUtils.drawRect({
-          coordinates: this.position,
-          dimensions: {
-            ...this.dimensions,
-            width: this.dimensions.width * this.detectionExtent,
-          },
-          fill: true,
-          context,
-        });
-      },
-      ["presenter", "preview"]
-    );
-  }
-
   handleTrigger() {
     if (this.detectionTimer) return;
-    this.triggerDetection(5000, () => {
+    this.triggerDetection(() => {
       if (this.stroke.length < 5) {
         this.stroke = [];
         return;
@@ -107,7 +65,7 @@ export class LinearPlaybackGestureListener extends GestureListener {
         if (!this.gestureName) {
           this.stroke = [];
           return;
-        };
+        }
 
         this.strokeRecognizer.addGesture(this.gestureName, this.stroke);
         this.publishToSubjectIfExists(GestureListener.snackbarSubjectKey, {
@@ -117,10 +75,9 @@ export class LinearPlaybackGestureListener extends GestureListener {
         });
       } else {
         const result = this.strokeRecognizer.recognize(this.stroke, false);
-        if (result.name === "temporal") {
+        if (result.name === this.strokeTriggerName) {
           this.publishToSubjectIfExists(GestureListener.playbackSubjectKey, {
             type: PlaybackSubjectType.CONTINUOUS,
-            duration: 3000,
           });
         }
       }
@@ -129,17 +86,10 @@ export class LinearPlaybackGestureListener extends GestureListener {
     });
   }
 
-  protected handleNewData(
-    fingerData: ListenerProcessedFingerData,
-    handCount: number
-  ): void {
+  protected handleNewData(fingerData: ListenerProcessedFingerData): void {
     const dominantHand = fingerData[this.handsToTrack.dominant];
 
-    const trigger = this.thumbsTouch(
-      fingerData,
-      this.handsToTrack.nonDominant,
-      this.handsToTrack.dominant
-    );
+    const trigger = this.thumbsTouch(fingerData);
 
     if (trigger) {
       this.handleTrigger();
@@ -150,9 +100,8 @@ export class LinearPlaybackGestureListener extends GestureListener {
       return;
     }
 
-    const [fingerToTrack] = dominantHand.fingersToTrack;
     const fingerPosition = dominantHand.fingerPositions[
-      fingerToTrack
+      HAND_LANDMARK_IDS.index_finger_tip
     ] as Coordinate2D;
 
     if (fingerPosition.x === undefined || fingerPosition.y === undefined) {

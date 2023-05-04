@@ -35,7 +35,7 @@ export interface CircleFitResults {
   computationTime: number;
 }
 
-interface CircleFit {
+export interface CircleFit {
   addPoint: (x: number, y: number) => void;
   resetPoints: () => void;
   compute: () => CircleFitResults;

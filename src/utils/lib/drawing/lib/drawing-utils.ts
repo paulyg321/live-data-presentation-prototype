@@ -317,7 +317,6 @@ export class DrawingUtils {
     stroke = false,
     clip = false,
     context,
-    key
   }: DrawRectArgs) {
     if (clip) {
       context.beginPath();
@@ -338,7 +337,9 @@ export class DrawingUtils {
         dimensions.width,
         dimensions.height
       );
-    } else if (stroke) {
+    }
+
+    if (stroke) {
       context.strokeRect(
         xScale(coordinates.x),
         yScale(coordinates.y),
