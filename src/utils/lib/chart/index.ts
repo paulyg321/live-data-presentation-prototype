@@ -9,3 +9,4 @@ export * from "./lib/LineChart";
 export * from "./lib/ScatterPlot";
 export * from "./lib/AnimatedBar";
 export * from "./lib/ChartController";
+export * from "./lib/AnimatedElement";

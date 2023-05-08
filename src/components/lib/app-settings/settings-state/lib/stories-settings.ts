@@ -8,10 +8,19 @@ export const widgetIconMap = {
   [ChartType.BAR]: "mdi-chart-bar",
   [ChartType.LINE]: "mdi-chart-line",
   [ChartType.SCATTER]: "mdi-chart-scatter-plot",
+
+  // OLD
   [ListenerType.TEMPORAL]: "mdi-play-box",
   [ListenerType.RADIAL]: "mdi-play-circle",
   [ListenerType.FORESHADOWING]: "mdi-crystal-ball",
   [ListenerType.SELECTION]: "mdi-select-group",
+
+  // NEW
+  [ListenerType.RECT_POSE]: "mdi-shape-rectangle-plus",
+  [ListenerType.RANGE_POSE]: "mdi-hands-pray",
+  [ListenerType.POINT_POSE]: "mdi-hand-pointing-up",
+  [ListenerType.OPEN_HAND_POSE]: "mdi-hand-back-left",
+  [ListenerType.STROKE_LISTENER]: "mdi-draw",
 };
 
 watch(() => CanvasSettings.generalDrawingUtils, initializeStories);

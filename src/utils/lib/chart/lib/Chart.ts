@@ -5,6 +5,7 @@ import {
   type Coordinate2D,
   type Dimensions,
   ChartController,
+  type ChartsControllerState,
 } from "@/utils";
 
 export enum ScaleTypes {
@@ -353,7 +354,10 @@ export class Chart {
       drawingUtils: this.state.drawingUtils,
       xScaleType: this.state.xScaleType,
       yScaleType: this.state.yScaleType,
-    };
+      currentKeyframeIndex: 0,
+      playbackExtent: 0,
+      chartType: this.state.type,
+    } as ChartsControllerState;
 
     switch (this.state.type) {
       case ChartType.LINE:

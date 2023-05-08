@@ -11,11 +11,16 @@ export function drawXAxis(
   fontSize: number,
   tickCount?: number,
   rotateLabels?: boolean,
-  drawLine?: boolean
+  drawLine?: boolean,
+  bold?: boolean
 ) {
+  const lineWidth = bold ? 2 : 1;
   const [startX, endX] = range;
-  const tickPadding = 3,
-    tickSize = 6,
+  const tickPadding = {
+    top: 10,
+    bottom: 10
+  },
+    tickSize = 9,
     xTicks = xScale.ticks(tickCount), // You may choose tick counts. ex: xScale.ticks(20)
     xTickFormat = xScale.tickFormat(); // you may choose the format. ex: xScale.tickFormat(tickCount, ".0s")
 
@@ -23,13 +28,14 @@ export function drawXAxis(
     {
       strokeStyle: AXES_COLOR,
       fontSize,
+      lineWidth,
     },
     (context) => {
       xTicks.forEach((d: any) => {
         drawingUtils.drawLine({
           coordinates: [
-            { x: d, y: Y },
-            { x: d, y: Y + tickSize },
+            { x: d, y: Y + tickPadding.top },
+            { x: d, y: Y + tickSize + tickPadding.top },
           ],
           shape: LineShape.SHARP,
           xScale,
@@ -46,7 +52,7 @@ export function drawXAxis(
             { x: endX, y: Y + tickSize },
           ],
           shape: LineShape.SHARP,
-          context
+          context,
         });
       }
     }
@@ -59,6 +65,7 @@ export function drawXAxis(
       textAlign: "center",
       textBaseline: "top",
       fillStyle: AXES_COLOR,
+      bold
     },
     (context) => {
       // Determine if there's overlap
@@ -90,7 +97,7 @@ export function drawXAxis(
       xTicks.forEach((d: any) => {
         const label = xTickFormat(d);
         const xPos = xScale(d);
-        const yPos = Y + tickSize + tickPadding;
+        const yPos = Y + tickSize + tickPadding.bottom + tickPadding.top;
 
         // rotate if there's overlaps
         if (overlap || rotateLabels) {

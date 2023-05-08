@@ -1,137 +1,313 @@
-import { gsap } from "gsap";
-import { MorphSVGPlugin } from "gsap/MorphSVGPlugin";
-import type {
-  AnimatedChartElementArgs,
-  AnimationChartElementData,
-  D3ScaleTypes,
-} from "./ChartController";
+import type { AnimatedChartElementArgs, D3ScaleTypes } from "./ChartController";
 import * as d3 from "d3";
-import type { Coordinate2D, Dimensions } from "../types";
-import { defaultScale } from "../../drawing";
+import type { Coordinate2D } from "../types";
 import { MAX_DOMAIN_Y } from "./Chart";
 import { ForeshadowingStatesMode } from "../../gestures";
-gsap.registerPlugin(MorphSVGPlugin);
+import {
+  AnimatedElement,
+  type HandleForeshadowArgs,
+  type HandleForeshadowReturnValue,
+  type HandleSelectionArgs,
+  type HandleSelectionReturnValue,
+  type VisualState,
+} from "./AnimatedElement";
 
-export type AnimatedBarState = AnimatedChartElementArgs & {
-  currentKeyframeIndex: number;
-  keyframes: any[];
-  foreshadowingMode: ForeshadowingStatesMode;
-};
-
-export type BarVisualState = {
-  color: string;
-  current: VisualState;
-  foreshadow: Record<string, VisualState>;
-};
-
-export type VisualState = {
-  opacity: number;
-  path: number[];
-  position: Coordinate2D;
-  dimensions: Dimensions;
-  pathTimeline?: any;
-};
-
-export class AnimatedBar {
-  controllerState: AnimatedBarState;
-  animationState: BarVisualState;
-
+export class AnimatedBar extends AnimatedElement {
   constructor(args: AnimatedChartElementArgs) {
-    this.controllerState = {
-      ...args,
-      currentKeyframeIndex: 0,
-      keyframes: args.unscaledData.map(
-        ({ keyframe }): AnimationChartElementData => keyframe
-      ),
-      foreshadowingMode: ForeshadowingStatesMode.NEXT,
-    };
-    this.animationState = {
-      color: args.colorScale(args.colorKey),
-      current: {
-        opacity: 0,
-        path: [],
-        position: { x: 0, y: 0 },
-        dimensions: { width: 0, height: 0 },
-      },
-      foreshadow: {},
-    };
-
-    this.initializeCurrentAnimationState();
-    this.initializeForeshadowingAnimationState();
+    super(args);
   }
 
-  onUpdate() {
-    this.setCurrentPath();
-  }
+  handleForeshadowCount(
+    args: HandleForeshadowArgs
+  ): HandleForeshadowReturnValue {
+    const FONT_SIZE = 16;
+    let opacity = 0;
+    const {
+      itemAnimationState,
+      itemUnscaledPosition,
+      index,
+      finalForeshadowingIndex,
+    } = args;
 
-  initializeCurrentAnimationState() {
-    const timeline1 = gsap.timeline();
-    const timeline2 = gsap.timeline();
-    const unscaledPosition =
+    const currentUnscaledData =
       this.controllerState.unscaledData[
         this.controllerState.currentKeyframeIndex
       ];
 
-    const { rectDimensions, topLeft: position } =
-      this.createRectDataFromCoordinate({
-        coordinate: unscaledPosition,
+    const isForeshadowed = this.controllerState.isForeshadowed;
+
+    if (
+      (index <= finalForeshadowingIndex && isForeshadowed) ||
+      (this.controllerState.foreshadowingMode === ForeshadowingStatesMode.ALL &&
+        isForeshadowed)
+    ) {
+      const margin = 30;
+
+      const lastPosition = this.controllerState.unscaledData[index - 1];
+
+      const { topRight: currentBarTopRight } =
+        AnimatedBar.createRectDataFromCoordinate({
+          coordinate: currentUnscaledData,
+          xScale: this.controllerState.xScale,
+          yScale: this.controllerState.yScale,
+        });
+      const {
+        rectDimensions: { height: diameter },
+        topRight: foreshadowedBarTopRight,
+      } = AnimatedBar.createRectDataFromCoordinate({
+        coordinate: itemUnscaledPosition,
+        xScale: this.controllerState.xScale,
+        yScale: this.controllerState.yScale,
       });
+      const { topRight: lastPositionBarTopRight } =
+        AnimatedBar.createRectDataFromCoordinate({
+          coordinate: lastPosition,
+          xScale: this.controllerState.xScale,
+          yScale: this.controllerState.yScale,
+        });
 
-    timeline1.to(this.animationState.current.dimensions, {
-      width: rectDimensions.width,
-      height: rectDimensions.height,
-      duration: 2,
-      onUpdate: () => this.onUpdate(),
-    });
-    timeline2.to(this.animationState.current.position, {
-      x: position.x,
-      y: position.y,
-      duration: 2,
-      onUpdate: () => this.onUpdate(),
-    });
+      const radius = diameter / 2;
+      const indexDiff = index - this.controllerState.currentKeyframeIndex - 1;
+      const marginSum = (margin + diameter) * indexDiff + (margin + radius);
 
-    timeline1.play();
-    timeline2.play();
-  }
+      const foreshadowElementCoords = {
+        x: currentBarTopRight.x + marginSum,
+        y: foreshadowedBarTopRight.y + radius,
+      };
 
-  initializeForeshadowingAnimationState() {
-    this.controllerState.unscaledData.forEach(
-      ({ keyframe, ...coords }: AnimationChartElementData, index: number) => {
-        this.animationState.foreshadow[keyframe] = {} as VisualState;
-        switch (this.controllerState.foreshadowingMode) {
-          case ForeshadowingStatesMode.ALL:
-          case ForeshadowingStatesMode.NEXT:
-          case ForeshadowingStatesMode.COUNT:
-          default: {
-            const { rectDimensions, topLeft: position } =
-              this.createRectDataFromCoordinate({
-                coordinate: coords,
-              });
-            this.animationState.foreshadow[keyframe].dimensions =
-              rectDimensions;
-            this.animationState.foreshadow[keyframe].position = position;
-            this.animationState.foreshadow[keyframe].opacity = 1;
+      const lastPositionElementCoords = {
+        x: currentBarTopRight.x + marginSum - (margin + diameter),
+        y: lastPositionBarTopRight.y + radius,
+      };
 
-            this.setForeshadowingPath();
-          }
+      const circleBounds = {
+        x: foreshadowElementCoords.x + radius,
+        y: foreshadowElementCoords.y + radius,
+      };
+      const [_, maxRight] = this.controllerState.xScale.range() as number[];
+      const [__, maxBottom] = this.controllerState.yScale.range() as number[];
+
+      const isOffChart = circleBounds.x > maxRight;
+      const isBelowLastValue = circleBounds.y > maxBottom;
+
+      if (!isOffChart) {
+        opacity = 1;
+        // is next index
+        itemAnimationState.label = {
+          position: {
+            ...foreshadowElementCoords,
+            y: foreshadowElementCoords.y + FONT_SIZE / 2,
+          },
+          fontSize: FONT_SIZE,
+          text: itemUnscaledPosition.y ? itemUnscaledPosition.y.toString() : "",
+          align: "center",
+        };
+
+        itemAnimationState.line = {
+          start: lastPositionElementCoords,
+          end: foreshadowElementCoords,
+          lineWidth: 3,
+        };
+
+        // CENTER COORDINATES OF THE CURRENT STATE
+        itemAnimationState.position = foreshadowElementCoords;
+        itemAnimationState.dimensions = {
+          width: diameter,
+          height: diameter,
+        };
+
+        if (isBelowLastValue) {
+          itemAnimationState.arrow = {
+            end: {
+              x: foreshadowElementCoords.x,
+              y: foreshadowElementCoords.y + radius,
+            },
+            start: {
+              x: foreshadowElementCoords.x,
+              y: foreshadowElementCoords.y - radius,
+            },
+            arrowWidth: radius,
+          };
+          itemAnimationState.circle = undefined;
+          itemAnimationState.rect = undefined;
+        } else {
+          itemAnimationState.circle = {
+            position: foreshadowElementCoords,
+            radius,
+          };
+          itemAnimationState.arrow = undefined;
+          itemAnimationState.rect = undefined;
         }
       }
-    );
+    }
+
+    return {
+      shouldPulse: index === finalForeshadowingIndex && isForeshadowed,
+      opacity: isForeshadowed ? opacity : 0,
+    };
+  }
+
+  handleForeshadowNext(
+    args: HandleForeshadowArgs
+  ): HandleForeshadowReturnValue {
+    const FONT_SIZE = 16;
+    const {
+      itemAnimationState,
+      itemUnscaledPosition,
+      index,
+      finalForeshadowingIndex,
+    } = args;
+
+    const isForeshadowed = this.controllerState.isForeshadowed;
+
+    let opacity = 0;
+    let shouldPulse = false;
+    if (index === finalForeshadowingIndex && isForeshadowed) {
+      shouldPulse = true;
+      opacity = 1;
+      const [_, endYrange] = this.controllerState.yScale.range() as number[];
+      const [startXrange, endXrange] =
+        this.controllerState.xScale.range() as number[];
+
+      const { rectDimensions, topLeft } =
+        AnimatedBar.createRectDataFromCoordinate({
+          coordinate: itemUnscaledPosition,
+          xScale: this.controllerState.xScale,
+          yScale: this.controllerState.yScale,
+        });
+      const margin = 20;
+
+      itemAnimationState.position = topLeft;
+      itemAnimationState.dimensions = rectDimensions;
+
+      itemAnimationState.label = {
+        position: {
+          x: topLeft.x + 10,
+          y: topLeft.y + rectDimensions.height * 0.5 + FONT_SIZE / 2,
+        },
+        fontSize: FONT_SIZE,
+        text: this.controllerState.selectionKey,
+        align: "start",
+      };
+      itemAnimationState.line = undefined;
+
+      const isBelowLastValue = topLeft.y >= endYrange;
+
+      if (isBelowLastValue) {
+        const chartMidPoint = startXrange + (endXrange - startXrange) / 2;
+        const chartEnd = endYrange;
+        itemAnimationState.label = {
+          position: {
+            x: chartMidPoint,
+            y: chartEnd - rectDimensions.height / 2,
+          },
+          fontSize: FONT_SIZE,
+          text: itemUnscaledPosition.y ? itemUnscaledPosition.y.toString() : "",
+          align: "center",
+        };
+
+        itemAnimationState.arrow = {
+          start: {
+            x: chartMidPoint,
+            y: chartEnd - rectDimensions.height / 2 - margin,
+          },
+          end: {
+            x: chartMidPoint,
+            y: chartEnd - margin,
+          },
+          arrowWidth: rectDimensions.height / 2,
+        };
+        itemAnimationState.circle = undefined;
+        itemAnimationState.rect = undefined;
+      } else {
+        itemAnimationState.circle = undefined;
+        itemAnimationState.arrow = undefined;
+
+        itemAnimationState.rect = {
+          position: topLeft,
+          dimensions: rectDimensions,
+        };
+      }
+    }
+
+    return {
+      opacity: isForeshadowed ? opacity : 0,
+      shouldPulse: isForeshadowed ? shouldPulse : false,
+    };
   }
 
   // -------------------------------------- SETTERS --------------------------------------
-  updateState() {
-    console.log("UPDATE_ME");
+
+  handleSelection(args: HandleSelectionArgs): HandleSelectionReturnValue {
+    const { itemUnscaledPosition } = args;
+    const { rectDimensions, topLeft: position } =
+      AnimatedBar.createRectDataFromCoordinate({
+        coordinate: itemUnscaledPosition,
+        xScale: this.controllerState.xScale,
+        yScale: this.controllerState.yScale,
+      });
+
+    const padding = 5;
+
+    const modifiedDimensions = {
+      width: rectDimensions.width + 2 * padding,
+      height: rectDimensions.height + 2 * padding,
+    };
+
+    const modifiedPosition = {
+      x: position.x - padding,
+      y: position.y - padding,
+    };
+
+    const rectElement = d3
+      .select("#test-svg")
+      .append("rect")
+      .attr("x", () => modifiedPosition.x)
+      .attr("y", () => modifiedPosition.y)
+      .attr("width", () => modifiedDimensions.width)
+      .attr("height", () => modifiedDimensions.height)
+      .node();
+
+    return {
+      element: rectElement,
+      position: modifiedPosition,
+      dimensions: modifiedDimensions,
+    };
   }
 
-  createRectDataFromCoordinate({
+  handleMainUpdate(args: HandleSelectionArgs): HandleSelectionReturnValue {
+    const { itemUnscaledPosition } = args;
+    const { rectDimensions, topLeft: position } =
+      AnimatedBar.createRectDataFromCoordinate({
+        coordinate: itemUnscaledPosition,
+        xScale: this.controllerState.xScale,
+        yScale: this.controllerState.yScale,
+      });
+
+    const rectElement = d3
+      .select("#test-svg")
+      .append("rect")
+      .attr("x", () => position.x)
+      .attr("y", () => position.y)
+      .attr("width", () => rectDimensions.width)
+      .attr("height", () => rectDimensions.height)
+      .node();
+
+    return {
+      element: rectElement,
+      position: position,
+      dimensions: rectDimensions,
+    };
+  }
+
+  static createRectDataFromCoordinate({
     coordinate,
-    xScale = this.controllerState.xScale,
-    yScale = this.controllerState.yScale,
+    xScale,
+    yScale,
   }: {
     coordinate: Coordinate2D;
-    xScale?: D3ScaleTypes;
-    yScale?: D3ScaleTypes;
+    xScale: D3ScaleTypes;
+    yScale: D3ScaleTypes;
   }) {
     if (coordinate.x === undefined || coordinate.y === undefined) {
       return {
@@ -186,109 +362,175 @@ export class AnimatedBar {
     };
   }
 
-  generateElementPath(element: any) {
-    const svgPath = MorphSVGPlugin.convertToPath(element);
-    const data = MorphSVGPlugin.getRawPath(svgPath[0]) as any;
-    const path = data[0];
-
-    return path;
-  }
-
-  setCurrentPath() {
-    let timeline = gsap.timeline();
-    if (this.animationState.current.pathTimeline) {
-      timeline = this.animationState.current.pathTimeline;
-    } else {
-      this.animationState.current.pathTimeline = timeline;
-    }
-    const path = this.generateElementPath(
-      d3
-        .select("#test-svg")
-        .append("rect")
-        .attr("x", () => this.animationState.current.position.x)
-        .attr("y", () => this.animationState.current.position.y)
-        .attr("width", () => this.animationState.current.dimensions.width)
-        .attr("height", () => this.animationState.current.dimensions.height)
-        .node()
-    );
-    d3.select("#test-svg").selectAll("*").remove();
-
-    this.animationState.current.path = path;
-  }
-
-  setForeshadowingPath() {
-    Object.entries(this.animationState.foreshadow).map(
-      ([key, value]: [string, VisualState]) => {
-        const path = this.generateElementPath(
-          d3
-            .select("#test-svg")
-            .append("rect")
-            .attr("x", () => value.position.x)
-            .attr("y", () => value.position.y)
-            .attr("width", () => value.dimensions.width)
-            .attr("height", () => value.dimensions.height)
-            .node()
-        );
-        d3.select("#test-svg").selectAll("*").remove();
-
-        this.animationState.foreshadow[key].path = path;
-      }
-    );
-  }
-
-  drawCurrentRect() {
+  drawCurrentState() {
     const color = this.animationState.color;
-    const opacity = this.animationState.current.opacity;
-    const path = this.animationState.current.path;
-
-    this.drawPath({
-      color,
+    const {
       opacity,
-      path,
-    });
-  }
+      parsedPath: path,
+      label,
+      position,
+      dimensions,
+    } = this.animationState.current;
+    const { opacity: selectionOpacity, parsedPath: selectionPath } =
+      this.animationState.selection;
 
-  drawForeshadowingState() {
-    const color = this.animationState.color;
-    Object.values(this.animationState.foreshadow).map((value: VisualState) => {
-      const { opacity, path } = value;
+    const textPosition = {
+      x: position.x + 10,
+      y: position.y + dimensions.height * 0.5 + (label?.fontSize ?? 0) / 2,
+    };
 
-      this.drawPath({
-        color,
-        opacity,
-        path,
-      });
-    });
-  }
+    if (!path) return;
 
-  drawPath(args: { color: string; path: number[]; opacity: number }) {
-    const { color, path, opacity } = args;
     this.controllerState.drawingUtils.modifyContextStyleAndDraw(
       {
+        strokeStyle: color,
         fillStyle: color,
         opacity,
       },
       (context: CanvasRenderingContext2D) => {
-        context.beginPath();
-        context.moveTo(path[0], path[1]);
-        for (let i = 2; i < path.length; ) {
-          context.bezierCurveTo(
-            path[i++],
-            path[i++],
-            path[i++],
-            path[i++],
-            path[i++],
-            path[i++]
-          );
-        }
-        context.closePath();
-        context.fill();
+        this.controllerState.clipBoundaries(context);
+        this.controllerState.drawingUtils.drawPath({
+          path,
+          mode: "fill",
+          context,
+        });
       }
     );
+
+    if (label) {
+      this.controllerState.drawingUtils.modifyContextStyleAndDraw(
+        {
+          fillStyle: "white",
+          opacity: opacity,
+          fontSize: label.fontSize,
+          textAlign: label.align as CanvasTextAlign,
+        },
+        (context: CanvasRenderingContext2D) => {
+          this.controllerState.clipBoundaries(context);
+          this.controllerState.drawingUtils.drawText({
+            text: label.text,
+            coordinates: textPosition,
+            context,
+          });
+        }
+      );
+    }
+
+    if (selectionPath && selectionOpacity) {
+      this.controllerState.drawingUtils.modifyContextStyleAndDraw(
+        {
+          strokeStyle: "white",
+          opacity: selectionOpacity,
+          lineWidth: 3,
+        },
+        (context: CanvasRenderingContext2D) => {
+          this.controllerState.drawingUtils.drawPath({
+            path: selectionPath,
+            mode: "stroke",
+            context,
+          });
+        }
+      );
+    }
   }
 
-  draw() {
-    this.drawCurrentRect();
-    // this.drawForeshadowingState();
+  drawForeshadowingState() {
+    const color = this.animationState.color;
+    // Draw Lines first
+    Object.values(this.animationState.foreshadow).map((value: VisualState) => {
+      const { line, opacity } = value;
+
+      if (!line) return;
+      this.controllerState.drawingUtils.modifyContextStyleAndDraw(
+        {
+          strokeStyle: color,
+          lineWidth: line?.lineWidth,
+          opacity,
+        },
+        (context: CanvasRenderingContext2D) => {
+          // this.controllerState.clipBoundaries(context);
+          this.controllerState.drawingUtils.drawLine({
+            coordinates: [line.start, line.end],
+            context,
+          });
+        }
+      );
+    });
+    Object.values(this.animationState.foreshadow).map((value: VisualState) => {
+      const { opacity, label, arrow, circle, rect } = value;
+
+      if (opacity === 0) return;
+
+      const applyLineDash =
+        !arrow &&
+        this.controllerState.foreshadowingMode === ForeshadowingStatesMode.NEXT;
+
+      this.controllerState.drawingUtils.modifyContextStyleAndDraw(
+        {
+          fillStyle: "white",
+          strokeStyle: color,
+          lineWidth: 3,
+          opacity,
+          lineDash: applyLineDash ? [4, 4] : undefined,
+        },
+        (context: CanvasRenderingContext2D) => {
+          // this.controllerState.clipBoundaries(context);
+          if (arrow) {
+            this.controllerState.drawingUtils.drawArrow({
+              context,
+              from: arrow.start,
+              to: arrow.end,
+              arrowWidth: arrow.arrowWidth,
+            });
+            context.save();
+            context.strokeStyle = "white";
+            this.controllerState.drawingUtils.drawArrow({
+              context,
+              from: arrow.start,
+              to: arrow.end,
+              arrowWidth: arrow.arrowWidth * 0.8,
+            });
+            context.restore();
+          } else if (circle) {
+            this.controllerState.drawingUtils.drawCircle({
+              coordinates: circle.position,
+              radius: circle.radius,
+              context,
+              stroke: true,
+              fill: true,
+            });
+          } else if (rect) {
+            this.controllerState.drawingUtils.drawRect({
+              coordinates: rect.position,
+              dimensions: rect.dimensions,
+              context,
+              stroke: true,
+              fill: true,
+            });
+          }
+        }
+      );
+
+      if (!label) return;
+
+      this.controllerState.drawingUtils.modifyContextStyleAndDraw(
+        {
+          fillStyle: color,
+          strokeStyle: color,
+          // lineWidth: 3,
+          opacity: opacity,
+          fontSize: label.fontSize,
+          textAlign: label.align as CanvasTextAlign,
+        },
+        (context: CanvasRenderingContext2D) => {
+          // this.controllerState.clipBoundaries(context);
+          this.controllerState.drawingUtils.drawText({
+            text: label.text,
+            coordinates: label.position,
+            context,
+          });
+        }
+      );
+    });
   }
 }

@@ -105,11 +105,9 @@ export class Story {
   }
 
   isChartLayer(type: string) {
-    return [
-      ChartType.BAR,
-      ChartType.SCATTER,
-      ChartType.LINE,
-    ].includes(type as ChartType);
+    return [ChartType.BAR, ChartType.SCATTER, ChartType.LINE].includes(
+      type as ChartType
+    );
   }
 
   getCurrentWidget() {
@@ -175,7 +173,16 @@ export class Story {
     const currentWidget = this.currentWidget;
     if (!currentWidget) return;
 
-    const listener = currentWidget?.layer?.state?.canvasListener;
+    let listener;
+    if (
+      [ChartType.BAR, ChartType.LINE, ChartType.SCATTER].includes(
+        currentWidget.type as ChartType
+      )
+    ) {
+      listener = currentWidget?.layer?.state?.canvasListener;
+    } else {
+      listener = currentWidget?.layer?.canvasListener;
+    }
     const boundsInformation = listener?.isInBounds(eventData);
 
     if (boundsInformation) {
@@ -199,9 +206,17 @@ export class Story {
   }
 
   draw() {
-    this.layers.forEach(({ layer, id }) => {
+    this.layers.forEach(({ layer, id, type }) => {
       if (id === this.currentWidget?.id) {
-        this.currentWidget.layer.state.canvasListener?.draw();
+        if (
+          [ChartType.BAR, ChartType.LINE, ChartType.SCATTER].includes(
+            type as ChartType
+          )
+        ) {
+          this.currentWidget.layer.state.canvasListener?.draw();
+        } else {
+          this.currentWidget.layer.canvasListener?.draw();
+        }
       }
       layer.draw();
     });

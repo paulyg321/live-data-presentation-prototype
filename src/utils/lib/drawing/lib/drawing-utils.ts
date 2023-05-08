@@ -32,6 +32,7 @@ export interface ModifyContextStyleArgs {
   lineDash?: number[];
   textAlign?: CanvasTextAlign;
   textBaseline?: CanvasTextBaseline;
+  bold?: boolean;
 }
 
 export interface DrawCircleArgs extends DrawingArgs {
@@ -308,6 +309,32 @@ export class DrawingUtils {
     context.restore();
   }
 
+  drawPath(args: {
+    path: number[];
+    context: CanvasRenderingContext2D;
+    mode: 'fill' | 'stroke';
+  }) {
+    const { path, context, mode } = args;
+    context.beginPath();
+    context.moveTo(path[0], path[1]);
+    for (let i = 2; i < path.length; ) {
+      context.bezierCurveTo(
+        path[i++],
+        path[i++],
+        path[i++],
+        path[i++],
+        path[i++],
+        path[i++]
+      );
+    }
+    context.closePath();
+    if (mode === 'stroke') {
+      context.stroke();
+    } else {
+      context.fill();
+    }
+  }
+
   drawRect({
     coordinates,
     dimensions,
@@ -420,6 +447,7 @@ export class DrawingUtils {
         lineDash,
         textAlign,
         textBaseline,
+        bold,
       } = settings;
 
       context.save();
@@ -433,7 +461,7 @@ export class DrawingUtils {
       }
 
       if (fontSize) {
-        context.font = `${fontSize}px Arial`;
+        context.font = `${bold ? "bold " : "" }${fontSize}px Arial`;
       }
 
       if (opacity) {

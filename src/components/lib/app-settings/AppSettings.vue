@@ -47,6 +47,11 @@ enum AvailableWidgets {
   FORESHADOWING = "foreshadowing",
   PORTALS = "portals",
   SELECTION = "selection",
+  RECT_POSE = "rect-pose",
+  RANGE_POSE = "range-pose",
+  POINT_POSE = "point-pose",
+  OPEN_HAND_POSE = "open-hand-pose",
+  STROKE_LISTENER = "stroke-listener",
   // GESTURE = "gesture",
 }
 
@@ -278,11 +283,11 @@ onMounted(() => {
             </template>
           </v-tooltip>
 
-          <v-tooltip text="Temporal Playback Widget">
+          <v-tooltip text="Rect Pose Widget">
             <template v-slot:activator="{ props }">
               <v-list-item
                 :prepend-icon="widgetIconMap.temporal"
-                :value="AvailableWidgets.LINEAR_PLAYBACK"
+                :value="AvailableWidgets.RECT_POSE"
                 v-bind="props"
                 :disabled="disableChartType"
               >

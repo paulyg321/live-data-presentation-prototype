@@ -9,6 +9,8 @@ import {
   highlightSubject,
   Chart,
   selectionSubject,
+  ForeshadowingStatesMode,
+  StateUpdateType,
 } from "@/utils";
 import { onMounted, onUnmounted, ref, watch } from "vue";
 import CanvasWrapper from "../../CanvasWrapper.vue";
@@ -59,7 +61,22 @@ selectionSubject.subscribe({
     const charts = StorySettings.currentStory?.getCharts();
     if (!charts) return;
 
-    // charts[0].chart?.setSelection(value);
+    charts[0].state.chart?.setForeshadow({
+      keys: [
+        "Afghanistan",
+        "Albania",
+        "Algeria",
+        "Angola",
+        "Argentina",
+        "Armenia",
+        "Australia",
+        "Austria",
+        "Azerbaijan",
+        "Bahamas",
+      ],
+      mode: ForeshadowingStatesMode.ALL,
+      stateCount: 8,
+    });
   },
 });
 
@@ -290,4 +307,9 @@ onMounted(() => {
   ></svg>
 </template>
 <!---------------------------------------------------------------------------------------------------------->
-<style></style>
+<style>
+.svg-label {
+  font-family: "Times New Roman", Times, serif;
+  font-weight: bold;
+}
+</style>

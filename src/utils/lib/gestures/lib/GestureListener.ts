@@ -32,6 +32,11 @@ export enum ListenerType {
   RADIAL = "radial",
   FORESHADOWING = "foreshadowing",
   SELECTION = "selection",
+  RECT_POSE = "rect-pose",
+  RANGE_POSE = "range-pose",
+  POINT_POSE = "point-pose",
+  OPEN_HAND_POSE = "open-hand-pose",
+  STROKE_LISTENER = "stroke-listener",
 }
 
 export type ListenerProcessedFingerData = Record<
