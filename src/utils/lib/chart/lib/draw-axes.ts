@@ -14,12 +14,11 @@ export function drawXAxis(
   drawLine?: boolean,
   bold?: boolean
 ) {
-  const lineWidth = bold ? 2 : 1;
   const [startX, endX] = range;
   const tickPadding = {
-    top: 10,
-    bottom: 10
-  },
+      top: 10,
+      bottom: 10,
+    },
     tickSize = 9,
     xTicks = xScale.ticks(tickCount), // You may choose tick counts. ex: xScale.ticks(20)
     xTickFormat = xScale.tickFormat(); // you may choose the format. ex: xScale.tickFormat(tickCount, ".0s")
@@ -28,7 +27,6 @@ export function drawXAxis(
     {
       strokeStyle: AXES_COLOR,
       fontSize,
-      lineWidth,
     },
     (context) => {
       xTicks.forEach((d: any) => {
@@ -39,7 +37,7 @@ export function drawXAxis(
           ],
           shape: LineShape.SHARP,
           xScale,
-          context
+          context,
         });
       });
 
@@ -65,7 +63,7 @@ export function drawXAxis(
       textAlign: "center",
       textBaseline: "top",
       fillStyle: AXES_COLOR,
-      bold
+      bold,
     },
     (context) => {
       // Determine if there's overlap
@@ -128,10 +126,15 @@ export function drawYAxis(
   tickCount?: number,
   scaleBand?: boolean,
   drawLine?: boolean,
+  bold?: boolean
 ) {
+  const lineWidth = bold ? 2 : 1;
   const [startY, endY] = range;
-  const tickPadding = 3,
-    tickSize = 6;
+  const tickPadding = {
+    left: 10,
+    right: 10,
+  },
+    tickSize = 9;
 
   let yTickFormat = (input: any) => input;
   let yTicks = yScale.domain();
@@ -150,12 +153,12 @@ export function drawYAxis(
       yTicks.forEach((d: any) => {
         drawingUtils.drawLine({
           coordinates: [
-            { x: X, y: d },
-            { x: X - tickSize, y: d },
+            { x: X - tickPadding.left, y: d },
+            { x: X - tickSize - tickPadding.left, y: d },
           ],
           shape: LineShape.SHARP,
           yScale,
-          context
+          context,
         });
       });
 
@@ -197,10 +200,10 @@ export function drawYAxis(
 
       yTicks.forEach((d: any) => {
         context.beginPath();
-        context.font = `${fontSize}px Arial`;
+        context.font = `${bold ? "bold " : ""}${fontSize}px Arial`;
         context.fillText(
           yTickFormat(d),
-          X - tickSize - tickPadding,
+          X - tickSize - tickPadding.left - tickPadding.right,
           yScale(d) + labelAdjustment
         );
       });

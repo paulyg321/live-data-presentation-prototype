@@ -1,6 +1,10 @@
 {
   "files": [],
   "references": [
+    /**
+    * Each of these are different tsconfigs to use
+    * notice each of them have different "include" and "exclude" so they can target different folders/file types in our projet
+    */
     {
       "path": "./tsconfig.config.json"
     },

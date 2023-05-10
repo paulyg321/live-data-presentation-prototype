@@ -26,12 +26,12 @@ export class StrokeListener extends GestureListener {
         leftHand: SupportedGestures.POINTING,
       },
     ],
+    trackedFingers = [HAND_LANDMARK_IDS.index_finger_tip],
     canvasDimensions,
     mode,
     resetKeys,
     drawingUtils,
     strokeTriggerName = "radial",
-    listenerMode = ListenerMode.STROKE,
     triggerDuration = DEFAULT_TRIGGER_DURATION,
     numHands = 1,
   }: StrokeListenerConstructorArgs) {
@@ -47,15 +47,15 @@ export class StrokeListener extends GestureListener {
       resetKeys,
       drawingUtils,
       mode,
-      listenerMode,
       strokeTriggerName,
       triggerDuration,
       numHands,
+      trackedFingers,
     });
   }
 
   private convertDistanceToAffect(distance: number) {
-    const radius = this.dimensions.width / 2;
+    const radius = this.state.dimensions.width / 2;
     const oneThirdRadius = radius * (1 / 3);
     const twoThirdRadius = radius * (2 / 3);
 
@@ -66,21 +66,21 @@ export class StrokeListener extends GestureListener {
 
   private getCenterPoint(): Coordinate2D {
     return {
-      x: this.position.x + this.dimensions.width / 2,
-      y: this.position.y + this.dimensions.width / 2,
+      x: this.state.position.x + this.state.dimensions.width / 2,
+      y: this.state.position.y + this.state.dimensions.width / 2,
     };
   }
 
   renderBorder() {
     const centerPoint = this.getCenterPoint();
-    this.drawingUtils?.modifyContextStyleAndDraw(
+    this.state.drawingUtils?.modifyContextStyleAndDraw(
       {
         strokeStyle: "skyblue",
       },
       (context) => {
-        this.drawingUtils?.drawCircle({
+        this.state.drawingUtils?.drawCircle({
           coordinates: centerPoint,
-          radius: this.dimensions.width / 2,
+          radius: this.state.dimensions.width / 2,
           stroke: true,
           context,
         });
@@ -90,18 +90,18 @@ export class StrokeListener extends GestureListener {
   }
 
   renderDetectionState() {
-    if (!this.startDetecting) return;
+    if (!this.state.startDetecting) return;
 
     const centerPoint = this.getCenterPoint();
-    this.drawingUtils.modifyContextStyleAndDraw(
+    this.state.drawingUtils.modifyContextStyleAndDraw(
       {
         strokeStyle: "#90EE90",
         opacity: 0.7,
       },
       (context) => {
-        this.drawingUtils?.drawCircle({
+        this.state.drawingUtils?.drawCircle({
           coordinates: centerPoint,
-          radius: this.dimensions.width / 2,
+          radius: this.state.dimensions.width / 2,
           stroke: true,
           context,
         });
@@ -109,16 +109,17 @@ export class StrokeListener extends GestureListener {
       ["presenter", "preview"]
     );
 
-    this.drawingUtils.modifyContextStyleAndDraw(
+    this.state.drawingUtils.modifyContextStyleAndDraw(
       {
         fillStyle: "#90EE90",
         opacity: 0.3,
       },
       (context) => {
-        this.drawingUtils?.drawCircle({
+        this.state.drawingUtils?.drawCircle({
           coordinates: centerPoint,
           radius:
-            (this.dimensions.width / 2) * this.animationState.detectionExtent,
+            (this.state.dimensions.width / 2) *
+            this.state.animationState.detectionExtent,
           fill: true,
           context,
         });
@@ -128,19 +129,19 @@ export class StrokeListener extends GestureListener {
   }
 
   renderReferenceCircles() {
-    const radius = this.dimensions.width / 2;
+    const radius = this.state.dimensions.width / 2;
     const oneThirdRadius = radius * (1 / 3);
     const twoThirdRadius = radius * (2 / 3);
 
     const centerPoint = this.getCenterPoint();
     [oneThirdRadius, twoThirdRadius].forEach(
       (value: number) => {
-        this.drawingUtils.modifyContextStyleAndDraw(
+        this.state.drawingUtils.modifyContextStyleAndDraw(
           {
             strokeStyle: "skyblue",
           },
           (context) => {
-            this.drawingUtils.drawCircle({
+            this.state.drawingUtils.drawCircle({
               coordinates: centerPoint,
               radius: value,
               stroke: true,
@@ -158,53 +159,56 @@ export class StrokeListener extends GestureListener {
   }
 
   handleTrigger() {
-    if (this.detectionTimer) return;
+    if (this.state.detectionTimer) return;
     this.triggerDetection(() => {
-      if (this.stroke.length < 5) {
-        this.stroke = [];
+      if (this.state.stroke.length < 5) {
+        this.state.stroke = [];
         return;
       }
 
-      if (this.addGesture) {
-        if (!this.gestureName) {
-          this.stroke = [];
+      if (this.state.addGesture) {
+        if (!this.state.gestureName) {
+          this.state.stroke = [];
           return;
         }
 
-        this.strokeRecognizer.addGesture(this.gestureName, this.stroke);
+        this.state.strokeRecognizer.addGesture(
+          this.state.gestureName,
+          this.state.stroke
+        );
         this.publishToSubjectIfExists(GestureListener.snackbarSubjectKey, {
           open: true,
           text: "Added new dialing playback gesture",
           variant: "success",
         });
       } else {
-        const result = this.strokeRecognizer.recognize(this.stroke, false);
-        if (result.name === this.strokeTriggerName) {
+        const result = this.state.strokeRecognizer.recognize(
+          this.state.stroke,
+          false
+        );
+        if (result.name === this.state.strokeTriggerName) {
           let affect;
 
-          if (this.strokeTriggerName === "radial") {
-            this.stroke.forEach((point: Coordinate2D) => {
+          if (this.state.strokeTriggerName === "radial") {
+            this.state.stroke.forEach((point: Coordinate2D) => {
               GestureListener.circleFitter.addPoint(point.x, point.y);
             });
             const fit = GestureListener.circleFitter.compute();
             affect = this.convertDistanceToAffect(fit.radius);
           }
 
-          this.publishToSubjectIfExists(GestureListener.playbackSubjectKey, {
-            type: PlaybackSubjectType.CONTINUOUS,
-            affect,
-          });
+          this.publishToSubject();
           GestureListener.circleFitter.resetPoints();
         }
       }
 
-      this.stroke = [];
+      this.state.stroke = [];
     });
   }
 
   // Implemented to only track one finger and one hand
   protected handleNewData(fingerData: ListenerProcessedFingerData): void {
-    const dominantHand = fingerData[this.handsToTrack.dominant];
+    const dominantHand = fingerData[this.state.handsToTrack.dominant];
     const trigger = this.thumbsTouch(fingerData);
 
     if (trigger) {
@@ -212,7 +216,7 @@ export class StrokeListener extends GestureListener {
       return;
     }
 
-    if (!dominantHand || !this.startDetecting) {
+    if (!dominantHand || !this.state.startDetecting) {
       return;
     }
     const indexFingerPosition = dominantHand.fingerPositions[
@@ -228,7 +232,7 @@ export class StrokeListener extends GestureListener {
     const isInBounds = this.isWithinObjectBounds(indexFingerPosition);
 
     if (isInBounds) {
-      this.stroke.push(indexFingerPosition);
+      this.state.stroke.push(indexFingerPosition);
     }
   }
 

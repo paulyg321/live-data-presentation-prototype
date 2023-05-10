@@ -13,7 +13,7 @@ import type { AnimatedElement } from "./AnimatedElement";
 import { ForeshadowingStatesMode } from "../../gestures";
 import { isInBound } from "../../calculations";
 import { markRaw } from "vue";
-import { drawXAxis } from "./draw-axes";
+import { drawXAxis, drawYAxis } from "./draw-axes";
 import { StateUpdateType } from "./AnimatedElement";
 import { AnimatedCircle } from "./AnimatedCircle";
 
@@ -327,8 +327,8 @@ export class ChartController {
 
   setForeshadow(args: {
     bounds?: {
-      position: Coordinate2D;
-      dimension?: Dimensions;
+      coordinates: Coordinate2D;
+      dimensions?: Dimensions;
       radius?: number;
     };
     keys?: string[];
@@ -359,7 +359,10 @@ export class ChartController {
               ].y
             ) as number,
           },
-          args.bounds
+          {
+            ...args.bounds,
+            position: args.bounds.coordinates,
+          }
         );
       }
 
@@ -388,8 +391,8 @@ export class ChartController {
 
   setSelection(args: {
     bounds?: {
-      position: Coordinate2D;
-      dimension?: Dimensions;
+      coordinates: Coordinate2D;
+      dimensions?: Dimensions;
       radius?: number;
     };
     keys?: string[];
@@ -415,7 +418,10 @@ export class ChartController {
               ].y
             ) as number,
           },
-          args.bounds
+          {
+            ...args.bounds,
+            position: args.bounds.coordinates,
+          }
         );
       }
 
@@ -431,7 +437,11 @@ export class ChartController {
     this.upsertAnimatedItems("select");
   }
 
-  getRange(args: { position: Coordinate2D; dimensions: Dimensions; chartType: ChartType }) {
+  getRange(args: {
+    position: Coordinate2D;
+    dimensions: Dimensions;
+    chartType: ChartType;
+  }) {
     const xRange = [args.position.x, args.position.x + args.dimensions.width];
     let yRange = [args.position.y + args.dimensions.height, args.position.y];
 
@@ -673,10 +683,44 @@ export class ChartController {
       });
   }
 
+  drawScatterAxes() {
+    /**
+     * -------------------- DRAW AXES --------------------
+     * */
+    const FONT_SIZE = 20;
+    if (this.state.xRange && this.state.yRange) {
+      drawXAxis(
+        this.state.drawingUtils,
+        this.state.xScale,
+        this.state.yRange[0],
+        this.state.xRange,
+        FONT_SIZE,
+        3,
+        undefined,
+        false,
+        true
+      );
+      drawYAxis(
+        this.state.drawingUtils,
+        this.state.yScale,
+        this.state.xRange[0],
+        this.state.yRange,
+        FONT_SIZE,
+        5,
+        undefined,
+        false,
+        true
+      );
+    }
+  }
+
   draw() {
     this.state.animatedElements?.forEach((elem: AnimatedBar) => elem.draw());
     if (this.state.chartType === ChartType.BAR) {
       this.drawBarAxes();
+    }
+    if (this.state.chartType === ChartType.SCATTER) {
+      this.drawScatterAxes();
     }
     this.drawKeyframeValue();
   }

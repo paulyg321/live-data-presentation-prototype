@@ -1,3 +1,4 @@
+import { gsap } from "gsap";
 import { containsValueLargerThanMax } from "../../calculations";
 import { distanceBetweenPoints, type Coordinate2D } from "../../chart";
 import { HAND_LANDMARK_IDS } from "../../media-pipe";
@@ -32,7 +33,10 @@ export class RectPoseListener extends GestureListener {
       },
     ],
     mode = ForeshadowingType.SHAPE,
-    listenerMode = ListenerMode.POSE,
+    trackedFingers = [
+      HAND_LANDMARK_IDS.index_finger_tip,
+      HAND_LANDMARK_IDS.thumb_tip,
+    ],
     animationState = {
       referencePointRadius: REFERENCE_POINT_BOUNDS,
     },
@@ -46,7 +50,6 @@ export class RectPoseListener extends GestureListener {
       handsToTrack,
       gestureTypes,
       mode,
-      listenerMode,
       animationState,
       poseDuration,
       resetPauseDuration,
@@ -54,21 +57,11 @@ export class RectPoseListener extends GestureListener {
     });
   }
 
-  private publishToSubject() {
-    // TODO: Based on settings configure this
-    const foreshadowingArea = this.getRectDataFromState();
-
-    this.publishToSubjectIfExists(GestureListener.foreshadowingAreaSubjectKey, {
-      area: foreshadowingArea,
-      count: this.foreshadowingStatesCount,
-      mode: this.foreshadowingStatesMode,
-    });
-  }
-
   private getRectDataFromState() {
-    const rightThumb = this.posePosition?.right[HAND_LANDMARK_IDS.thumb_tip];
+    const rightThumb =
+      this.state.posePosition?.right[HAND_LANDMARK_IDS.thumb_tip];
     const leftIndex =
-      this.posePosition?.left[HAND_LANDMARK_IDS.index_finger_tip];
+      this.state.posePosition?.left[HAND_LANDMARK_IDS.index_finger_tip];
 
     if (leftIndex && rightThumb) {
       const rectDimensions = {
@@ -85,9 +78,8 @@ export class RectPoseListener extends GestureListener {
   }
 
   private resetGestureState() {
-    this.resetTimer();
-    this.posePosition = undefined;
-    this.posePositionToMatch = undefined;
+    this.state.posePosition = undefined;
+    this.state.posePositionToMatch = undefined;
   }
 
   resetHandler(): void {
@@ -100,7 +92,7 @@ export class RectPoseListener extends GestureListener {
 
   draw() {
     this.renderBorder();
-    if (this.timer) {
+    if (this.state.timer) {
       this.drawPoseState();
     }
   }
@@ -108,14 +100,14 @@ export class RectPoseListener extends GestureListener {
   private drawPoseState() {
     // DRAW REFERENCE POINTS
     [HANDS.LEFT, HANDS.RIGHT].forEach((hand: HANDS) => {
-      this.trackedFingers.forEach((fingerId: number) => {
-        if (!this.posePositionToMatch) return;
+      this.state.trackedFingers.forEach((fingerId: number) => {
+        if (!this.state.posePositionToMatch) return;
 
-        const positionToMatch = this.posePositionToMatch[hand][fingerId];
+        const positionToMatch = this.state.posePositionToMatch[hand][fingerId];
 
         if (!positionToMatch) return;
 
-        this.drawingUtils.modifyContextStyleAndDraw(
+        this.state.drawingUtils.modifyContextStyleAndDraw(
           {
             strokeStyle: "green",
             opacity: 0.5,
@@ -123,49 +115,52 @@ export class RectPoseListener extends GestureListener {
             lineDash: [4, 4],
           },
           (context) => {
-            this.drawingUtils.drawCircle({
+            this.state.drawingUtils.drawCircle({
               coordinates: positionToMatch,
               radius: REFERENCE_POINT_BOUNDS,
               stroke: true,
               context,
             });
-          }
+          },
+          ["presenter", "preview"]
         );
 
-        this.drawingUtils.modifyContextStyleAndDraw(
+        this.state.drawingUtils.modifyContextStyleAndDraw(
           {
             fillStyle: "green",
             opacity: 0.5,
           },
           (context) => {
-            this.drawingUtils.drawCircle({
+            this.state.drawingUtils.drawCircle({
               coordinates: positionToMatch,
-              radius: this.animationState.referencePointRadius,
+              radius: this.state.animationState.referencePointRadius,
               fill: true,
               context,
             });
-          }
+          },
+          ["presenter", "preview"]
         );
 
-        if (!this.posePosition) return;
+        if (!this.state.posePosition) return;
 
-        const currentPosition = this.posePosition[hand][fingerId];
+        const currentPosition = this.state.posePosition[hand][fingerId];
 
         if (!currentPosition) return;
 
-        this.drawingUtils.modifyContextStyleAndDraw(
+        this.state.drawingUtils.modifyContextStyleAndDraw(
           {
             fillStyle: "skyBlue",
             opacity: 0.5,
           },
           (context) => {
-            this.drawingUtils.drawCircle({
+            this.state.drawingUtils.drawCircle({
               coordinates: currentPosition,
               radius: 5,
               fill: true,
               context,
             });
-          }
+          },
+          ["presenter", "preview"]
         );
       });
     });
@@ -175,12 +170,7 @@ export class RectPoseListener extends GestureListener {
     rightHandCoords: Coordinate2D[],
     leftHandCoords: Coordinate2D[]
   ) {
-    const FINGER_IDS = [
-      HAND_LANDMARK_IDS.index_finger_tip,
-      HAND_LANDMARK_IDS.thumb_tip,
-    ];
-
-    const { newPosePosition, isInBounds } = FINGER_IDS.reduce(
+    const { newPosePosition, isInBounds } = this.state.trackedFingers.reduce(
       (
         results: { newPosePosition: PosePosition; isInBounds: boolean },
         currentFingerId: number
@@ -214,19 +204,19 @@ export class RectPoseListener extends GestureListener {
     if (!isInBounds) {
       this.resetGestureState();
     } else {
-      this.posePosition = newPosePosition;
+      this.state.posePosition = newPosePosition;
 
-      if (this.timer) return;
-      this.posePositionToMatch = newPosePosition;
+      if (this.state.timer) return;
+      this.state.posePositionToMatch = newPosePosition;
 
-      this.timer = startTimeoutInstance({
+      this.state.timer = startTimeoutInstance({
         onCompletion: () => {
           const [isInPlaceLeft, isInPlaceRight] = [HANDS.LEFT, HANDS.RIGHT].map(
             (hand: HANDS) => {
-              if (this.posePosition && this.posePositionToMatch) {
+              if (this.state.posePosition && this.state.posePositionToMatch) {
                 const diff = distanceBetweenPoints(
-                  Object.values(this.posePositionToMatch[hand]),
-                  Object.values(this.posePosition[hand])
+                  Object.values(this.state.posePositionToMatch[hand]),
+                  Object.values(this.state.posePosition[hand])
                 ).map((diff: any) => diff.euclideanDistance);
 
                 return !containsValueLargerThanMax(
@@ -239,21 +229,24 @@ export class RectPoseListener extends GestureListener {
           );
 
           if (isInPlaceRight && isInPlaceLeft) {
-            this.publishToSubject();
-            this.resetTimer(this.resetPauseDuration);
+            const foreshadowingArea = this.state.useBounds
+              ? this.getRectDataFromState()
+              : undefined;
+            this.publishToSubject(foreshadowingArea);
+            this.resetTimer(this.state.resetPauseDuration);
           } else {
             this.resetTimer();
           }
           this.resetGestureState();
         },
-        timeout: this.poseDuration ?? DEFAULT_POSE_DURATION,
+        timeout: this.state.poseDuration ?? DEFAULT_POSE_DURATION,
       });
 
-      gsap.to(this.animationState, {
+      gsap.to(this.state.animationState, {
         referencePointRadius: REFERENCE_POINT_BOUNDS,
-        duration: this.poseDuration ? this.poseDuration / 1000 : 2,
+        duration: this.state.poseDuration ? this.state.poseDuration / 1000 : 2,
         onComplete: () => {
-          this.animationState.referencePointRadius = 0;
+          this.state.animationState.referencePointRadius = 0;
         },
       });
     }

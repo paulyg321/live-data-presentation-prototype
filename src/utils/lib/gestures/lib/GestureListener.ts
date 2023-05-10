@@ -73,31 +73,11 @@ export interface GestureListenerConstructorArgs {
   numHands?: number;
   foreshadowingStatesMode?: ForeshadowingStatesMode;
   foreshadowingStatesCount?: number;
+  useBounds?: boolean;
+  restrictToBounds?: boolean;
 }
 
-export type GestureListenerSubjectMap = { [key: string]: Subject<any> };
-
-export interface ProcessedGestureListenerFingerData {
-  detectedGesture: SupportedGestures;
-  fingerPositions: Coordinate2D[];
-}
-
-export type PosePosition = Record<HANDS, Record<number, Coordinate2D>>;
-
-export enum ListenerMode {
-  POSE = "pose",
-  STROKE = "stroke",
-}
-
-export abstract class GestureListener {
-  static snackbarSubjectKey = "snackbarSubject";
-  static playbackSubjectKey = "playbackSubject";
-  static emphasisSubjectKey = "emphasisSubject";
-  static foreshadowingAreaSubjectKey = "foreshadowingAreaSubject";
-  static highlighSubjectKey = "highlightSubject";
-  static selectionSubjectKey = "selectionSubject";
-  static circleFitter = getCircleFit();
-
+export interface GestureListenerState {
   canvasListener?: CanvasElementListener;
   position: Coordinate2D;
   dimensions: Dimensions;
@@ -118,14 +98,14 @@ export abstract class GestureListener {
         leftHand: SupportedGestures;
       }[];
 
-  stroke: Coordinate2D[] = [];
-  strokeRecognizer = new DollarRecognizer();
+  stroke: Coordinate2D[];
+  strokeRecognizer: DollarRecognizer;
   addGesture: boolean;
   gestureName?: string;
   strokeTriggerName?: string;
 
   detectionTimer: Timer | undefined;
-  startDetecting = false;
+  startDetecting: boolean;
 
   listenerMode?: ListenerMode;
   posePosition?: PosePosition;
@@ -133,20 +113,50 @@ export abstract class GestureListener {
   trackedFingers: number[];
   mode: any;
 
+  useBounds?: boolean;
+  restrictToBounds?: boolean;
+
   poseDuration?: number;
   resetPauseDuration?: number;
   triggerDuration?: number;
 
   animationState: Record<string, any>;
 
-  selectionKeys: string[] = [];
+  selectionKeys: string[];
   numHands?: number;
   foreshadowingStatesMode?: ForeshadowingStatesMode;
   foreshadowingStatesCount?: number;
 
-  private gestureSubscription: Subscription | undefined;
+  gestureSubscription: Subscription | undefined;
 
-  protected drawingUtils: DrawingUtils;
+  drawingUtils: DrawingUtils;
+}
+
+export type GestureListenerSubjectMap = { [key: string]: Subject<any> };
+
+export interface ProcessedGestureListenerFingerData {
+  detectedGesture: SupportedGestures;
+  fingerPositions: Coordinate2D[];
+}
+
+export type PosePosition = Record<HANDS, Record<number, Coordinate2D>>;
+
+export enum ListenerMode {
+  FORESHADOWING = "foreshadowing",
+  SELECTION = "selection",
+  PLAYBACK = "playback",
+}
+
+export abstract class GestureListener {
+  static snackbarSubjectKey = "snackbarSubject";
+  static playbackSubjectKey = "playbackSubject";
+  static emphasisSubjectKey = "emphasisSubject";
+  static foreshadowingAreaSubjectKey = "foreshadowingAreaSubject";
+  static highlighSubjectKey = "highlightSubject";
+  static selectionSubjectKey = "selectionSubject";
+  static circleFitter = getCircleFit();
+
+  state: GestureListenerState;
 
   constructor({
     position,
@@ -176,52 +186,56 @@ export abstract class GestureListener {
     foreshadowingStatesMode,
     foreshadowingStatesCount,
   }: GestureListenerConstructorArgs) {
-    this.position = position;
-    this.dimensions = dimensions;
-    this.canvasListener = new CanvasElementListener({
-      position: this.position,
-      dimensions: this.dimensions,
-      isCircle: false,
-      updateFn: (value) => {
-        this.updateState(value);
+    this.state = {
+      position,
+      dimensions,
+      canvasListener: new CanvasElementListener({
+        position: position,
+        dimensions: dimensions,
+        isCircle: false,
+        updateFn: (value) => {
+          this.updateState(value);
+        },
+        drawingUtils,
+      }),
+      handsToTrack,
+      gestureTypes,
+      gestureSubject,
+      gestureSubscription: gestureSubject.subscribe({
+        next: (data: any) => this.handler(data),
+      }),
+      canvasDimensions,
+      subjects: {
+        [GestureListener.highlighSubjectKey]: highlightSubject,
+        [GestureListener.emphasisSubjectKey]: emphasisSubject,
+        [GestureListener.playbackSubjectKey]: playbackSubject,
+        [GestureListener.foreshadowingAreaSubjectKey]: foreshadowingAreaSubject,
+        [GestureListener.snackbarSubjectKey]: snackbarSubject,
+        [GestureListener.selectionSubjectKey]: selectionSubject,
       },
       drawingUtils,
-    });
-    this.handsToTrack = handsToTrack;
-    this.gestureTypes = gestureTypes;
-    // Set up listener for gesture subject
-    this.gestureSubject = gestureSubject;
-    this.gestureSubscription = this.gestureSubject.subscribe({
-      next: (data: any) => this.handler(data),
-    });
-    this.canvasDimensions = canvasDimensions;
-    this.subjects = {
-      [GestureListener.highlighSubjectKey]: highlightSubject,
-      [GestureListener.emphasisSubjectKey]: emphasisSubject,
-      [GestureListener.playbackSubjectKey]: playbackSubject,
-      [GestureListener.foreshadowingAreaSubjectKey]: foreshadowingAreaSubject,
-      [GestureListener.snackbarSubjectKey]: snackbarSubject,
-      [GestureListener.selectionSubjectKey]: selectionSubject,
+      addGesture: false,
+      strokeRecognizer: new DollarRecognizer(),
+      trackedFingers,
+      listenerMode,
+      mode,
+      animationState,
+      poseDuration,
+      resetPauseDuration,
+      triggerDuration,
+      numHands,
+      strokeTriggerName,
+      selectionKeys: selectionKeys ?? [],
+      foreshadowingStatesMode,
+      foreshadowingStatesCount,
+      stroke: [],
+      timer: undefined,
+      resetKeys,
+      detectionTimer: undefined,
+      startDetecting: false,
     };
-    if (resetKeys && resetKeys.size > 0) {
-      this.resetKeys = resetKeys;
-      this.setResetHandler();
-    }
-    this.drawingUtils = drawingUtils;
-    this.addGesture = false;
-    this.strokeRecognizer = new DollarRecognizer();
-    this.trackedFingers = trackedFingers;
-    this.listenerMode = listenerMode;
-    this.mode = mode;
-    this.animationState = animationState;
-    this.poseDuration = poseDuration;
-    this.resetPauseDuration = resetPauseDuration;
-    this.triggerDuration = triggerDuration;
-    this.numHands = numHands;
-    this.strokeTriggerName = strokeTriggerName;
-    this.selectionKeys = selectionKeys ?? [];
-    this.foreshadowingStatesMode = foreshadowingStatesMode;
-    this.foreshadowingStatesCount = foreshadowingStatesCount;
+
+    this.setResetHandler();
   }
 
   updateState({
@@ -242,72 +256,102 @@ export abstract class GestureListener {
     selectionKeys,
     numHands,
     foreshadowingStatesMode,
-    foreshadowingStatesCount
+    foreshadowingStatesCount,
   }: Partial<GestureListenerConstructorArgs>) {
     if (position) {
-      this.position = position;
+      this.state.position = position;
     }
     if (dimensions) {
-      this.dimensions = dimensions;
+      this.state.dimensions = dimensions;
     }
     if (canvasDimensions) {
-      this.canvasDimensions = canvasDimensions;
+      this.state.canvasDimensions = canvasDimensions;
     }
     if (handsToTrack) {
-      this.handsToTrack = handsToTrack;
+      this.state.handsToTrack = handsToTrack;
     }
     if (addGesture !== undefined) {
-      this.addGesture = addGesture;
+      this.state.addGesture = addGesture;
     }
     if (gestureName) {
-      this.gestureName = gestureName;
+      this.state.gestureName = gestureName;
     }
     if (listenerMode) {
-      this.listenerMode = listenerMode;
+      this.state.listenerMode = listenerMode;
     }
     if (mode) {
-      this.mode = mode;
+      this.state.mode = mode;
     }
     if (resetKeys) {
-      this.resetKeys = resetKeys;
+      this.state.resetKeys = resetKeys;
     }
     if (trackedFingers) {
-      this.trackedFingers = trackedFingers;
+      this.state.trackedFingers = trackedFingers;
     }
     if (strokeTriggerName) {
-      this.strokeTriggerName = strokeTriggerName;
+      this.state.strokeTriggerName = strokeTriggerName;
     }
     if (resetPauseDuration) {
-      this.resetPauseDuration = resetPauseDuration;
+      this.state.resetPauseDuration = resetPauseDuration;
     }
     if (poseDuration) {
-      this.poseDuration = poseDuration;
+      this.state.poseDuration = poseDuration;
     }
     if (triggerDuration) {
-      this.triggerDuration = triggerDuration;
+      this.state.triggerDuration = triggerDuration;
     }
     if (selectionKeys) {
-      this.selectionKeys = selectionKeys;
+      this.state.selectionKeys = selectionKeys;
     }
     if (numHands) {
-      this.numHands = numHands;
+      this.state.numHands = numHands;
     }
     if (foreshadowingStatesMode) {
-      this.foreshadowingStatesMode = foreshadowingStatesMode;
+      this.state.foreshadowingStatesMode = foreshadowingStatesMode;
     }
     if (foreshadowingStatesCount) {
-      this.foreshadowingStatesCount = foreshadowingStatesCount;
+      this.state.foreshadowingStatesCount = foreshadowingStatesCount;
     }
   }
 
   private setResetHandler() {
-    this.resetKeys?.forEach((resetKey: string) => {
-      document.addEventListener("keypress", (event) => {
-        if (event.code == resetKey) {
-          this.resetHandler();
-        }
-      });
-    });
+    // this.state.resetKeys?.forEach((resetKey: string) => {
+    //   document.addEventListener("keypress", (event) => {
+    //     if (event.code == resetKey) {
+    //       this.resetHandler();
+    //     }
+    //   });
+    // });
+  }
+
+  publishToSubject(bounds?: {
+    coordinates: Coordinate2D;
+    dimensions: Dimensions;
+  }) {
+    switch (this.state.listenerMode) {
+      case ListenerMode.FORESHADOWING:
+        this.publishToSubjectIfExists(
+          GestureListener.foreshadowingAreaSubjectKey,
+          {
+            keys: this.state.selectionKeys,
+            count: this.state.foreshadowingStatesCount,
+            mode: this.state.foreshadowingStatesMode,
+            bounds,
+            requireKeyInBounds: this.state.restrictToBounds,
+          }
+        );
+        break;
+      case ListenerMode.SELECTION:
+        this.publishToSubjectIfExists(GestureListener.selectionSubjectKey, {
+          keys: this.state.selectionKeys,
+          bounds,
+          requireKeyInBounds: this.state.restrictToBounds,
+        });
+        break;
+      case ListenerMode.PLAYBACK:
+      default:
+        break;
+    }
   }
 
   private validateGesture({
@@ -348,14 +392,14 @@ export abstract class GestureListener {
   ): void;
 
   protected publishToSubjectIfExists(subjectKey: string, value: any) {
-    if (this.subjects && this.subjects[subjectKey]) {
-      this.subjects[subjectKey].next(value);
+    if (this.state.subjects && this.state.subjects[subjectKey]) {
+      this.state.subjects[subjectKey].next(value);
     }
   }
 
   protected getSubjectByKey(subjectKey: string) {
-    if (this.subjects && this.subjects[subjectKey]) {
-      return this.subjects[subjectKey];
+    if (this.state.subjects && this.state.subjects[subjectKey]) {
+      return this.state.subjects[subjectKey];
     }
     return undefined;
   }
@@ -364,24 +408,24 @@ export abstract class GestureListener {
     if (time) {
       startTimeoutInstance({
         onCompletion: () => {
-          this.timer = undefined;
+          this.state.timer = undefined;
         },
         timeout: time,
       });
     } else {
-      this.timer = undefined;
+      this.state.timer = undefined;
     }
   }
 
   protected renderBorder() {
-    this.drawingUtils?.modifyContextStyleAndDraw(
+    this.state.drawingUtils?.modifyContextStyleAndDraw(
       {
         strokeStyle: "skyblue",
       },
       (context) => {
-        this.drawingUtils?.drawRect({
-          coordinates: this.position,
-          dimensions: this.dimensions,
+        this.state.drawingUtils?.drawRect({
+          coordinates: this.state.position,
+          dimensions: this.state.dimensions,
           stroke: true,
           context,
         });
@@ -391,32 +435,33 @@ export abstract class GestureListener {
   }
 
   renderStrokePath() {
-    if (!this.startDetecting) return;
-    this.stroke.forEach((stroke) => {
-      this.drawingUtils.modifyContextStyleAndDraw(
+    if (!this.state.startDetecting) return;
+    this.state.stroke.forEach((stroke) => {
+      this.state.drawingUtils.modifyContextStyleAndDraw(
         {
           fillStyle: "skyBlue",
           opacity: 0.8,
         },
         (context) => {
-          this.drawingUtils.drawCircle({
+          this.state.drawingUtils.drawCircle({
             coordinates: stroke,
             radius: 3,
             context,
             fill: true,
           });
-        }
+        },
+        ["presenter", "preview"]
       );
     });
   }
 
   unsubscribe() {
-    this.gestureSubscription?.unsubscribe();
+    this.state.gestureSubscription?.unsubscribe();
   }
 
   getSubject(key: string) {
-    if (this.subjects) {
-      const includesKey = Object.keys(this.subjects).includes(key);
+    if (this.state.subjects) {
+      const includesKey = Object.keys(this.state.subjects).includes(key);
 
       if (!includesKey) {
         throw new Error(
@@ -424,23 +469,23 @@ export abstract class GestureListener {
         );
       }
 
-      return this.subjects[key];
+      return this.state.subjects[key];
     }
   }
 
   setCanvasDimensions(dimensions: Dimensions) {
-    this.canvasDimensions = dimensions;
+    this.state.canvasDimensions = dimensions;
   }
 
   setHandsToTrack(hands: { dominant: HANDS; nonDominant: HANDS }) {
-    this.handsToTrack = hands;
+    this.state.handsToTrack = hands;
   }
 
   isWithinObjectBounds(position: Coordinate2D) {
-    const { x: minX, y: minY } = this.position;
+    const { x: minX, y: minY } = this.state.position;
     const { maxX, maxY } = {
-      maxX: this.position.x + this.dimensions.width,
-      maxY: this.position.y + this.dimensions.height,
+      maxX: this.state.position.x + this.state.dimensions.width,
+      maxY: this.state.position.y + this.state.dimensions.height,
     };
 
     if (
@@ -456,35 +501,35 @@ export abstract class GestureListener {
   }
 
   triggerDetection(onComplete: () => void) {
-    if (this.detectionTimer) return;
-    this.startDetecting = true;
-    this.detectionTimer = startTimerInstance({
+    if (this.state.detectionTimer) return;
+    this.state.startDetecting = true;
+    this.state.detectionTimer = startTimerInstance({
       onTick: (elapsed?: number) => {
         if (!elapsed) return;
-        this.animationState.detectionExtent = elapsed;
+        this.state.animationState.detectionExtent = elapsed;
       },
       onCompletion: () => {
-        this.startDetecting = false;
-        this.detectionTimer = undefined;
-        this.animationState.detectionExtent = 0;
+        this.state.startDetecting = false;
+        this.state.detectionTimer = undefined;
+        this.state.animationState.detectionExtent = 0;
         onComplete();
       },
-      timeout: this.triggerDuration ?? DEFAULT_TRIGGER_DURATION,
+      timeout: this.state.triggerDuration ?? DEFAULT_TRIGGER_DURATION,
     });
   }
 
   renderDetectionState() {
-    if (!this.startDetecting) return;
+    if (!this.state.startDetecting) return;
 
-    this.drawingUtils.modifyContextStyleAndDraw(
+    this.state.drawingUtils.modifyContextStyleAndDraw(
       {
         strokeStyle: "#90EE90",
         opacity: 0.7,
       },
       (context) => {
-        this.drawingUtils.drawRect({
-          coordinates: this.position,
-          dimensions: this.dimensions,
+        this.state.drawingUtils.drawRect({
+          coordinates: this.state.position,
+          dimensions: this.state.dimensions,
           stroke: true,
           context,
         });
@@ -492,17 +537,19 @@ export abstract class GestureListener {
       ["presenter", "preview"]
     );
 
-    this.drawingUtils.modifyContextStyleAndDraw(
+    this.state.drawingUtils.modifyContextStyleAndDraw(
       {
         fillStyle: "#90EE90",
         opacity: 0.3,
       },
       (context) => {
-        this.drawingUtils.drawRect({
-          coordinates: this.position,
+        this.state.drawingUtils.drawRect({
+          coordinates: this.state.position,
           dimensions: {
-            ...this.dimensions,
-            width: this.dimensions.width * this.animationState.detectionExtent,
+            ...this.state.dimensions,
+            width:
+              this.state.dimensions.width *
+              this.state.animationState.detectionExtent,
           },
           fill: true,
           context,
@@ -513,8 +560,8 @@ export abstract class GestureListener {
   }
 
   protected thumbsTouch(fingerData: ListenerProcessedFingerData) {
-    const handOne = fingerData[this.handsToTrack.dominant];
-    const handTwo = fingerData[this.handsToTrack.nonDominant];
+    const handOne = fingerData[this.state.handsToTrack.dominant];
+    const handTwo = fingerData[this.state.handsToTrack.nonDominant];
 
     if (!handOne || !handTwo) return false;
 
@@ -534,7 +581,7 @@ export abstract class GestureListener {
   }
 
   protected isPinchGesture(fingerData: ListenerProcessedFingerData) {
-    const hand = fingerData[this.handsToTrack.dominant];
+    const hand = fingerData[this.state.handsToTrack.dominant];
 
     if (!hand) return false;
 
@@ -555,7 +602,7 @@ export abstract class GestureListener {
 
   // Whenever new gesture data comes we track the hand and gestures configured in the class
   handler(gestureData: GestureTrackerValues) {
-    if (!this.handsToTrack) return;
+    if (!this.state.handsToTrack) return;
 
     const {
       rightHandLandmarks,
@@ -570,7 +617,7 @@ export abstract class GestureListener {
     let rightHandData: ProcessedGestureListenerFingerData | undefined;
     let leftHandData: ProcessedGestureListenerFingerData | undefined;
 
-    this.gestureTypes.forEach(
+    this.state.gestureTypes.forEach(
       (gestureType: {
         rightHand: SupportedGestures;
         leftHand: SupportedGestures;

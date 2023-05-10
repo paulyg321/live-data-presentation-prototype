@@ -22,17 +22,18 @@ import { Hands, type Results } from "@mediapipe/hands";
 // STATE
 import { PortalState } from "./settings-state";
 import {
-  ForeshadowingGestureListener,
-  LinearPlaybackGestureListener,
   ListenerType,
-  RadialPlaybackGestureListener,
-  RadialTrackerMode,
   ChartType,
   getGestureListenerResetKeys,
+  StrokeListener,
 } from "@/utils";
 import WidgetSettingsTab from "./nav-drawer-tab/WidgetSettingsTab.vue";
 import PortalSettingsTab from "./nav-drawer-tab/PortalSettingsTab.vue";
-import { SelectionGestureListener } from "@/utils/lib/gestures/lib/SelectionGestureListener";
+
+import { RectPoseListener } from "@/utils/lib/gestures/lib/RectPoseListener";
+import { RangePoseListener } from "@/utils/lib/gestures/lib/RangePoseListener";
+import { OpenHandPoseListener } from "@/utils/lib/gestures/lib/OpenHandPoseListener";
+import { PointPoseListener } from "@/utils/lib/gestures/lib/PointPoseListener";
 
 enum AvailableWidgets {
   // Not really widgets
@@ -42,17 +43,12 @@ enum AvailableWidgets {
   LINE_CHART = "line-chart",
   BAR_CHART = "bar-chart",
   SCATTER_PLOT = "scatter-plot",
-  LINEAR_PLAYBACK = "linear-playback",
-  RADIAL_PLAYBACK = "radial-playback",
-  FORESHADOWING = "foreshadowing",
   PORTALS = "portals",
-  SELECTION = "selection",
   RECT_POSE = "rect-pose",
   RANGE_POSE = "range-pose",
   POINT_POSE = "point-pose",
   OPEN_HAND_POSE = "open-hand-pose",
   STROKE_LISTENER = "stroke-listener",
-  // GESTURE = "gesture",
 }
 
 enum SettingsTab {
@@ -93,9 +89,6 @@ function handleAddWidget(value: {
       case AvailableWidgets.VIDEO:
         currentTab.value = SettingsTab.VIDEO_SETTINGS;
         break;
-      // case AvailableWidgets.GESTURE:
-      //   currentTab.value = SettingsTab.GESTURE_SETTINGS;
-      //   break;
       case AvailableWidgets.PORTALS:
         currentTab.value = SettingsTab.PORTALS;
         break;
@@ -111,22 +104,34 @@ function handleAddWidget(value: {
       case AvailableWidgets.LINE_CHART:
         handleChartWidget(SettingsTab.CHART_SETTINGS, ChartType.LINE);
         break;
-      case AvailableWidgets.LINEAR_PLAYBACK:
-        handleGestureWidget(SettingsTab.WIDGET_SETTINGS, ListenerType.TEMPORAL);
-        break;
-      case AvailableWidgets.RADIAL_PLAYBACK:
-        handleGestureWidget(SettingsTab.WIDGET_SETTINGS, ListenerType.RADIAL);
-        break;
-      case AvailableWidgets.FORESHADOWING:
+      case AvailableWidgets.RECT_POSE:
         handleGestureWidget(
           SettingsTab.WIDGET_SETTINGS,
-          ListenerType.FORESHADOWING
+          ListenerType.RECT_POSE
         );
         break;
-      case AvailableWidgets.SELECTION:
+      case AvailableWidgets.RANGE_POSE:
         handleGestureWidget(
           SettingsTab.WIDGET_SETTINGS,
-          ListenerType.SELECTION
+          ListenerType.RANGE_POSE
+        );
+        break;
+      case AvailableWidgets.POINT_POSE:
+        handleGestureWidget(
+          SettingsTab.WIDGET_SETTINGS,
+          ListenerType.POINT_POSE
+        );
+        break;
+      case AvailableWidgets.OPEN_HAND_POSE:
+        handleGestureWidget(
+          SettingsTab.WIDGET_SETTINGS,
+          ListenerType.OPEN_HAND_POSE
+        );
+        break;
+      case AvailableWidgets.STROKE_LISTENER:
+        handleGestureWidget(
+          SettingsTab.WIDGET_SETTINGS,
+          ListenerType.STROKE_LISTENER
         );
         break;
       default:
@@ -143,13 +148,10 @@ function addWidget(type: string) {
   if (!drawingUtils) return;
 
   switch (type) {
-    case ListenerType.TEMPORAL: {
-      const newListener = new LinearPlaybackGestureListener({
+    case ListenerType.RECT_POSE: {
+      const newListener = new RectPoseListener({
         position: { x: 0, y: 0 },
-        dimensions: {
-          width: 400,
-          height: 50,
-        },
+        dimensions: { width: 50, height: 50 },
         canvasDimensions: CanvasSettings.dimensions,
         resetKeys: getGestureListenerResetKeys(),
         drawingUtils,
@@ -159,12 +161,11 @@ function addWidget(type: string) {
 
       break;
     }
-    case ListenerType.RADIAL: {
-      const newListener = new RadialPlaybackGestureListener({
+    case ListenerType.RANGE_POSE: {
+      const newListener = new RangePoseListener({
         position: { x: 0, y: 0 },
-        dimensions: { width: 100, height: 100 },
+        dimensions: { width: 50, height: 50 },
         canvasDimensions: CanvasSettings.dimensions,
-        mode: RadialTrackerMode.NORMAL,
         resetKeys: getGestureListenerResetKeys(),
         drawingUtils,
       });
@@ -173,10 +174,23 @@ function addWidget(type: string) {
 
       break;
     }
-    case ListenerType.FORESHADOWING: {
-      const newListener = new ForeshadowingGestureListener({
+    case ListenerType.POINT_POSE: {
+      const newListener = new PointPoseListener({
         position: { x: 0, y: 0 },
-        dimensions: { width: 200, height: 200 },
+        dimensions: { width: 50, height: 50 },
+        canvasDimensions: CanvasSettings.dimensions,
+        resetKeys: getGestureListenerResetKeys(),
+        drawingUtils,
+      });
+
+      StorySettings.currentStory?.addLayer(type, newListener);
+
+      break;
+    }
+    case ListenerType.OPEN_HAND_POSE: {
+      const newListener = new OpenHandPoseListener({
+        position: { x: 0, y: 0 },
+        dimensions: { width: 50, height: 50 },
         canvasDimensions: CanvasSettings.dimensions,
         resetKeys: getGestureListenerResetKeys(),
         drawingUtils,
@@ -185,10 +199,10 @@ function addWidget(type: string) {
       StorySettings.currentStory?.addLayer(type, newListener);
       break;
     }
-    case ListenerType.SELECTION: {
-      const newListener = new SelectionGestureListener({
+    case ListenerType.STROKE_LISTENER: {
+      const newListener = new StrokeListener({
         position: { x: 0, y: 0 },
-        dimensions: { width: 200, height: 200 },
+        dimensions: { width: 50, height: 50 },
         canvasDimensions: CanvasSettings.dimensions,
         resetKeys: getGestureListenerResetKeys(),
         drawingUtils,
@@ -247,18 +261,6 @@ onMounted(() => {
     <v-app>
       <v-navigation-drawer theme="light" rail permanent>
         <v-list density="compact" @click:select="handleAddWidget">
-          <v-tooltip text="Line Chart">
-            <template v-slot:activator="{ props }">
-              <v-list-item
-                :prepend-icon="widgetIconMap.line"
-                :value="AvailableWidgets.LINE_CHART"
-                v-bind="props"
-                :disabled="disableChartType"
-              >
-              </v-list-item>
-            </template>
-          </v-tooltip>
-
           <v-tooltip text="Scatter Plot">
             <template v-slot:activator="{ props }">
               <v-list-item
@@ -283,10 +285,12 @@ onMounted(() => {
             </template>
           </v-tooltip>
 
+          <v-divider></v-divider>
+
           <v-tooltip text="Rect Pose Widget">
             <template v-slot:activator="{ props }">
               <v-list-item
-                :prepend-icon="widgetIconMap.temporal"
+                :prepend-icon="widgetIconMap['rect-pose']"
                 :value="AvailableWidgets.RECT_POSE"
                 v-bind="props"
                 :disabled="disableChartType"
@@ -295,11 +299,11 @@ onMounted(() => {
             </template>
           </v-tooltip>
 
-          <v-tooltip text="Radial Playback Widget">
+          <v-tooltip text="Range Pose Widget">
             <template v-slot:activator="{ props }">
               <v-list-item
-                :prepend-icon="widgetIconMap.radial"
-                :value="AvailableWidgets.RADIAL_PLAYBACK"
+                :prepend-icon="widgetIconMap['range-pose']"
+                :value="AvailableWidgets.RANGE_POSE"
                 v-bind="props"
                 :disabled="disableChartType"
               >
@@ -307,11 +311,11 @@ onMounted(() => {
             </template>
           </v-tooltip>
 
-          <v-tooltip text="Foreshadowing Widget">
+          <v-tooltip text="Point Pose Widget">
             <template v-slot:activator="{ props }">
               <v-list-item
-                :prepend-icon="widgetIconMap.foreshadowing"
-                :value="AvailableWidgets.FORESHADOWING"
+                :prepend-icon="widgetIconMap['point-pose']"
+                :value="AvailableWidgets.POINT_POSE"
                 v-bind="props"
                 :disabled="disableChartType"
               >
@@ -319,11 +323,23 @@ onMounted(() => {
             </template>
           </v-tooltip>
 
-          <v-tooltip text="Selection Widget">
+          <v-tooltip text="Open Hand Pose Widget">
             <template v-slot:activator="{ props }">
               <v-list-item
-                :prepend-icon="widgetIconMap.selection"
-                :value="AvailableWidgets.SELECTION"
+                :prepend-icon="widgetIconMap['open-hand-pose']"
+                :value="AvailableWidgets.OPEN_HAND_POSE"
+                v-bind="props"
+                :disabled="disableChartType"
+              >
+              </v-list-item>
+            </template>
+          </v-tooltip>
+
+          <v-tooltip text="Stroke Listener Widget">
+            <template v-slot:activator="{ props }">
+              <v-list-item
+                :prepend-icon="widgetIconMap['stroke-listener']"
+                :value="AvailableWidgets.STROKE_LISTENER"
                 v-bind="props"
                 :disabled="disableChartType"
               >
@@ -412,7 +428,7 @@ onMounted(() => {
       :handle-close="() => PortalState.handleAudiencePortalClose()"
     />
     <video
-      :ref="(el) => CameraSettings.setVideo(el)"
+      :ref="(el) => CameraSettings.setVideo(el as HTMLVideoElement)"
       autoplay="true"
       :srcObject="CameraSettings.stream"
       @loadeddata="runDetection"

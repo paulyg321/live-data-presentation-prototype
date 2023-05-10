@@ -86,7 +86,7 @@ onMounted(() => {
     />
     <GestureSettings
       v-if="
-              [ListenerType.RADIAL, ListenerType.TEMPORAL, ListenerType.FORESHADOWING, ListenerType.SELECTION].includes(
+              [ListenerType.RECT_POSE, ListenerType.RANGE_POSE, ListenerType.POINT_POSE, ListenerType.OPEN_HAND_POSE, ListenerType.STROKE_LISTENER].includes(
                 StorySettings.currentStory?.currentWidget?.type as ListenerType
               )
             "

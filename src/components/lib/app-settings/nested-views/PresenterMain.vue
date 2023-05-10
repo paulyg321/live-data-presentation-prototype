@@ -57,25 +57,12 @@ snackbarSubject.subscribe({
 });
 
 selectionSubject.subscribe({
-  next(value: any) {
+  next(selectionSettings: any) {
     const charts = StorySettings.currentStory?.getCharts();
     if (!charts) return;
 
-    charts[0].state.chart?.setForeshadow({
-      keys: [
-        "Afghanistan",
-        "Albania",
-        "Algeria",
-        "Angola",
-        "Argentina",
-        "Armenia",
-        "Australia",
-        "Austria",
-        "Azerbaijan",
-        "Bahamas",
-      ],
-      mode: ForeshadowingStatesMode.ALL,
-      stateCount: 8,
+    charts.forEach((chart) => {
+      chart.state.chart?.setSelection(selectionSettings);
     });
   },
 });
@@ -112,10 +99,13 @@ playbackSubject.subscribe({
 
 // Foreshadowing area
 foreshadowingAreaSubject.subscribe({
-  next(foreshadowingAreaValue: any) {
-    // StorySettings.currentStory?.getCharts().forEach((chart: Chart) => {
-    //   chart.state.chart?.setForeshadowing(foreshadowingAreaValue);
-    // });
+  next(foreshadowingSettings: any) {
+    const charts = StorySettings.currentStory?.getCharts();
+    if (!charts) return;
+
+    charts.forEach((chart) => {
+      chart.state.chart?.setForeshadow(foreshadowingSettings);
+    });
   },
 });
 
@@ -197,7 +187,7 @@ function initializeCanvasListeners() {
       CanvasEvent.MOUSE_UP,
       CanvasEvent.CLICK,
     ].forEach((event: CanvasEvent) => {
-      CanvasSettings.canvas.events.addEventListener(
+      CanvasSettings.canvas.events?.addEventListener(
         event,
         (mouseEvent: MouseEvent) => {
           const rect = eventsCanvas.getBoundingClientRect();
@@ -291,7 +281,7 @@ onMounted(() => {
             :width="CanvasSettings.dimensions.width"
             :height="CanvasSettings.dimensions.height"
             :class="className"
-            :ref="(el) => CanvasSettings.setCanvas(el, 'events')"
+            :ref="(el) => CanvasSettings.setCanvas(el as HTMLCanvasElement, 'events')"
           ></canvas>
         </CanvasWrapper>
       </v-col>

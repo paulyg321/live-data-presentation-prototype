@@ -4,9 +4,7 @@ import {
   HANDS,
   type GestureListener,
   ListenerMode,
-  type Unistroke,
   ListenerType,
-  ForeshadowingType,
   ForeshadowingStatesMode,
 } from "@/utils";
 import { StorySettings } from "../settings-state";
@@ -37,8 +35,7 @@ const widgetState = reactive<{
   gestures: ListItems[];
   dominantHand: HANDS;
   resetKey?: string;
-  mode: any;
-  listenerMode: ListenerMode;
+  listenerMode?: ListenerMode;
   strokeTriggerName: string;
   poseDuration: number;
   resetPauseDuration: number;
@@ -46,19 +43,22 @@ const widgetState = reactive<{
   selectionKeys: string;
   foreshadowingStatesMode: ForeshadowingStatesMode;
   foreshadowingStatesCount: number;
+  useBounds: boolean;
+  restrictToBounds: boolean;
 }>({
   gestureName: "",
   gestures: [],
   dominantHand: HANDS.RIGHT,
-  listenerMode: ListenerMode.POSE,
+  listenerMode: undefined,
   strokeTriggerName: "",
   poseDuration: 1000,
   resetPauseDuration: 1000,
   triggerDuration: 1000,
-  mode: "",
   selectionKeys: "",
   foreshadowingStatesCount: 0,
   foreshadowingStatesMode: ForeshadowingStatesMode.ALL,
+  useBounds: false,
+  restrictToBounds: false,
 });
 
 const step = ref<number>(1);
@@ -90,7 +90,9 @@ onMounted(() => {
     selectionKeys,
     foreshadowingStatesCount,
     foreshadowingStatesMode,
-  } = currentWidget.value;
+    useBounds,
+    restrictToBounds
+  } = currentWidget.value.state;
 
   widgetState.gestures = getGestures();
   widgetState.dominantHand = handsToTrack.dominant;
@@ -118,12 +120,14 @@ onMounted(() => {
   if (foreshadowingStatesMode) {
     widgetState.foreshadowingStatesMode = foreshadowingStatesMode;
   }
-
-  widgetState.resetKey = resetKeys?.values().next().value;
-
-  if (mode) {
-    widgetState.mode = mode;
+  if (useBounds) {
+    widgetState.useBounds = useBounds;
   }
+  if (restrictToBounds) {
+    widgetState.restrictToBounds = restrictToBounds;
+  }
+
+  // widgetState.resetKey = resetKeys?.values().next().value;
 });
 
 watch(
@@ -141,10 +145,11 @@ watch(
       resetPauseDuration: widgetState.resetPauseDuration,
       triggerDuration: widgetState.triggerDuration,
       resetKeys: new Set(widgetState.resetKey),
-      mode: widgetState.mode,
       selectionKeys: widgetState.selectionKeys.split(","),
       foreshadowingStatesMode: widgetState.foreshadowingStatesMode,
       foreshadowingStatesCount: widgetState.foreshadowingStatesCount,
+      useBounds: widgetState.useBounds,
+      restrictToBounds: widgetState.restrictToBounds,
     };
   },
   (state) => {
@@ -177,14 +182,14 @@ function handleNext() {
 function handleGestureDelete(name: string) {
   if (!currentWidget.value) return;
 
-  currentWidget.value.strokeRecognizer.deleteGestureByName(name);
+  currentWidget.value.state.strokeRecognizer.deleteGestureByName(name);
   widgetState.gestures = getGestures();
 }
 
 function getGestures() {
   if (!currentWidget.value) return [];
 
-  return currentWidget.value.strokeRecognizer
+  return currentWidget.value.state.strokeRecognizer
     .getGestureNames()
     .map((name: string, index: number) => {
       return {
@@ -215,77 +220,10 @@ function getGestures() {
     <v-row
       v-if="
         [
-          ListenerType.SELECTION,
-        ].includes(widgetType as ListenerType)
-      "
-    >
-      <v-col>
-        <v-select
-          v-model="widgetState.listenerMode"
-          label="Listener Mode"
-          :items="[ListenerMode.POSE, ListenerMode.STROKE]"
-        ></v-select>
-      </v-col>
-    </v-row>
-
-    <v-row
-      v-if="
-        [
-          ListenerType.FORESHADOWING,
-        ].includes(widgetType as ListenerType)
-      "
-    >
-      <v-col>
-        <v-select
-          v-model="widgetState.mode"
-          label="Mode"
-          :items="
-            widgetType === ListenerType.FORESHADOWING
-              ? [ForeshadowingType.RANGE, ForeshadowingType.SHAPE]
-              : []
-          "
-        ></v-select>
-      </v-col>
-    </v-row>
-
-    <v-row
-      v-if="
-        [
-          ListenerType.FORESHADOWING,
-        ].includes(widgetType as ListenerType)
-      "
-    >
-      <v-col lg="12">
-        <v-select
-          v-model="widgetState.foreshadowingStatesMode"
-          label="Mode"
-          :items="[
-            ForeshadowingStatesMode.NEXT,
-            ForeshadowingStatesMode.ALL,
-            ForeshadowingStatesMode.COUNT,
-          ]"
-        ></v-select>
-      </v-col>
-      <v-col
-        lg="12"
-        v-if="
-          widgetState.foreshadowingStatesMode === ForeshadowingStatesMode.COUNT
-        "
-      >
-        <v-text-field
-          v-model="widgetState.foreshadowingStatesCount"
-          label="Number of States"
-          type="number"
-          hint="Number of states to draw after the current state"
-        ></v-text-field>
-      </v-col>
-    </v-row>
-
-    <v-row
-      v-if="
-        [
-          ListenerType.SELECTION,
-          ListenerType.FORESHADOWING,
+          ListenerType.RECT_POSE,
+          ListenerType.RANGE_POSE,
+          ListenerType.POINT_POSE,
+          ListenerType.OPEN_HAND_POSE,
         ].includes(widgetType as ListenerType)
       "
     >
@@ -301,41 +239,10 @@ function getGestures() {
     <v-row
       v-if="
         [
-          ListenerType.SELECTION,
-        ].includes(widgetType as ListenerType)
-      "
-    >
-      <v-col>
-        <v-text-field
-          v-model="widgetState.selectionKeys"
-          label="Items to select"
-          hint="Enter the keys for the items you wish to select"
-        ></v-text-field>
-      </v-col>
-    </v-row>
-
-    <v-row
-      v-if="
-        [
-          ListenerType.SELECTION,
-          ListenerType.FORESHADOWING,
-        ].includes(widgetType as ListenerType)
-      "
-    >
-      <v-col>
-        <v-text-field
-          v-model="widgetState.poseDuration"
-          label="Pose Hold Duration"
-          type="number"
-        ></v-text-field>
-      </v-col>
-    </v-row>
-
-    <v-row
-      v-if="
-        [
-          ListenerType.SELECTION,
-          ListenerType.FORESHADOWING,
+          ListenerType.RECT_POSE,
+          ListenerType.RANGE_POSE,
+          ListenerType.POINT_POSE,
+          ListenerType.OPEN_HAND_POSE,
         ].includes(widgetType as ListenerType)
       "
     >
@@ -348,12 +255,90 @@ function getGestures() {
       </v-col>
     </v-row>
 
+    <v-row>
+      <v-col>
+        <v-select
+          v-model="widgetState.listenerMode"
+          label="Listener Mode"
+          :items="[
+            ListenerMode.FORESHADOWING,
+            ListenerMode.SELECTION,
+            ListenerMode.PLAYBACK,
+          ]"
+        ></v-select>
+      </v-col>
+    </v-row>
+
+    <v-row
+      v-if="[ListenerMode.FORESHADOWING].includes(widgetState.listenerMode as ListenerMode)"
+    >
+      <v-col>
+        <v-select
+          v-model="widgetState.foreshadowingStatesMode"
+          label="Foreshadowing Mode"
+          :items="
+            widgetState.listenerMode === ListenerMode.FORESHADOWING
+              ? [
+                  ForeshadowingStatesMode.NEXT,
+                  ForeshadowingStatesMode.COUNT,
+                  ForeshadowingStatesMode.ALL,
+                ]
+              : []
+          "
+        ></v-select>
+      </v-col>
+    </v-row>
+
+    <v-row
+      v-if="
+        [ListenerMode.FORESHADOWING].includes(widgetState.listenerMode as ListenerMode) &&
+        (widgetState.foreshadowingStatesMode ===
+          ForeshadowingStatesMode.COUNT ||
+          widgetState.foreshadowingStatesMode === ForeshadowingStatesMode.NEXT)
+      "
+    >
+      <v-col>
+        <v-text-field
+          v-model="widgetState.foreshadowingStatesCount"
+          label="Number of States"
+          type="number"
+          hint="Number of states to draw after the current state"
+        ></v-text-field>
+      </v-col>
+    </v-row>
+
+    <v-row
+      v-if="
+        [ListenerMode.FORESHADOWING, ListenerMode.SELECTION].includes(
+          widgetState.listenerMode as ListenerMode
+        )
+      "
+    >
+      <v-col lg="12">
+        <v-text-field
+          v-model="widgetState.selectionKeys"
+          label="Items to select"
+          hint="Enter the keys for the items you wish to select"
+        ></v-text-field>
+      </v-col>
+      <v-col lg="12">
+        <v-checkbox
+          label="Emit to items within bounds"
+          v-model="widgetState.useBounds"
+        ></v-checkbox>
+      </v-col>
+      <v-col lg="12" v-if="widgetState.useBounds === true">
+        <v-checkbox
+          label="Only emit to items within bounds"
+          v-model="widgetState.restrictToBounds"
+        ></v-checkbox>
+      </v-col>
+    </v-row>
+
     <v-row
       v-if="
         [
-          ListenerType.RADIAL,
-          ListenerType.TEMPORAL,
-          ListenerType.SELECTION,
+          ListenerType.STROKE_LISTENER,
         ].includes(widgetType as ListenerType)
         && widgetState.gestures.length > 0
       "
@@ -391,9 +376,7 @@ function getGestures() {
     <v-row
       v-if="
         [
-          ListenerType.RADIAL,
-          ListenerType.TEMPORAL,
-          ListenerType.SELECTION,
+          ListenerType.STROKE_LISTENER
         ].includes(widgetType as ListenerType)
       "
     >

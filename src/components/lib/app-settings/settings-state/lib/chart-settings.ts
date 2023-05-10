@@ -77,30 +77,31 @@ export const ChartSettings = reactive<{
     const charts = StorySettings.currentStory?.getCharts();
     if (!charts) return;
 
-    charts[0].state.chart?.play({
-      // keys: ["Coca-Cola", "Intel", "IBM", "GE"],
-      states: [
-        {
-          index: 0,
-        },
-        {
-          index: 1,
-        },
-        {
-          index: 3,
-        },
-        {
-          index: 4,
-        },
-        {
-          index: 5,
-        },
-        {
-          index: 6,
-        },
-      ],
-      duration: 5,
-      updateType: StateUpdateType.INDIVIDUAL_TWEENS,
+    charts.forEach((chart) => {
+      chart.state.chart?.play({
+        states: [
+          {
+            index: 0,
+          },
+          {
+            index: 1,
+          },
+          {
+            index: 3,
+          },
+          {
+            index: 4,
+          },
+          {
+            index: 5,
+          },
+          {
+            index: 6,
+          },
+        ],
+        duration: 5,
+        updateType: StateUpdateType.GROUP_TIMELINE,
+      });
     });
     // const affectPlaybackSettings = {
     //   [Affect.JOY]: { duration: 2000, easeFn: d3.easeBounce },
@@ -187,16 +188,7 @@ export const ChartSettings = reactive<{
   },
   playbackExtent: 0,
   setPlaybackExtent(value: number) {
-    if (value > 1 || value < 0) {
-      return;
-    }
-
-    StorySettings.currentStory?.getCharts().map((chart: Chart) => {
-      chart.chart?.updateState({
-        extent: value,
-      });
-    });
-    this.playbackExtent = value;
+    console.log("");
   },
   extentVisualizer: undefined,
   setExtentVisualizer() {

@@ -200,11 +200,6 @@ export class AnimatedCircle extends AnimatedElement {
     const { opacity: selectionOpacity, parsedPath: selectionPath } =
       this.animationState.selection;
 
-    // const textPosition = {
-    //   x: position.x + 10,
-    //   y: position.y + dimensions.height * 0.5 + (label?.fontSize ?? 0) / 2,
-    // };
-
     if (!path) return;
 
     this.controllerState.drawingUtils.modifyContextStyleAndDraw(
@@ -214,7 +209,6 @@ export class AnimatedCircle extends AnimatedElement {
         opacity,
       },
       (context: CanvasRenderingContext2D) => {
-        this.controllerState.clipBoundaries(context);
         this.controllerState.drawingUtils.drawPath({
           path,
           mode: "fill",
@@ -222,25 +216,6 @@ export class AnimatedCircle extends AnimatedElement {
         });
       }
     );
-
-    // if (label) {
-    //   this.controllerState.drawingUtils.modifyContextStyleAndDraw(
-    //     {
-    //       fillStyle: "white",
-    //       opacity: opacity,
-    //       fontSize: label.fontSize,
-    //       textAlign: label.align as CanvasTextAlign,
-    //     },
-    //     (context: CanvasRenderingContext2D) => {
-    //       this.controllerState.clipBoundaries(context);
-    //       this.controllerState.drawingUtils.drawText({
-    //         text: label.text,
-    //         coordinates: textPosition,
-    //         context,
-    //       });
-    //     }
-    //   );
-    // }
 
     if (selectionPath && selectionOpacity) {
       this.controllerState.drawingUtils.modifyContextStyleAndDraw(
@@ -297,7 +272,6 @@ export class AnimatedCircle extends AnimatedElement {
           opacity,
         },
         (context: CanvasRenderingContext2D) => {
-          // this.controllerState.clipBoundaries(context);
           this.controllerState.drawingUtils.drawCircle({
             coordinates: path[0],
             radius: RADIUS,
@@ -316,7 +290,6 @@ export class AnimatedCircle extends AnimatedElement {
           opacity,
         },
         (context: CanvasRenderingContext2D) => {
-          // this.controllerState.clipBoundaries(context);
           this.controllerState.drawingUtils.drawLine({
             coordinates: path,
             shape: LineShape.CURVED,

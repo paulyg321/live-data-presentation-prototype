@@ -7,16 +7,25 @@ import {
   RadialPlaybackGestureListener,
   LinearPlaybackGestureListener,
   getGestureListenerResetKeys,
-  SelectionGestureListener,
+  RangePoseListener,
+  PointPoseListener,
+  OpenHandPoseListener,
+  StrokeListener,
+  RectPoseListener,
 } from "../../gestures";
 import { CanvasEvent } from "../../interactions";
 import { parse, stringify } from "flatted";
 
 export type StoryLayer =
-  | ForeshadowingGestureListener
-  | RadialPlaybackGestureListener
-  | LinearPlaybackGestureListener
-  | SelectionGestureListener
+  // | ForeshadowingGestureListener
+  // | RadialPlaybackGestureListener
+  // | LinearPlaybackGestureListener
+  // | SelectionGestureListener
+  | RangePoseListener
+  | RectPoseListener
+  | PointPoseListener
+  | OpenHandPoseListener
+  | StrokeListener
   | Chart;
 
 export type LayerType = ChartType | ListenerType;
@@ -52,9 +61,10 @@ export class Story {
     if (storedLayerString) {
       this.layers = parse(storedLayerString).map(({ layer, type, id }: any) => {
         const arg = {
-          ...layer,
+          ...layer.state,
           drawingUtils: this.drawingUtils,
         };
+
         switch (type) {
           case ChartType.BAR:
           case ChartType.LINE:
@@ -62,37 +72,41 @@ export class Story {
             return {
               type,
               id,
-              layer: new Chart({
-                ...arg.state,
-                drawingUtils: this.drawingUtils,
-              }),
+              layer: new Chart(arg),
             };
-          case ListenerType.FORESHADOWING: {
+          case ListenerType.POINT_POSE: {
             return {
               type,
               id,
-              layer: new ForeshadowingGestureListener(arg),
+              layer: new PointPoseListener(arg),
             };
           }
-          case ListenerType.TEMPORAL: {
+          case ListenerType.OPEN_HAND_POSE: {
             return {
               type,
               id,
-              layer: new LinearPlaybackGestureListener(arg),
+              layer: new OpenHandPoseListener(arg),
             };
           }
-          case ListenerType.RADIAL: {
+          case ListenerType.RECT_POSE: {
             return {
               type,
               id,
-              layer: new RadialPlaybackGestureListener(arg),
+              layer: new RectPoseListener(arg),
             };
           }
-          case ListenerType.SELECTION: {
+          case ListenerType.RANGE_POSE: {
             return {
               type,
               id,
-              layer: new SelectionGestureListener(arg),
+              layer: new RangePoseListener(arg),
+            };
+          }
+          case ListenerType.STROKE_LISTENER: {
+            return {
+              type,
+              id,
+              layer: new StrokeListener(arg),
             };
           }
           default:
@@ -173,16 +187,7 @@ export class Story {
     const currentWidget = this.currentWidget;
     if (!currentWidget) return;
 
-    let listener;
-    if (
-      [ChartType.BAR, ChartType.LINE, ChartType.SCATTER].includes(
-        currentWidget.type as ChartType
-      )
-    ) {
-      listener = currentWidget?.layer?.state?.canvasListener;
-    } else {
-      listener = currentWidget?.layer?.canvasListener;
-    }
+    const listener = currentWidget?.layer?.state?.canvasListener;
     const boundsInformation = listener?.isInBounds(eventData);
 
     if (boundsInformation) {
@@ -206,17 +211,9 @@ export class Story {
   }
 
   draw() {
-    this.layers.forEach(({ layer, id, type }) => {
+    this.layers.forEach(({ layer, id }) => {
       if (id === this.currentWidget?.id) {
-        if (
-          [ChartType.BAR, ChartType.LINE, ChartType.SCATTER].includes(
-            type as ChartType
-          )
-        ) {
-          this.currentWidget.layer.state.canvasListener?.draw();
-        } else {
-          this.currentWidget.layer.canvasListener?.draw();
-        }
+        this.currentWidget.layer.state.canvasListener?.draw();
       }
       layer.draw();
     });
