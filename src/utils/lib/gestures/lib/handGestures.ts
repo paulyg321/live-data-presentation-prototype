@@ -1,13 +1,5 @@
+import { SupportedGestures } from "@/utils";
 import fp from "fingerpose";
-
-export enum SupportedGestures {
-  POINTING = "pointing",
-  OPEN_HAND = "open-hand",
-  FORESHADOWING_LEFT_L = "foreshadowing-left-l",
-  FORESHADOWING_RIGHT_L = "foreshadowing-right-l",
-  FORESHADOWING_LEFT_C = "foreshadowing-left-c",
-  FORESHADOWING_RIGHT_C = "foreshadowing-right-c",
-}
 
 // POINTING
 export const pointingGesture = new fp.GestureDescription(

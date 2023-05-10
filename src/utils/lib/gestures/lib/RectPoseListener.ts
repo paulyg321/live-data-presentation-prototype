@@ -1,20 +1,19 @@
 import { gsap } from "gsap";
-import { containsValueLargerThanMax } from "../../calculations";
-import { distanceBetweenPoints, type Coordinate2D } from "../../chart";
-import { HAND_LANDMARK_IDS } from "../../media-pipe";
-import { startTimeoutInstance } from "../../timer";
-import { ForeshadowingType } from "./ForeshadowingGestureListener";
 import {
-  DEFAULT_POSE_DURATION,
-  DEFAULT_RESET_PAUSE_DURATION,
+  containsValueLargerThanMax,
+  HAND_LANDMARK_IDS,
+  startTimeoutInstance,
+  distanceBetweenPoints,
+  type Coordinate2D,
+  HANDS,
   GestureListener,
-  ListenerMode,
   type GestureListenerConstructorArgs,
   type ListenerProcessedFingerData,
   type PosePosition,
-} from "./GestureListener";
-import { HANDS } from "./gesture-utils";
-import { SupportedGestures } from "./handGestures";
+  DEFAULT_POSE_DURATION,
+  DEFAULT_RESET_PAUSE_DURATION,
+  SupportedGestures,
+} from "@/utils";
 
 const REFERENCE_POINT_BOUNDS = 30;
 
@@ -32,7 +31,6 @@ export class RectPoseListener extends GestureListener {
         leftHand: SupportedGestures.POINTING,
       },
     ],
-    mode = ForeshadowingType.SHAPE,
     trackedFingers = [
       HAND_LANDMARK_IDS.index_finger_tip,
       HAND_LANDMARK_IDS.thumb_tip,
@@ -49,11 +47,11 @@ export class RectPoseListener extends GestureListener {
       ...rest,
       handsToTrack,
       gestureTypes,
-      mode,
       animationState,
       poseDuration,
       resetPauseDuration,
       numHands,
+      trackedFingers,
     });
   }
 

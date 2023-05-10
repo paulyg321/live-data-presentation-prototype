@@ -1,6 +1,4 @@
-import type { Coordinate2D, Dimensions } from "../../chart";
-import { defaultScale } from "../../drawing";
-import { HORIZONTAL_ORDER, VERTICAL_ORDER } from "../../media-pipe";
+import { type Coordinate2D, type Dimensions, defaultScale } from "@/utils";
 
 export function calculateAngleBetweenPoints(
   origin: Coordinate2D,
@@ -26,37 +24,6 @@ export function calculateDistance(pointA: Coordinate2D, pointB: Coordinate2D) {
 
 export function getRandomArbitrary(min: number, max: number) {
   return Math.random() * (max - min) + min;
-}
-
-export function generateLineData(minY: number, maxY: number) {
-  return new Array(20)
-    .fill(0)
-    .map((val, index) => ({ x: index, y: getRandomArbitrary(minY, maxY) }));
-}
-
-export function keepBetween({
-  value,
-  range,
-  roundValue,
-}: {
-  value: number;
-  range: { start: number; end: number };
-  roundValue: boolean;
-}) {
-  if (range.start > range.end) throw new Error("Invalid range");
-
-  let output = value;
-  if (roundValue) {
-    output = Math.round(value);
-  }
-
-  if (output > range.end) {
-    return range.end;
-  } else if (output < range.start) {
-    return range.start;
-  } else {
-    return output;
-  }
 }
 
 export function isInBound(
@@ -105,4 +72,19 @@ export function isInBound(
   }
 
   return isWithinBounds;
+}
+
+export function distanceBetweenPoints(
+  initialPosition: Coordinate2D[],
+  newPosition: Coordinate2D[]
+) {
+  if (initialPosition.length !== newPosition.length) {
+    throw new Error(
+      "distanceDiff - please ensure coordinate arrays have equal length"
+    );
+  }
+
+  return initialPosition.map((position: Coordinate2D, index: number) => {
+    return calculateDistance(position, newPosition[index]);
+  });
 }

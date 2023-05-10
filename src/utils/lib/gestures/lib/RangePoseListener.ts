@@ -1,19 +1,19 @@
 import { gsap } from "gsap";
-import { containsValueLargerThanMax } from "../../calculations";
-import { distanceBetweenPoints, type Coordinate2D } from "../../chart";
-import { HAND_LANDMARK_IDS } from "../../media-pipe";
-import { startTimeoutInstance } from "../../timer";
-import { ForeshadowingType } from "./ForeshadowingGestureListener";
 import {
-  DEFAULT_POSE_DURATION,
-  DEFAULT_RESET_PAUSE_DURATION,
+  containsValueLargerThanMax,
+  HAND_LANDMARK_IDS,
+  startTimeoutInstance,
+  distanceBetweenPoints,
+  type Coordinate2D,
+  HANDS,
   GestureListener,
   type GestureListenerConstructorArgs,
   type ListenerProcessedFingerData,
   type PosePosition,
-} from "./GestureListener";
-import { HANDS } from "./gesture-utils";
-import { SupportedGestures } from "./handGestures";
+  DEFAULT_POSE_DURATION,
+  DEFAULT_RESET_PAUSE_DURATION,
+  SupportedGestures,
+} from "@/utils";
 
 const REFERENCE_POINT_BOUNDS = 30;
 
@@ -35,7 +35,6 @@ export class RangePoseListener extends GestureListener {
       HAND_LANDMARK_IDS.index_finger_tip,
       HAND_LANDMARK_IDS.thumb_tip,
     ],
-    mode = ForeshadowingType.SHAPE,
     animationState = {
       referencePointRadius: REFERENCE_POINT_BOUNDS,
     },
@@ -48,7 +47,6 @@ export class RangePoseListener extends GestureListener {
       ...rest,
       handsToTrack,
       gestureTypes,
-      mode,
       animationState,
       poseDuration,
       resetPauseDuration,

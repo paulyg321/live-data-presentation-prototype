@@ -1,21 +1,23 @@
 import { gsap } from "gsap";
 import * as d3 from "d3";
-import type { DrawingUtils } from "../../drawing";
-import type { Dimensions, Coordinate2D } from "../types";
 import {
+  DrawingUtils,
+  type Dimensions,
+  type Coordinate2D,
   ScaleTypes,
   type ScaleOrdinal,
   MAX_DOMAIN_Y,
   ChartType,
-} from "./Chart";
-import { AnimatedBar } from "./AnimatedBar";
-import type { AnimatedElement } from "./AnimatedElement";
-import { ForeshadowingStatesMode } from "../../gestures";
-import { isInBound } from "../../calculations";
+  AnimatedBar,
+  AnimatedElement,
+  ForeshadowingStatesMode,
+  isInBound,
+  drawXAxis,
+  drawYAxis,
+  StateUpdateType,
+  AnimatedCircle,
+} from "@/utils";
 import { markRaw } from "vue";
-import { drawXAxis, drawYAxis } from "./draw-axes";
-import { StateUpdateType } from "./AnimatedElement";
-import { AnimatedCircle } from "./AnimatedCircle";
 
 export interface AnimationChartElementData {
   x: number;

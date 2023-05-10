@@ -1,26 +1,19 @@
-import _ from "lodash";
-import { ChartType, Chart, type Coordinate2D } from "../../chart";
-import type { DrawingUtils } from "../../drawing";
 import {
-  ForeshadowingGestureListener,
   ListenerType,
-  RadialPlaybackGestureListener,
-  LinearPlaybackGestureListener,
-  getGestureListenerResetKeys,
   RangePoseListener,
   PointPoseListener,
   OpenHandPoseListener,
   StrokeListener,
   RectPoseListener,
-} from "../../gestures";
-import { CanvasEvent } from "../../interactions";
+  CanvasEvent,
+  type DrawingUtils,
+  ChartType,
+  Chart,
+  type Coordinate2D,
+} from "@/utils";
 import { parse, stringify } from "flatted";
 
 export type StoryLayer =
-  // | ForeshadowingGestureListener
-  // | RadialPlaybackGestureListener
-  // | LinearPlaybackGestureListener
-  // | SelectionGestureListener
   | RangePoseListener
   | RectPoseListener
   | PointPoseListener

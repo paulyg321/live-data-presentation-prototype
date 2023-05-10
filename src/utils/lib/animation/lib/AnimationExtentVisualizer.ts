@@ -1,5 +1,4 @@
-import type { Coordinate2D, Dimensions } from "../../chart";
-import type { DrawingUtils } from "../../drawing";
+import type { Coordinate2D, Dimensions, DrawingUtils } from "@/utils";
 
 const HEIGHT = 10;
 

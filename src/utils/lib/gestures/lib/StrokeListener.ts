@@ -1,14 +1,14 @@
-import { PlaybackSubjectType, HAND_LANDMARK_IDS } from "@/utils";
-import { Affect, type Coordinate2D } from "../../chart";
-import { HANDS } from "./gesture-utils";
 import {
+  HAND_LANDMARK_IDS,
+  type Coordinate2D,
+  HANDS,
   GestureListener,
-  ListenerMode,
   type GestureListenerConstructorArgs,
   type ListenerProcessedFingerData,
+  SupportedGestures,
   DEFAULT_TRIGGER_DURATION,
-} from "./GestureListener";
-import { SupportedGestures } from "./handGestures";
+  Affect,
+} from "@/utils";
 
 export type StrokeListenerConstructorArgs = GestureListenerConstructorArgs;
 
@@ -28,7 +28,6 @@ export class StrokeListener extends GestureListener {
     ],
     trackedFingers = [HAND_LANDMARK_IDS.index_finger_tip],
     canvasDimensions,
-    mode,
     resetKeys,
     drawingUtils,
     strokeTriggerName = "radial",
@@ -46,7 +45,6 @@ export class StrokeListener extends GestureListener {
       canvasDimensions,
       resetKeys,
       drawingUtils,
-      mode,
       strokeTriggerName,
       triggerDuration,
       numHands,

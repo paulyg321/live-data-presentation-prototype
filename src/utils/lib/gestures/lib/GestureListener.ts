@@ -18,10 +18,11 @@ import {
   startTimeoutInstance,
   selectionSubject,
   ForeshadowingStatesMode,
+  type Coordinate2D,
+  type Dimensions,
 } from "@/utils";
 import type { Timer } from "d3";
 import type { Subject, Subscription } from "rxjs";
-import type { Coordinate2D, Dimensions } from "../../chart";
 
 export const DEFAULT_TRIGGER_DURATION = 5000; // 5 SECONDS
 export const DEFAULT_POSE_DURATION = 1000; // 1 second
@@ -59,7 +60,6 @@ export interface GestureListenerConstructorArgs {
   }[];
   resetKeys?: Set<string>;
   drawingUtils: DrawingUtils;
-  mode?: any;
   listenerMode?: ListenerMode;
   trackedFingers?: number[];
   animationState?: Record<string, any>;
@@ -111,7 +111,6 @@ export interface GestureListenerState {
   posePosition?: PosePosition;
   posePositionToMatch?: PosePosition;
   trackedFingers: number[];
-  mode: any;
 
   useBounds?: boolean;
   restrictToBounds?: boolean;
@@ -175,7 +174,6 @@ export abstract class GestureListener {
       HAND_LANDMARK_IDS.thumb_tip,
     ],
     listenerMode,
-    mode,
     animationState = {},
     poseDuration,
     resetPauseDuration,
@@ -218,7 +216,6 @@ export abstract class GestureListener {
       strokeRecognizer: new DollarRecognizer(),
       trackedFingers,
       listenerMode,
-      mode,
       animationState,
       poseDuration,
       resetPauseDuration,
@@ -245,7 +242,6 @@ export abstract class GestureListener {
     canvasDimensions,
     addGesture,
     gestureName,
-    mode,
     listenerMode,
     resetKeys,
     trackedFingers,
@@ -278,9 +274,6 @@ export abstract class GestureListener {
     }
     if (listenerMode) {
       this.state.listenerMode = listenerMode;
-    }
-    if (mode) {
-      this.state.mode = mode;
     }
     if (resetKeys) {
       this.state.resetKeys = resetKeys;

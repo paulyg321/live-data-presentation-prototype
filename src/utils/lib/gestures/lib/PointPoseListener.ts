@@ -1,19 +1,20 @@
-import { HAND_LANDMARK_IDS, startTimeoutInstance } from "@/utils";
-import { containsValueLargerThanMax } from "../../calculations";
-import { distanceBetweenPoints, type Coordinate2D } from "../../chart";
-import { HANDS } from "./gesture-utils";
+import { gsap } from "gsap";
 import {
+  containsValueLargerThanMax,
+  HAND_LANDMARK_IDS,
+  startTimeoutInstance,
+  distanceBetweenPoints,
+  type Coordinate2D,
+  HANDS,
   GestureListener,
-  ListenerMode,
   type GestureListenerConstructorArgs,
   type ListenerProcessedFingerData,
   type PosePosition,
   DEFAULT_POSE_DURATION,
   DEFAULT_RESET_PAUSE_DURATION,
   DEFAULT_TRIGGER_DURATION,
-} from "./GestureListener";
-import { SupportedGestures } from "./handGestures";
-import { gsap } from "gsap";
+  SupportedGestures,
+} from "@/utils";
 
 export type PointPoseListenerConstructorArgs = GestureListenerConstructorArgs;
 

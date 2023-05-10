@@ -1,13 +1,10 @@
-import { calculateDistance, isInBound } from "../../calculations";
-import type { Chart, Coordinate2D, Dimensions } from "../../chart";
-import type { DrawingUtils } from "../../drawing";
-import type {
-  EmphasisGestureListener,
-  ForeshadowingGestureListener,
-  GestureListener,
-  LinearPlaybackGestureListener,
-  RadialPlaybackGestureListener,
-} from "../../gestures";
+import {
+  calculateDistance,
+  isInBound,
+  type DrawingUtils,
+  type Coordinate2D,
+  type Dimensions,
+} from "@/utils";
 
 export enum CanvasEvent {
   MOUSE_DOWN = "mousedown",
