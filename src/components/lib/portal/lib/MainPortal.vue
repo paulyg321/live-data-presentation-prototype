@@ -1,8 +1,12 @@
 <script setup lang="ts">
+import type { Dimensions } from "@/utils";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 const emit = defineEmits(["on-close"]);
-const props = withDefaults(defineProps<{ open: boolean }>(), { open: false });
+const props = withDefaults(
+  defineProps<{ open: boolean; dimensions: Dimensions }>(),
+  { open: false }
+);
 
 const el = ref(null);
 
@@ -46,7 +50,7 @@ function openPortal() {
   windowRef.value = window.open(
     "",
     "",
-    "width=640,height=480,left=200,top=200"
+    `width=${props.dimensions.width},height=${props.dimensions.height},left=200,top=200`
   );
   windowRef.value.document.body.appendChild(el.value);
   copyStyles(window.document, windowRef.value.document);

@@ -2,10 +2,10 @@ import { DrawingUtils, snackbarSubject, type Dimensions } from "@/utils";
 import { reactive } from "vue";
 import { CameraSettings } from "./camera-settings";
 
-export const initialCanvasWidth = 640;
+export const initialCanvasWidth = 720;
 export const initialCanvasDimensions = {
   width: initialCanvasWidth,
-  height: initialCanvasWidth * (3 / 4),
+  height: initialCanvasWidth * (9 / 16),
 };
 
 export const CanvasSettings = reactive<{

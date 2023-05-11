@@ -15,11 +15,16 @@ const childClass = "canvas-elements";
 
 <style>
 .canvas-wrapper {
+  top: 0;
+  left: 0;
   position: relative;
+  width: 100%;
+  height: 100%;
 }
 .canvas-elements {
   position: absolute;
-  left: 0;
-  top: 0;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
 }
 </style>

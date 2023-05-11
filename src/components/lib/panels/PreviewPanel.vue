@@ -145,88 +145,43 @@ onMounted(() => {
 </script>
 <!---------------------------------------------------------------------------------------------------------->
 <template>
-  <v-container class="pa-10">
-    <v-row class="justify-center">
-      <v-col lg="12">
-        <v-slider
-          v-model="ChartSettings.playbackExtent"
-          :min="0"
-          :max="1"
-          thumb-label
-        ></v-slider>
-      </v-col>
-    </v-row>
-    <v-row class="justify-center">
-      <v-col lg="3">
-        <v-btn
-          icon="mdi-skip-backward"
-          @click="() => ChartSettings.handlePlay(PlaybackType.NEXT)"
-        ></v-btn>
-      </v-col>
-      <v-col lg="3">
-        <v-btn
-          icon="mdi-play"
-          color="primary"
-          @click="() => ChartSettings.handlePlay(PlaybackType.ALL)"
-        ></v-btn>
-      </v-col>
-      <v-col lg="3">
-        <v-btn
-          icon="mdi-skip-forward"
-          @click="() => ChartSettings.handlePlay(PlaybackType.NEXT)"
-        ></v-btn>
-      </v-col>
-    </v-row>
-    <v-row>
-      <v-col lg="12">
-        <v-radio-group
-          label="Playback Type"
-          inline
-          v-model="ChartSettings.playbackType"
-        >
-          <v-radio
-            :label="PlaybackType.ALL"
-            :value="PlaybackType.ALL"
-          ></v-radio>
-          <v-radio
-            :label="PlaybackType.NEXT"
-            :value="PlaybackType.NEXT"
-          ></v-radio>
-        </v-radio-group>
-      </v-col>
-    </v-row>
-    <v-row class="mt-10">
-      <v-col lg="12">
-        <CanvasWrapper
-          :width="CanvasSettings.dimensions.width"
-          :height="CanvasSettings.dimensions.height"
-          v-slot="{ className }"
-        >
-          <VideoCanvas id="default" :className="className" />
-          <AppCanvas v-for="key in ['preview']" :id="key" v-bind:key="key" />
-          <canvas
-            :width="CanvasSettings.dimensions.width"
-            :height="CanvasSettings.dimensions.height"
-            :class="className"
-            :ref="(el) => CanvasSettings.setCanvas(el as HTMLCanvasElement, 'events')"
-          ></canvas>
-        </CanvasWrapper>
-      </v-col>
-    </v-row>
-  </v-container>
+  <CanvasWrapper
+    :width="CanvasSettings.dimensions.width"
+    :height="CanvasSettings.dimensions.height"
+    v-slot="{ className }"
+  >
+    <svg
+      id="test-svg"
+      :width="CanvasSettings.dimensions.width"
+      :height="CanvasSettings.dimensions.height"
+      :class="className"
+    ></svg>
+    <VideoCanvas id="default" :className="className" />
+    <AppCanvas
+      v-for="key in ['preview']"
+      :id="key"
+      v-bind:key="key"
+      :class="className"
+    />
+    <canvas
+      :width="CanvasSettings.dimensions.width"
+      :height="CanvasSettings.dimensions.height"
+      :class="className"
+      :ref="(el) => CanvasSettings.setCanvas(el as HTMLCanvasElement, 'events')"
+    ></canvas>
+  </CanvasWrapper>
   <v-snackbar :timeout="2000" :color="snackbarVariant" v-model="snackbar">
     {{ snackbarText }}
   </v-snackbar>
-  <svg
-    id="test-svg"
-    :width="CanvasSettings.dimensions.width"
-    :height="CanvasSettings.dimensions.height"
-  ></svg>
 </template>
 <!---------------------------------------------------------------------------------------------------------->
 <style>
-.svg-label {
-  font-family: "Times New Roman", Times, serif;
-  font-weight: bold;
+.panel-container {
+  width: 100%;
+  height: 100%;
+}
+
+canvas {
+  border: 2px solid #9e9e9e;
 }
 </style>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, toRaw } from "vue";
+import { computed, onMounted, ref, toRaw, watch } from "vue";
 import {
   PortalContainer,
   StoriesPanel,
@@ -259,10 +259,20 @@ onMounted(() => {
 </script>
 
 <template>
-  <v-container>
+  <v-layout>
     <v-app>
-      <v-navigation-drawer theme="light" rail permanent>
-        <v-list density="compact" @click:select="handleAddWidget">
+      <v-navigation-drawer
+        theme="light"
+        rail
+        location="top"
+        elevation="1"
+        permanent
+      >
+        <v-list
+          density="compact"
+          @click:select="handleAddWidget"
+          class="d-flex flex-row"
+        >
           <v-tooltip text="Scatter Plot">
             <template v-slot:activator="{ props }">
               <v-list-item
@@ -286,8 +296,6 @@ onMounted(() => {
               </v-list-item>
             </template>
           </v-tooltip>
-
-          <v-divider></v-divider>
 
           <v-tooltip text="Rect Pose Widget">
             <template v-slot:activator="{ props }">
@@ -349,8 +357,6 @@ onMounted(() => {
             </template>
           </v-tooltip>
 
-          <v-divider></v-divider>
-
           <v-tooltip text="Camera Settings">
             <template v-slot:activator="{ props }">
               <v-list-item
@@ -361,17 +367,6 @@ onMounted(() => {
               </v-list-item>
             </template>
           </v-tooltip>
-
-          <!-- <v-tooltip text="Gesture Settings">
-            <template v-slot:activator="{ props }">
-              <v-list-item
-                prepend-icon="mdi-gesture"
-                :value="AvailableWidgets.GESTURE"
-                v-bind="props"
-              >
-              </v-list-item>
-            </template>
-          </v-tooltip> -->
 
           <v-tooltip text="Portals">
             <template v-slot:activator="{ props }">
@@ -396,11 +391,7 @@ onMounted(() => {
           </v-tooltip>
         </v-list>
       </v-navigation-drawer>
-
-      <v-navigation-drawer permanent location="right" width="300">
-        <StoriesPanel />
-      </v-navigation-drawer>
-      <v-navigation-drawer permanent location="left" width="400">
+      <v-navigation-drawer permanent location="right" width="600">
         <div v-if="currentTab === SettingsTab.WIDGET_SETTINGS">
           <WidgetSettings />
         </div>
@@ -414,8 +405,13 @@ onMounted(() => {
           <PortalSettings />
         </div>
       </v-navigation-drawer>
+      <v-navigation-drawer permanent location="bottom" width="300">
+        <StoriesPanel />
+      </v-navigation-drawer>
 
-      <v-main style="min-width: 700px">
+      <v-main
+        class="w-100 h-screen d-flex flex-column justify-center align-center"
+      >
         <PreviewPanel />
       </v-main>
     </v-app>
@@ -436,10 +432,13 @@ onMounted(() => {
       @loadeddata="runDetection"
       @loadedmetadata="setVideoDimensions"
     ></video>
-  </v-container>
+  </v-layout>
 </template>
 
 <style>
+.preview-panel {
+  position: absolute;
+}
 .form-row {
   padding: 30px 30px;
   align-items: flex-start;

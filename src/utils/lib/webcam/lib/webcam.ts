@@ -1,3 +1,4 @@
+import { CanvasSettings } from "@/state";
 import type { VideoSourcesTypes } from "@/utils";
 
 export async function getVideoSources() {
@@ -20,6 +21,8 @@ export async function getVideoStream(sourceOption: string) {
     return await navigator.mediaDevices.getUserMedia({
       video: {
         deviceId: sourceOption,
+        width: { ideal: CanvasSettings.dimensions.width },
+        height: { ideal: CanvasSettings.dimensions.height },
       },
     });
   } catch (error) {

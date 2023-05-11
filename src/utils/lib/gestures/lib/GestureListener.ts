@@ -29,10 +29,6 @@ export const DEFAULT_POSE_DURATION = 1000; // 1 second
 export const DEFAULT_RESET_PAUSE_DURATION = 2000; // 2 seconds
 
 export enum ListenerType {
-  TEMPORAL = "temporal",
-  RADIAL = "radial",
-  FORESHADOWING = "foreshadowing",
-  SELECTION = "selection",
   RECT_POSE = "rect-pose",
   RANGE_POSE = "range-pose",
   POINT_POSE = "point-pose",

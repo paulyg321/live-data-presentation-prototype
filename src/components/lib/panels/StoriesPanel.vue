@@ -16,49 +16,53 @@ function closeMenu() {
 }
 </script>
 <template>
-  <v-container class="pa-6">
-    <v-row>
-      <v-col
-        cols="12"
-        v-for="(story, index) in StorySettings.stories"
-        :key="story"
-      >
-        <v-card
-          :theme="index === StorySettings.currentStoryIndex ? 'dark' : 'light'"
-        >
-          <!-- <v-img
-            src=""
-            class="align-end"
-            height="100px"
-            cover
-          >
-        </v-img> -->
-          <v-card-title class="text-deep-purple-lighten-2">{{
-            story.title
-          }}</v-card-title>
+  <v-container class="d-flex h-100 flex-column">
+    <v-row class="flex-1">
+      <v-col cols="12" class="pa-0">
+        <v-container class="d-flex h-100 flex-column">
+          <v-row class="flex-1 pa-5 flex-nowrap overflow-auto">
+            <v-col
+              v-for="(story, index) in StorySettings.stories"
+              :key="story"
+              cols="12"
+              md="4"
+              class="h-100"
+            >
+              <v-card
+                :theme="
+                  index === StorySettings.currentStoryIndex ? 'dark' : 'light'
+                "
+                class="h-100 d-flex flex-column"
+                variant="outlined"
+                color="#9e9e9e"
+              >
+                <v-card-title class="text-deep-purple-lighten-2 flex-1">{{
+                  story.title
+                }}</v-card-title>
 
-          <v-card-actions>
-            <v-spacer></v-spacer>
-            <v-btn
-              density="compact"
-              color="deep-purple-lighten-2"
-              variant="elevated"
-              icon="mdi-delete"
-              @click="StorySettings.deleteStory(story.title)"
-            ></v-btn>
-            <v-btn
-              density="compact"
-              color="deep-purple-lighten-2"
-              variant="elevated"
-              icon="mdi-play"
-              @click="StorySettings.setCurrentStory(index)"
-            ></v-btn>
-          </v-card-actions>
-        </v-card>
+                <v-card-actions class="flex-1">
+                  <v-spacer></v-spacer>
+                  <v-btn
+                    density="compact"
+                    color="deep-purple-lighten-2"
+                    variant="elevated"
+                    icon="mdi-delete"
+                    @click="StorySettings.deleteStory(story.title)"
+                  ></v-btn>
+                  <v-btn
+                    density="compact"
+                    color="deep-purple-lighten-2"
+                    variant="elevated"
+                    icon="mdi-play"
+                    @click="StorySettings.setCurrentStory(index)"
+                  ></v-btn>
+                </v-card-actions>
+              </v-card>
+            </v-col>
+          </v-row>
+        </v-container>
       </v-col>
-    </v-row>
-    <v-row>
-      <v-col class="d-flex justify-center">
+      <!-- <v-col cols="1" class="d-flex justify-center">
         <v-btn color="success" prepend-icon="mdi-plus" variant="tonal">
           Add Story
           <v-menu
@@ -87,7 +91,7 @@ function closeMenu() {
             </v-card>
           </v-menu>
         </v-btn>
-      </v-col>
+      </v-col> -->
     </v-row>
   </v-container>
 </template>

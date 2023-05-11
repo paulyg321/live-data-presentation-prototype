@@ -20,8 +20,12 @@ onUnmounted(() => {
     :width="CanvasSettings.dimensions.width"
     :height="CanvasSettings.dimensions.height"
     :ref="(el) => CanvasSettings.setCanvas(el as HTMLCanvasElement, id)"
-    :class="className"
+    :class="`${className} canvas`"
   ></canvas>
 </template>
 
-<style></style>
+<style>
+  .canvas {
+    display: block;
+  }
+</style>

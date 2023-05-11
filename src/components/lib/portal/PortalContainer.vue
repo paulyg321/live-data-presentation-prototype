@@ -17,7 +17,11 @@ defineProps<PresenterViewsProps>();
 </script>
 
 <template>
-  <MainPortal :open="open" @on-close="handleClose">
+  <MainPortal
+    :open="open"
+    @on-close="handleClose"
+    :dimensions="CanvasSettings.dimensions"
+  >
     <CanvasWrapper
       :width="CanvasSettings.dimensions.width"
       :height="CanvasSettings.dimensions.height"
