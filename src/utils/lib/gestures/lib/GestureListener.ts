@@ -20,21 +20,53 @@ import {
   ForeshadowingStatesMode,
   type Coordinate2D,
   type Dimensions,
+  AffectOptions,
 } from "@/utils";
+import { StateUpdateType } from "../../chart";
 import type { Timer } from "d3";
 import type { Subject, Subscription } from "rxjs";
 
 export const DEFAULT_TRIGGER_DURATION = 5000; // 5 SECONDS
 export const DEFAULT_POSE_DURATION = 1000; // 1 second
 export const DEFAULT_RESET_PAUSE_DURATION = 2000; // 2 seconds
+export const DEFAULT_PLAYBACK_SETTINGS = {
+  [AffectOptions.NEUTRAL]: {
+    duration: 5,
+    easeFn: "none",
+    playbackMode: StateUpdateType.GROUP_TIMELINE,
+    svg: undefined,
+  },
+  [AffectOptions.POSITIVE]: {
+    duration: 5,
+    easeFn: "none",
+    playbackMode: StateUpdateType.GROUP_TIMELINE,
+    svg: undefined,
+  },
+  [AffectOptions.NEGATIVE]: {
+    duration: 5,
+    easeFn: "none",
+    playbackMode: StateUpdateType.INDIVIDUAL_TWEENS,
+    svg: undefined,
+  },
+};
 
 export enum ListenerType {
   RECT_POSE = "rect-pose",
   RANGE_POSE = "range-pose",
   POINT_POSE = "point-pose",
   OPEN_HAND_POSE = "open-hand-pose",
+  THUMB_POSE = "thumb-pose",
   STROKE_LISTENER = "stroke-listener",
 }
+
+export interface PlaybackSettingsConfig {
+  duration: number;
+  easeFn: string;
+  playbackMode: StateUpdateType;
+  svg?: string;
+}
+
+export type PlaybackSettings = Record<AffectOptions, PlaybackSettingsConfig>;
 
 export type ListenerProcessedFingerData = Record<
   HANDS,
@@ -71,19 +103,26 @@ export interface GestureListenerConstructorArgs {
   foreshadowingStatesCount?: number;
   useBounds?: boolean;
   restrictToBounds?: boolean;
+  playbackSettings?: PlaybackSettings;
+  playbackConfig?: {
+    key: AffectOptions;
+    value: PlaybackSettingsConfig;
+  };
+  endKeyframe?: number;
 }
 
 export interface GestureListenerState {
   canvasListener?: CanvasElementListener;
   position: Coordinate2D;
   dimensions: Dimensions;
-  subjects: GestureListenerSubjectMap | undefined;
-  timer: Timer | undefined;
   canvasDimensions: Dimensions;
-  // Ordered from most dominant to least dominant
-  gestureSubject: Subject<any>;
-  resetKeys: Set<string> | undefined;
+  drawingUtils: DrawingUtils;
 
+  subjects?: GestureListenerSubjectMap;
+  gestureSubject: Subject<any>;
+
+  numHands?: number;
+  resetKeys?: Set<string>;
   handsToTrack: {
     dominant: HANDS;
     nonDominant: HANDS;
@@ -94,37 +133,40 @@ export interface GestureListenerState {
         leftHand: SupportedGestures;
       }[];
 
+  // Stroke settings
   stroke: Coordinate2D[];
   strokeRecognizer: DollarRecognizer;
   addGesture: boolean;
   gestureName?: string;
   strokeTriggerName?: string;
 
-  detectionTimer: Timer | undefined;
+  timer?: Timer;
+  detectionTimer?: Timer;
+
   startDetecting: boolean;
 
   listenerMode?: ListenerMode;
+
   posePosition?: PosePosition;
   posePositionToMatch?: PosePosition;
   trackedFingers: number[];
 
+  // FORESHADOW & SELECT SETTINGS FOR POSE GESTURES
   useBounds?: boolean;
   restrictToBounds?: boolean;
-
   poseDuration?: number;
   resetPauseDuration?: number;
   triggerDuration?: number;
 
-  animationState: Record<string, any>;
+  playbackSettings: PlaybackSettings;
+  endKeyframe?: number;
 
   selectionKeys: string[];
-  numHands?: number;
   foreshadowingStatesMode?: ForeshadowingStatesMode;
   foreshadowingStatesCount?: number;
 
-  gestureSubscription: Subscription | undefined;
-
-  drawingUtils: DrawingUtils;
+  animationState: Record<string, any>;
+  gestureSubscription?: Subscription;
 }
 
 export type GestureListenerSubjectMap = { [key: string]: Subject<any> };
@@ -140,6 +182,7 @@ export enum ListenerMode {
   FORESHADOWING = "foreshadowing",
   SELECTION = "selection",
   PLAYBACK = "playback",
+  KEYFRAME = "keyframe",
 }
 
 export abstract class GestureListener {
@@ -179,6 +222,7 @@ export abstract class GestureListener {
     selectionKeys,
     foreshadowingStatesMode,
     foreshadowingStatesCount,
+    endKeyframe,
   }: GestureListenerConstructorArgs) {
     this.state = {
       position,
@@ -226,6 +270,8 @@ export abstract class GestureListener {
       resetKeys,
       detectionTimer: undefined,
       startDetecting: false,
+      playbackSettings: DEFAULT_PLAYBACK_SETTINGS,
+      endKeyframe,
     };
 
     this.setResetHandler();
@@ -249,6 +295,8 @@ export abstract class GestureListener {
     numHands,
     foreshadowingStatesMode,
     foreshadowingStatesCount,
+    playbackConfig,
+    endKeyframe,
   }: Partial<GestureListenerConstructorArgs>) {
     if (position) {
       this.state.position = position;
@@ -301,6 +349,12 @@ export abstract class GestureListener {
     if (foreshadowingStatesCount) {
       this.state.foreshadowingStatesCount = foreshadowingStatesCount;
     }
+    if (playbackConfig) {
+      this.state.playbackSettings[playbackConfig.key] = playbackConfig.value;
+    }
+    if (endKeyframe) {
+      this.state.endKeyframe = endKeyframe;
+    }
   }
 
   private setResetHandler() {
@@ -313,10 +367,13 @@ export abstract class GestureListener {
     // });
   }
 
-  publishToSubject(bounds?: {
-    coordinates: Coordinate2D;
-    dimensions: Dimensions;
-  }) {
+  publishToSubject(
+    bounds?: {
+      coordinates: Coordinate2D;
+      dimensions: Dimensions;
+    },
+    affectKey?: AffectOptions
+  ) {
     switch (this.state.listenerMode) {
       case ListenerMode.FORESHADOWING:
         this.publishToSubjectIfExists(
@@ -338,6 +395,18 @@ export abstract class GestureListener {
         });
         break;
       case ListenerMode.PLAYBACK:
+        if (!affectKey) return;
+        this.publishToSubjectIfExists(GestureListener.playbackSubjectKey, {
+          type: "config",
+          data: this.state.playbackSettings[affectKey],
+        });
+        break;
+      case ListenerMode.KEYFRAME:
+        this.publishToSubjectIfExists(GestureListener.playbackSubjectKey, {
+          type: "keyframe",
+          data: this.state.endKeyframe,
+        });
+        break;
       default:
         break;
     }

@@ -40,7 +40,7 @@ export const ChartSettings = reactive<{
   // animationMode: DrawingMode;
   // setAnimationMode: (mode: DrawingMode) => void;
   handlePlay: (
-    type: string,
+    type?: string,
     callbackFn?: any,
     affect?: Affect,
     duration?: number
@@ -72,7 +72,7 @@ export const ChartSettings = reactive<{
   // setAnimationMode(mode: DrawingMode) {
   //   this.animationMode = mode;
   // },
-  handlePlay(type: string, callbackFn?: any, affect?: Affect) {
+  handlePlay(type?: string, callbackFn?: any, affect?: Affect) {
     const charts = StorySettings.currentStory?.getCharts();
     if (!charts) return;
 
@@ -80,26 +80,29 @@ export const ChartSettings = reactive<{
       chart.state.chart?.play({
         states: [
           {
-            index: 0,
+            index: 1,
           },
           {
-            index: 1,
+            index: 6,
+            selector: "#st0",
           },
           {
             index: 3,
           },
-          {
-            index: 4,
-          },
-          {
-            index: 5,
-          },
-          {
-            index: 6,
-          },
+          // {
+          //   index: 3,
+
+          // },
+          // {
+          //   index: 4,
+          // },
+          // {
+          //   index: 5,
+          // },
         ],
         duration: 5,
-        updateType: StateUpdateType.GROUP_TIMELINE,
+        updateType: StateUpdateType.INDIVIDUAL_TWEENS,
+        // easeFn: "circ.out",
       });
     });
     // const affectPlaybackSettings = {

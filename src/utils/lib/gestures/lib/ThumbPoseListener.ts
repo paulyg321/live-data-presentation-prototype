@@ -1,0 +1,104 @@
+import {
+  HAND_LANDMARK_IDS,
+  type Coordinate2D,
+  HANDS,
+  GestureListener,
+  type GestureListenerConstructorArgs,
+  type ListenerProcessedFingerData,
+  SupportedGestures,
+  DEFAULT_TRIGGER_DURATION,
+} from "@/utils";
+
+export type ThumbPoseListenerConstructorArgs = GestureListenerConstructorArgs;
+
+export class ThumbPoseListener extends GestureListener {
+  constructor({
+    position,
+    dimensions,
+    handsToTrack = {
+      dominant: HANDS.RIGHT,
+      nonDominant: HANDS.LEFT,
+    },
+    gestureTypes = [
+      {
+        rightHand: SupportedGestures.POINTING,
+        leftHand: SupportedGestures.POINTING,
+      },
+    ],
+    trackedFingers = [HAND_LANDMARK_IDS.index_finger_tip],
+    canvasDimensions,
+    resetKeys,
+    drawingUtils,
+    strokeTriggerName = "radial",
+    triggerDuration = DEFAULT_TRIGGER_DURATION,
+    numHands = 1,
+    ...rest
+  }: ThumbPoseListenerConstructorArgs) {
+    super({
+      ...rest,
+      position,
+      dimensions: {
+        width: dimensions.width,
+        height: dimensions.width,
+      },
+      handsToTrack,
+      gestureTypes,
+      canvasDimensions,
+      resetKeys,
+      drawingUtils,
+      strokeTriggerName,
+      triggerDuration,
+      numHands,
+      trackedFingers,
+    });
+  }
+
+  resetHandler(): void {
+    console.log("RESET - RADIAL");
+  }
+
+  handleTrigger(fingerData: ListenerProcessedFingerData) {
+    const handOne = fingerData[this.state.handsToTrack.dominant];
+
+    const thumbPosition = handOne?.fingerPositions[
+      HAND_LANDMARK_IDS.thumb_tip
+    ] as Coordinate2D;
+
+    const isInBounds = this.isWithinObjectBounds(thumbPosition);
+    console.log(isInBounds);
+
+    if (isInBounds) {
+      this.publishToSubject();
+    }
+  }
+
+  private getCenterPoint(): Coordinate2D {
+    return {
+      x: this.state.position.x + this.state.dimensions.width / 2,
+      y: this.state.position.y + this.state.dimensions.width / 2,
+    };
+  }
+
+  // Implemented to only track one finger and one hand
+  protected handleNewData(fingerData: ListenerProcessedFingerData): void {
+    const dominantHand = fingerData[this.state.handsToTrack.dominant];
+    const nonDominantHand = fingerData[this.state.handsToTrack.nonDominant];
+
+    if (!dominantHand || !nonDominantHand) {
+      return;
+    }
+
+    const trigger = this.thumbsTouch(fingerData);
+
+    if (trigger) {
+      this.handleTrigger(fingerData);
+      return;
+    }
+  }
+
+  draw() {
+    this.renderBorder();
+    this.renderStrokePath();
+    this.renderDetectionState();
+  }
+}

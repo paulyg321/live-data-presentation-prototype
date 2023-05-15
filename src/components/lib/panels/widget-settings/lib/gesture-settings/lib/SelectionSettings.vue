@@ -1,15 +1,8 @@
 <script lang="ts" setup>
-import { ListenerMode } from "@/utils";
 import { GestureSettingsState } from "@/state";
 </script>
 <template>
-  <v-row
-    v-if="
-        [ListenerMode.FORESHADOWING, ListenerMode.SELECTION].includes(
-          GestureSettingsState.listenerMode as ListenerMode
-        )
-      "
-  >
+  <v-row>
     <v-col lg="12">
       <v-text-field
         v-model="GestureSettingsState.selectionKeys"

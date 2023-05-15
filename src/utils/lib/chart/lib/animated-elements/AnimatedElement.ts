@@ -10,6 +10,11 @@ import type {
 import * as d3 from "d3";
 import type { Coordinate2D, Dimensions } from "../../types";
 import { ForeshadowingStatesMode } from "../../../gestures";
+import { CustomEase } from "gsap/CustomEase";
+
+export const FORESHADOW_OPACITY = 0.6;
+export const SELECTED_OPACITY = 1;
+export const UNSELECTED_OPACITY = 0.3;
 
 export type AnimatedElementState = AnimatedChartElementArgs & {
   playback: {
@@ -33,15 +38,21 @@ export type AnimatedElementVisualState = {
 };
 
 export type VisualState = {
-  opacityTimeline: ReturnType<typeof gsap.timeline>;
-  pathTimeline: ReturnType<typeof gsap.timeline>;
-  generalTimeline: ReturnType<typeof gsap.timeline>;
+  opacityTimeline?: ReturnType<typeof gsap.timeline>;
+  pathTimeline?: ReturnType<typeof gsap.timeline>;
+  positionTimeline?: ReturnType<typeof gsap.timeline>;
+  sizeTimeline?: ReturnType<typeof gsap.timeline>;
+  scaleTimeline?: ReturnType<typeof gsap.timeline>;
 
+  path: {
+    parsedPath: any;
+    rawPath: any;
+    xScale: number;
+    yScale: number;
+  };
   opacity: number;
-  path: any;
   position: Coordinate2D;
   dimensions: Dimensions;
-  parsedPath: number[];
   circle?: {
     radius: number;
     position: Coordinate2D;
@@ -83,6 +94,7 @@ export interface HandleForeshadowArgs {
 }
 
 export interface HandleSelectionArgs {
+  selector?: string;
   itemUnscaledPosition: Coordinate2D;
 }
 
@@ -90,6 +102,8 @@ export interface HandleSelectionReturnValue {
   element: SVGPrimitive | null;
   position: Coordinate2D;
   dimensions: Dimensions;
+  xSize: number;
+  ySize: number;
 }
 
 export type SVGPrimitive =
@@ -105,18 +119,15 @@ export abstract class AnimatedElement {
   animationState: AnimatedElementVisualState;
 
   constructor(args: AnimatedChartElementArgs) {
-    const placeholderElement = d3
-      .select("#test-svg")
-      .append("rect")
-      .attr("x", () => 0)
-      .attr("y", () => 0)
-      .attr("width", () => 0)
-      .attr("height", () => 0)
-      .node();
+    const element = d3
+      .select("#rect")
+      .clone()
+      .attr("id", "remove")
+      .node() as SVGPrimitive;
 
-    if (!placeholderElement) throw new Error("unable to make path");
+    if (!element) throw new Error("unable to make path");
 
-    const placeholderPath = MorphSVGPlugin.convertToPath(placeholderElement)[0];
+    const placeholderPath = MorphSVGPlugin.convertToPath(element);
 
     const foreshadow: Record<string, VisualState> = {};
 
@@ -125,11 +136,13 @@ export abstract class AnimatedElement {
         opacity: 0,
         position: { x: 0, y: 0 },
         dimensions: { width: 0, height: 0 },
-        path: [],
-        parsedPath: [],
+        path: {
+          parsedPath: [],
+          rawPath: placeholderPath,
+          xScale: 1,
+          yScale: 1,
+        },
         opacityTimeline: gsap.timeline(),
-        pathTimeline: gsap.timeline(),
-        generalTimeline: gsap.timeline(),
       };
     });
 
@@ -139,22 +152,33 @@ export abstract class AnimatedElement {
         opacity: 0,
         position: { x: 0, y: 0 },
         dimensions: { width: 0, height: 0 },
-        path: placeholderPath,
-        parsedPath: [],
+        path: {
+          parsedPath: [],
+          rawPath: placeholderPath,
+          xScale: 1,
+          yScale: 1,
+        },
         opacityTimeline: gsap.timeline(),
         pathTimeline: gsap.timeline(),
-        generalTimeline: gsap.timeline(),
+        positionTimeline: gsap.timeline(),
+        sizeTimeline: gsap.timeline(),
+        scaleTimeline: gsap.timeline(),
       },
       foreshadow: foreshadow,
       selection: {
         opacity: 0,
         position: { x: 0, y: 0 },
         dimensions: { width: 0, height: 0 },
-        path: placeholderPath,
-        parsedPath: [],
+        path: {
+          parsedPath: [],
+          rawPath: placeholderPath,
+          xScale: 1,
+          yScale: 1,
+        },
         opacityTimeline: gsap.timeline(),
         pathTimeline: gsap.timeline(),
-        generalTimeline: gsap.timeline(),
+        positionTimeline: gsap.timeline(),
+        sizeTimeline: gsap.timeline(),
       },
     };
 
@@ -189,30 +213,39 @@ export abstract class AnimatedElement {
   abstract drawForeshadowingState(): void;
 
   clearSvg() {
-    d3.select("#test-svg").selectAll("*").remove();
+    d3.select("#drawing-board").selectAll("#remove").remove();
   }
 
   play(args: AnimatedElementPlaybackArgs) {
     const currentItemAnimationState = this.animationState.current;
     const selectionAnimationState = this.animationState.selection;
 
-    currentItemAnimationState.pathTimeline.totalProgress(0);
-    currentItemAnimationState.pathTimeline.clear();
+    currentItemAnimationState.pathTimeline?.totalProgress(0);
+    currentItemAnimationState.pathTimeline?.clear();
 
-    currentItemAnimationState.opacityTimeline.totalProgress(0);
-    currentItemAnimationState.opacityTimeline.clear();
+    currentItemAnimationState.opacityTimeline?.totalProgress(0);
+    currentItemAnimationState.opacityTimeline?.clear();
 
-    currentItemAnimationState.generalTimeline.totalProgress(0);
-    currentItemAnimationState.generalTimeline.clear();
+    currentItemAnimationState.positionTimeline?.totalProgress(0);
+    currentItemAnimationState.positionTimeline?.clear();
 
-    selectionAnimationState.opacityTimeline.totalProgress(0);
-    selectionAnimationState.opacityTimeline.clear();
+    currentItemAnimationState.sizeTimeline?.totalProgress(0);
+    currentItemAnimationState.sizeTimeline?.clear();
 
-    selectionAnimationState.pathTimeline.totalProgress(0);
-    selectionAnimationState.pathTimeline.clear();
+    currentItemAnimationState.scaleTimeline?.totalProgress(0);
+    currentItemAnimationState.scaleTimeline?.clear();
 
-    selectionAnimationState.generalTimeline.totalProgress(0);
-    selectionAnimationState.generalTimeline.clear();
+    selectionAnimationState.opacityTimeline?.totalProgress(0);
+    selectionAnimationState.opacityTimeline?.clear();
+
+    selectionAnimationState.pathTimeline?.totalProgress(0);
+    selectionAnimationState.pathTimeline?.clear();
+
+    selectionAnimationState.positionTimeline?.totalProgress(0);
+    selectionAnimationState.positionTimeline?.clear();
+
+    selectionAnimationState.sizeTimeline?.totalProgress(0);
+    selectionAnimationState.sizeTimeline?.clear();
 
     args.states.forEach(
       (state: AnimatedElementPlaybackState, index: number) => {
@@ -223,15 +256,17 @@ export abstract class AnimatedElement {
         this.controllerState.currentKeyframeIndex = state.index;
         this.updateCurrentAnimationState(
           args.updateType,
-          state.shape,
-          state.easeFn,
+          state.selector,
+          StateUpdateType.INDIVIDUAL_TWEENS === args.updateType
+            ? args.easeFn
+            : undefined,
           args.duration,
           isLastTween
         );
         this.updateSelectionState(
           args.updateType,
-          state.shape,
-          state.easeFn,
+          state.selector,
+          args.easeFn,
           args.duration
         );
       }
@@ -245,22 +280,31 @@ export abstract class AnimatedElement {
         {
           extent: 1,
           onUpdate: () => {
-            currentItemAnimationState.pathTimeline.totalProgress(
+            currentItemAnimationState.pathTimeline?.totalProgress(
               this.controllerState.playback.extent
             );
-            currentItemAnimationState.generalTimeline.totalProgress(
+            currentItemAnimationState.positionTimeline?.totalProgress(
               this.controllerState.playback.extent
             );
-            currentItemAnimationState.opacityTimeline.totalProgress(
+            currentItemAnimationState.sizeTimeline?.totalProgress(
               this.controllerState.playback.extent
             );
-            selectionAnimationState.opacityTimeline.totalProgress(
+            currentItemAnimationState.opacityTimeline?.totalProgress(
               this.controllerState.playback.extent
             );
-            selectionAnimationState.pathTimeline.totalProgress(
+            currentItemAnimationState.scaleTimeline?.totalProgress(
               this.controllerState.playback.extent
             );
-            selectionAnimationState.generalTimeline.totalProgress(
+            selectionAnimationState.opacityTimeline?.totalProgress(
+              this.controllerState.playback.extent
+            );
+            selectionAnimationState.pathTimeline?.totalProgress(
+              this.controllerState.playback.extent
+            );
+            selectionAnimationState.positionTimeline?.totalProgress(
+              this.controllerState.playback.extent
+            );
+            selectionAnimationState.sizeTimeline?.totalProgress(
               this.controllerState.playback.extent
             );
           },
@@ -274,12 +318,15 @@ export abstract class AnimatedElement {
 
       this.controllerState.playback.playbackTimeline.play();
     } else if (args.updateType === StateUpdateType.INDIVIDUAL_TWEENS) {
-      currentItemAnimationState.pathTimeline.play();
-      currentItemAnimationState.generalTimeline.play();
-      currentItemAnimationState.opacityTimeline.play();
-      selectionAnimationState.opacityTimeline.play();
-      selectionAnimationState.pathTimeline.play();
-      selectionAnimationState.generalTimeline.play();
+      currentItemAnimationState.sizeTimeline?.play();
+      currentItemAnimationState.scaleTimeline?.play();
+      currentItemAnimationState.pathTimeline?.play();
+      currentItemAnimationState.opacityTimeline?.play();
+      currentItemAnimationState.positionTimeline?.play();
+      selectionAnimationState.opacityTimeline?.play();
+      selectionAnimationState.pathTimeline?.play();
+      selectionAnimationState.positionTimeline?.play();
+      selectionAnimationState.sizeTimeline?.play();
     }
   }
 
@@ -343,9 +390,9 @@ export abstract class AnimatedElement {
         if (updateType === StateUpdateType.SET) {
           currentItemAnimationState.opacity = opacity;
         } else if (updateType === StateUpdateType.ANIMATE) {
-          currentItemAnimationState.opacityTimeline.clear();
+          currentItemAnimationState.opacityTimeline?.clear();
 
-          currentItemAnimationState.opacityTimeline.fromTo(
+          currentItemAnimationState.opacityTimeline?.fromTo(
             currentItemAnimationState,
             {
               opacity: 0,
@@ -356,9 +403,9 @@ export abstract class AnimatedElement {
             }
           );
 
-          currentItemAnimationState.opacityTimeline.play();
+          currentItemAnimationState.opacityTimeline?.play();
         } else {
-          currentItemAnimationState.opacityTimeline.fromTo(
+          currentItemAnimationState.opacityTimeline?.fromTo(
             currentItemAnimationState,
             {
               opacity: 0,
@@ -382,76 +429,76 @@ export abstract class AnimatedElement {
 
   updateSelectionState(
     updateType: StateUpdateType = StateUpdateType.SET,
-    elementArg?: SVGPrimitive,
+    selector?: string,
     easeFn?: any,
     duration?: number,
     isLastTween?: boolean
   ) {
-    if (!this.controllerState.activeSelection) return;
 
     const unscaledPosition =
       this.controllerState.unscaledData[
         this.controllerState.currentKeyframeIndex
       ];
 
-    const isSelected = this.controllerState.isSelected;
-    const newCurrentItemOpacity = isSelected ? 1 : 0.3;
-    const newSelectedItemOpacity = isSelected ? 1 : 0;
-
-    let element: SVGPrimitive | null;
+    const isSelected = this.controllerState.isSelected || !this.controllerState.activeSelection;
+    const newCurrentItemOpacity = isSelected
+      ? SELECTED_OPACITY
+      : UNSELECTED_OPACITY;
+    const newSelectedItemOpacity = isSelected && this.controllerState.activeSelection ? SELECTED_OPACITY : 0;
 
     const currentItemAnimationState = this.animationState.current;
     const selectionAnimationState = this.animationState.selection;
 
     // UPDATE POSITION AND DIMENSIONS
-    const results = this.handleSelection({
-      itemUnscaledPosition: unscaledPosition,
-    });
-    ({ element } = results);
-    const { position, dimensions } = results;
-
-    if (elementArg) {
-      element = elementArg;
-    }
+    const { element, position, dimensions, xSize, ySize } =
+      this.handleSelection({
+        itemUnscaledPosition: unscaledPosition,
+        selector,
+      });
 
     if (element) {
       const newPath = MorphSVGPlugin.convertToPath(element)[0];
       // if there's an active tween clear it
       if (updateType === StateUpdateType.SET) {
-        selectionAnimationState.path = newPath;
-        // @ts-expect-error the real path is a number[] but it seems to think its returning a string
-        selectionAnimationState.parsedPath =
-          MorphSVGPlugin.getRawPath(newPath)[0];
+        selectionAnimationState.path = {
+          rawPath: newPath,
+          parsedPath: MorphSVGPlugin.getRawPath(newPath),
+          xScale: xSize,
+          yScale: ySize,
+        };
 
         selectionAnimationState.position = position;
         selectionAnimationState.dimensions = dimensions;
         selectionAnimationState.opacity = newSelectedItemOpacity;
         currentItemAnimationState.opacity = newCurrentItemOpacity;
       } else if (updateType === StateUpdateType.ANIMATE) {
-        selectionAnimationState.pathTimeline.clear();
-        selectionAnimationState.opacityTimeline.clear();
-        selectionAnimationState.generalTimeline.clear();
-        currentItemAnimationState.opacityTimeline.clear();
+        selectionAnimationState.pathTimeline?.clear();
+        selectionAnimationState.opacityTimeline?.clear();
+        selectionAnimationState.positionTimeline?.clear();
+        selectionAnimationState.sizeTimeline?.clear();
+        currentItemAnimationState.opacityTimeline?.clear();
 
-        selectionAnimationState.pathTimeline.to(selectionAnimationState.path, {
-          morphSVG: {
-            shape: newPath,
-            render: (rawPath: any) => {
-              const path = rawPath[0];
-              selectionAnimationState.parsedPath = path;
+        selectionAnimationState.pathTimeline?.to(
+          selectionAnimationState.path.rawPath,
+          {
+            morphSVG: {
+              shape: newPath,
+              render: (rawPath: any) => {
+                selectionAnimationState.path.parsedPath = rawPath;
+              },
             },
-          },
-          duration,
-          ease: easeFn,
-        });
+            duration,
+            ease: easeFn,
+          }
+        );
 
-        selectionAnimationState.opacityTimeline.to(selectionAnimationState, {
+        selectionAnimationState.opacityTimeline?.to(selectionAnimationState, {
           opacity: newSelectedItemOpacity,
           duration,
           ease: easeFn,
         });
 
-        selectionAnimationState.generalTimeline.to(
+        selectionAnimationState.sizeTimeline?.to(
           selectionAnimationState.dimensions,
           {
             width: dimensions.width,
@@ -461,7 +508,7 @@ export abstract class AnimatedElement {
           }
         );
 
-        selectionAnimationState.generalTimeline.to(
+        selectionAnimationState.positionTimeline?.to(
           selectionAnimationState.position,
           {
             x: position.x,
@@ -471,7 +518,7 @@ export abstract class AnimatedElement {
           }
         );
 
-        currentItemAnimationState.opacityTimeline.to(
+        currentItemAnimationState.opacityTimeline?.to(
           currentItemAnimationState,
           {
             opacity: newCurrentItemOpacity,
@@ -480,30 +527,34 @@ export abstract class AnimatedElement {
           }
         );
 
-        selectionAnimationState.opacityTimeline.play();
-        selectionAnimationState.pathTimeline.play();
-        selectionAnimationState.generalTimeline.play();
-        currentItemAnimationState.opacityTimeline.play();
+        selectionAnimationState.opacityTimeline?.play();
+        selectionAnimationState.pathTimeline?.play();
+        selectionAnimationState.positionTimeline?.play();
+        selectionAnimationState.pathTimeline?.play();
+        currentItemAnimationState.opacityTimeline?.play();
       } else {
-        selectionAnimationState.pathTimeline.to(selectionAnimationState.path, {
-          morphSVG: {
-            shape: newPath,
-            render: (rawPath: any) => {
-              const path = rawPath[0];
-              selectionAnimationState.parsedPath = path;
+        selectionAnimationState.pathTimeline?.to(
+          selectionAnimationState.path.rawPath,
+          {
+            morphSVG: {
+              shape: newPath,
+              render: (rawPath: any) => {
+                const path = rawPath[0];
+                selectionAnimationState.path.parsedPath = rawPath;
+              },
             },
-          },
-          duration,
-          ease: easeFn,
-        });
+            duration,
+            ease: easeFn,
+          }
+        );
 
-        selectionAnimationState.opacityTimeline.to(selectionAnimationState, {
+        selectionAnimationState.opacityTimeline?.to(selectionAnimationState, {
           opacity: newSelectedItemOpacity,
           duration,
           ease: easeFn,
         });
 
-        selectionAnimationState.generalTimeline.to(
+        selectionAnimationState.sizeTimeline?.to(
           selectionAnimationState.dimensions,
           {
             width: dimensions.width,
@@ -513,7 +564,7 @@ export abstract class AnimatedElement {
           }
         );
 
-        selectionAnimationState.generalTimeline.to(
+        selectionAnimationState.positionTimeline?.to(
           selectionAnimationState.position,
           {
             x: position.x,
@@ -523,7 +574,7 @@ export abstract class AnimatedElement {
           }
         );
 
-        currentItemAnimationState.opacityTimeline.to(
+        currentItemAnimationState.opacityTimeline?.to(
           currentItemAnimationState,
           {
             opacity: newCurrentItemOpacity,
@@ -539,13 +590,13 @@ export abstract class AnimatedElement {
 
   updateCurrentAnimationState(
     updateType: StateUpdateType = StateUpdateType.SET,
-    elementArg?: SVGPrimitive,
-    easeFn?: any,
+    elementSelector?: string,
+    easeFn?: string,
     duration?: number,
     isLastTween?: boolean
   ) {
+    // console.log(easeFn);
     const FONT_SIZE = 16;
-    let element: SVGPrimitive | null;
     const unscaledPosition =
       this.controllerState.unscaledData[
         this.controllerState.currentKeyframeIndex
@@ -554,12 +605,11 @@ export abstract class AnimatedElement {
     const currentItemAnimationState = this.animationState.current;
 
     // UPDATE POSITION AND DIMENSIONS
-    const results = this.handleMainUpdate({
-      itemUnscaledPosition: unscaledPosition,
-    });
-
-    ({ element } = results);
-    const { position, dimensions } = results;
+    const { element, position, dimensions, xSize, ySize } =
+      this.handleMainUpdate({
+        itemUnscaledPosition: unscaledPosition,
+        selector: elementSelector,
+      });
 
     let label = currentItemAnimationState.label;
 
@@ -574,10 +624,6 @@ export abstract class AnimatedElement {
       currentItemAnimationState.label = label;
     }
 
-    if (elementArg) {
-      element = elementArg;
-    }
-
     if (element) {
       const newPath = MorphSVGPlugin.convertToPath(element)[0];
       // if there's an active tween clear it
@@ -585,25 +631,29 @@ export abstract class AnimatedElement {
 
       // if there's an active tween clear it
       if (updateType === StateUpdateType.SET) {
-        currentItemAnimationState.path = newPath;
-        // @ts-expect-error the real path is a number[] but it seems to think its returning a string
-        currentItemAnimationState.parsedPath =
-          MorphSVGPlugin.getRawPath(newPath)[0];
+        currentItemAnimationState.path = {
+          rawPath: newPath,
+          parsedPath: MorphSVGPlugin.getRawPath(newPath),
+          xScale: xSize,
+          yScale: ySize,
+        };
 
         currentItemAnimationState.position = position;
         currentItemAnimationState.dimensions = dimensions;
       } else if (updateType === StateUpdateType.ANIMATE) {
-        currentItemAnimationState.pathTimeline.clear();
-        currentItemAnimationState.generalTimeline.clear();
+        currentItemAnimationState.sizeTimeline?.clear();
+        currentItemAnimationState.scaleTimeline?.clear();
+        currentItemAnimationState.positionTimeline?.clear();
+        currentItemAnimationState.pathTimeline?.clear();
 
-        currentItemAnimationState.pathTimeline.to(
-          currentItemAnimationState.path,
+        currentItemAnimationState.pathTimeline?.to(
+          currentItemAnimationState.path.rawPath,
           {
             morphSVG: {
               shape: newPath,
               render: (rawPath: any) => {
                 const path = rawPath[0];
-                currentItemAnimationState.parsedPath = path;
+                currentItemAnimationState.path.parsedPath = rawPath;
               },
             },
             duration,
@@ -611,7 +661,7 @@ export abstract class AnimatedElement {
           }
         );
 
-        currentItemAnimationState.generalTimeline.to(
+        currentItemAnimationState.positionTimeline?.to(
           currentItemAnimationState.position,
           {
             x: position.x,
@@ -621,24 +671,68 @@ export abstract class AnimatedElement {
           }
         );
 
-        currentItemAnimationState.pathTimeline.play();
-        currentItemAnimationState.generalTimeline.play();
-      } else {
-        currentItemAnimationState.pathTimeline.to(
-          currentItemAnimationState.path,
+        currentItemAnimationState.sizeTimeline?.to(
+          currentItemAnimationState.dimensions,
           {
-            morphSVG: {
-              shape: newPath,
-              render: (rawPath: any) => {
-                const path = rawPath[0];
-                currentItemAnimationState.parsedPath = path;
-              },
-            },
+            width: dimensions.width,
+            height: dimensions.height,
             duration,
             ease: easeFn,
           }
         );
-        currentItemAnimationState.generalTimeline.to(
+
+        currentItemAnimationState.scaleTimeline?.to(
+          currentItemAnimationState.path,
+          {
+            xScale: xSize,
+            yScale: ySize,
+            duration,
+            ease: easeFn,
+          }
+        );
+
+        currentItemAnimationState.sizeTimeline?.play();
+        currentItemAnimationState.scaleTimeline?.play();
+        currentItemAnimationState.positionTimeline?.play();
+        currentItemAnimationState.pathTimeline?.play();
+      } else {
+        currentItemAnimationState.pathTimeline?.to(
+          currentItemAnimationState.path.rawPath,
+          {
+            morphSVG: {
+              shape: newPath,
+              render: (rawPath: any) => {
+                // console.log(rawPath);
+                const path = rawPath[0];
+                currentItemAnimationState.path.parsedPath = rawPath;
+              },
+            },
+            duration: duration ? duration * 0.6 : 1,
+            ease: "sine.inOut",
+          }
+        );
+
+        currentItemAnimationState.sizeTimeline?.to(
+          currentItemAnimationState.dimensions,
+          {
+            width: dimensions.width,
+            height: dimensions.height,
+            duration,
+            ease: easeFn,
+          }
+        );
+
+        currentItemAnimationState.scaleTimeline?.to(
+          currentItemAnimationState.path,
+          {
+            xScale: xSize,
+            yScale: ySize,
+            duration: duration ? duration * 0.6 : 1,
+            ease: "sine.inOut",
+          }
+        );
+
+        currentItemAnimationState.positionTimeline?.to(
           currentItemAnimationState.position,
           {
             x: position.x,
@@ -704,14 +798,6 @@ export abstract class AnimatedElement {
     }
 
     this.updateSelectionState(StateUpdateType.ANIMATE);
-  }
-
-  generateElementPath(element: any) {
-    const svgPath = MorphSVGPlugin.convertToPath(element);
-    const data = MorphSVGPlugin.getRawPath(svgPath[0]) as any;
-    const path = data[0];
-
-    return path;
   }
 
   draw() {

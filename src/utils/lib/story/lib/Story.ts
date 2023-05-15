@@ -10,6 +10,7 @@ import {
   ChartType,
   Chart,
   type Coordinate2D,
+  ThumbPoseListener,
 } from "@/utils";
 import { parse, stringify } from "flatted";
 
@@ -19,6 +20,7 @@ export type StoryLayer =
   | PointPoseListener
   | OpenHandPoseListener
   | StrokeListener
+  | ThumbPoseListener
   | Chart;
 
 export type LayerType = ChartType | ListenerType;
@@ -75,6 +77,7 @@ export class Story {
             };
           }
           case ListenerType.OPEN_HAND_POSE: {
+            console.log({arg});
             return {
               type,
               id,
@@ -93,6 +96,13 @@ export class Story {
               type,
               id,
               layer: new RangePoseListener(arg),
+            };
+          }
+          case ListenerType.THUMB_POSE: {
+            return {
+              type,
+              id,
+              layer: new ThumbPoseListener(arg),
             };
           }
           case ListenerType.STROKE_LISTENER: {
@@ -141,7 +151,7 @@ export class Story {
       this.layers = [{ type, id, layer }, ...this.layers];
     }
 
-    localStorage.setItem(this.title, stringify(this.layers));
+    this.saveLayers();
 
     return {
       type,
@@ -150,10 +160,15 @@ export class Story {
     };
   }
 
+  saveLayers() {
+    localStorage.setItem(this.title, stringify(this.layers));
+  }
+
   removeLayer(layerId: string) {
     const updatedLayers = this.layers.filter((layer) => layer.id !== layerId);
     this.layers = updatedLayers;
 
+    this.saveLayers();
     return this.layers;
   }
 

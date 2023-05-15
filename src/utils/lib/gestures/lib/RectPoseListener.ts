@@ -13,6 +13,7 @@ import {
   DEFAULT_POSE_DURATION,
   DEFAULT_RESET_PAUSE_DURATION,
   SupportedGestures,
+  AffectOptions,
 } from "@/utils";
 
 const REFERENCE_POINT_BOUNDS = 30;
@@ -81,10 +82,6 @@ export class RectPoseListener extends GestureListener {
   }
 
   resetHandler(): void {
-    this.publishToSubjectIfExists(
-      GestureListener.foreshadowingAreaSubjectKey,
-      undefined
-    );
     this.resetGestureState();
   }
 
@@ -227,10 +224,10 @@ export class RectPoseListener extends GestureListener {
           );
 
           if (isInPlaceRight && isInPlaceLeft) {
-            const foreshadowingArea = this.state.useBounds
+            const bounds = this.state.useBounds
               ? this.getRectDataFromState()
               : undefined;
-            this.publishToSubject(foreshadowingArea);
+            this.publishToSubject(bounds, AffectOptions.NEUTRAL);
             this.resetTimer(this.state.resetPauseDuration);
           } else {
             this.resetTimer();

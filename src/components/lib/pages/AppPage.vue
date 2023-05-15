@@ -35,6 +35,7 @@ import {
   RangePoseListener,
   OpenHandPoseListener,
   PointPoseListener,
+  ThumbPoseListener,
 } from "@/utils";
 
 enum AvailableWidgets {
@@ -50,6 +51,7 @@ enum AvailableWidgets {
   RANGE_POSE = "range-pose",
   POINT_POSE = "point-pose",
   OPEN_HAND_POSE = "open-hand-pose",
+  THUMB_POSE = "thumb-touch",
   STROKE_LISTENER = "stroke-listener",
 }
 
@@ -65,6 +67,11 @@ const currentTab = ref<SettingsTab | null>();
 const chartType = ref<ChartType | undefined>();
 const disableChartType = computed(() => {
   return StorySettings.currentStory === undefined;
+});
+const disablePoses = computed(() => {
+  const charts = StorySettings.currentStory?.getCharts();
+
+  return !(charts && charts.length > 0);
 });
 
 function handleSaveChart() {
@@ -130,6 +137,12 @@ function handleAddWidget(value: {
           ListenerType.OPEN_HAND_POSE
         );
         break;
+      case AvailableWidgets.THUMB_POSE:
+        handleGestureWidget(
+          SettingsTab.WIDGET_SETTINGS,
+          ListenerType.THUMB_POSE
+        );
+        break;
       case AvailableWidgets.STROKE_LISTENER:
         handleGestureWidget(
           SettingsTab.WIDGET_SETTINGS,
@@ -191,6 +204,18 @@ function addWidget(type: string) {
     }
     case ListenerType.OPEN_HAND_POSE: {
       const newListener = new OpenHandPoseListener({
+        position: { x: 0, y: 0 },
+        dimensions: { width: 50, height: 50 },
+        canvasDimensions: CanvasSettings.dimensions,
+        resetKeys: getGestureListenerResetKeys(),
+        drawingUtils,
+      });
+
+      StorySettings.currentStory?.addLayer(type, newListener);
+      break;
+    }
+    case ListenerType.THUMB_POSE: {
+      const newListener = new ThumbPoseListener({
         position: { x: 0, y: 0 },
         dimensions: { width: 50, height: 50 },
         canvasDimensions: CanvasSettings.dimensions,
@@ -303,7 +328,7 @@ onMounted(() => {
                 :prepend-icon="widgetIconMap['rect-pose']"
                 :value="AvailableWidgets.RECT_POSE"
                 v-bind="props"
-                :disabled="disableChartType"
+                :disabled="disablePoses"
               >
               </v-list-item>
             </template>
@@ -315,7 +340,7 @@ onMounted(() => {
                 :prepend-icon="widgetIconMap['range-pose']"
                 :value="AvailableWidgets.RANGE_POSE"
                 v-bind="props"
-                :disabled="disableChartType"
+                :disabled="disablePoses"
               >
               </v-list-item>
             </template>
@@ -327,7 +352,7 @@ onMounted(() => {
                 :prepend-icon="widgetIconMap['point-pose']"
                 :value="AvailableWidgets.POINT_POSE"
                 v-bind="props"
-                :disabled="disableChartType"
+                :disabled="disablePoses"
               >
               </v-list-item>
             </template>
@@ -339,7 +364,19 @@ onMounted(() => {
                 :prepend-icon="widgetIconMap['open-hand-pose']"
                 :value="AvailableWidgets.OPEN_HAND_POSE"
                 v-bind="props"
-                :disabled="disableChartType"
+                :disabled="disablePoses"
+              >
+              </v-list-item>
+            </template>
+          </v-tooltip>
+
+          <v-tooltip text="Thumb Pose Widget">
+            <template v-slot:activator="{ props }">
+              <v-list-item
+                :prepend-icon="widgetIconMap['thumb-pose']"
+                :value="AvailableWidgets.THUMB_POSE"
+                v-bind="props"
+                :disabled="disablePoses"
               >
               </v-list-item>
             </template>
@@ -351,7 +388,7 @@ onMounted(() => {
                 :prepend-icon="widgetIconMap['stroke-listener']"
                 :value="AvailableWidgets.STROKE_LISTENER"
                 v-bind="props"
-                :disabled="disableChartType"
+                :disabled="disablePoses"
               >
               </v-list-item>
             </template>

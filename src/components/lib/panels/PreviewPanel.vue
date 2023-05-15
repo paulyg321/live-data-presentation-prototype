@@ -1,39 +1,33 @@
 <script setup lang="ts">
 import {
   playbackSubject,
-  PlaybackSubjectType,
   foreshadowingAreaSubject,
   snackbarSubject,
   CanvasEvent,
-  highlightSubject,
-  Chart,
   selectionSubject,
+  type PlaybackSettingsConfig,
+  StateUpdateType,
+  type AnimatedElementPlaybackArgs,
 } from "@/utils";
-import { onMounted, ref, watch } from "vue";
-import {
-  ChartSettings,
-  PlaybackType,
-  CanvasSettings,
-  StorySettings,
-} from "@/state";
+import { onMounted, ref } from "vue";
+import { ChartSettings, CanvasSettings, StorySettings } from "@/state";
 import { CanvasWrapper, VideoCanvas, AppCanvas } from "@/components";
-
+import * as d3 from "d3";
 import { gsap } from "gsap";
 import { MorphSVGPlugin } from "gsap/MorphSVGPlugin";
+import { CustomEase } from "gsap/CustomEase";
 gsap.registerPlugin(MorphSVGPlugin);
+gsap.registerPlugin(CustomEase);
 
+const path = ref<string>("");
 const snackbar = ref<boolean>(false);
 const snackbarText = ref<string>("");
 const snackbarVariant = ref<string>("");
-
-highlightSubject.subscribe({
-  next(value: any) {
-    StorySettings.currentStory?.getCharts().map((chart: Chart) => {
-      // chart.chart?.updateState({
-      //   highlightPosition: value,
-      // });
-    });
-  },
+const endKeyframe = ref<number>();
+const playbackConfig = ref<PlaybackSettingsConfig>({
+  duration: 5,
+  easeFn: "none",
+  playbackMode: StateUpdateType.GROUP_TIMELINE,
 });
 
 snackbarSubject.subscribe({
@@ -58,30 +52,32 @@ selectionSubject.subscribe({
 
 // PLAYBACK CONTROLS
 playbackSubject.subscribe({
-  next(playbackValue: any) {
-    if (!playbackValue) {
-      if (ChartSettings.playbackTimer) {
-        ChartSettings.resetTimer();
+  next(config: any) {
+    if (config.type === "keyframe") {
+      endKeyframe.value = config.data;
+    } else {
+      playbackConfig.value = config.data;
+      if (config.data.svg) {
+        path.value = config.data.svg;
+        const element = d3
+          .select("path")
+          .attr("id", "st0")
+          .attr("d", config.data.svg);
       }
-      return;
-    }
 
-    const { type, value } = playbackValue;
+      const charts = StorySettings.currentStory?.getCharts();
+      if (!charts) return;
 
-    if (type === PlaybackSubjectType.DISCRETE) {
-      ChartSettings.setPlaybackExtent(value);
-    }
-
-    if (type === PlaybackSubjectType.CONTINUOUS) {
-      // USE CHECKBOX TO CHANGE ALL TO NEXT AND VICE VERSA
-      const affect = playbackValue.affect;
-      const duration = playbackValue.duration;
-      ChartSettings.handlePlay(
-        ChartSettings.playbackType,
-        value,
-        affect,
-        duration
-      );
+      charts.forEach((chart) => {
+        const args = chart.state.chart?.processPlaybackSubscriptionData(
+          playbackConfig.value,
+          endKeyframe.value,
+          path.value ? "#st0" : undefined
+        );
+        if (args) {
+          chart.state.chart?.play(args as AnimatedElementPlaybackArgs);
+        }
+      });
     }
   },
 });
@@ -145,17 +141,29 @@ onMounted(() => {
 </script>
 <!---------------------------------------------------------------------------------------------------------->
 <template>
+  <!-- <v-btn @click="() => ChartSettings.handlePlay()">HII</v-btn> -->
   <CanvasWrapper
     :width="CanvasSettings.dimensions.width"
     :height="CanvasSettings.dimensions.height"
     v-slot="{ className }"
   >
     <svg
-      id="test-svg"
+      id="drawing-board"
       :width="CanvasSettings.dimensions.width"
       :height="CanvasSettings.dimensions.height"
-      :class="className"
-    ></svg>
+      :className="className"
+      ref="svg"
+    >
+      <rect id="rect" />
+      <circle id="circle" />
+
+      <path />
+      <!-- <path
+        id="st0"
+        fill="#231F20"
+        d="M60,20h-4v-4.031c0-2.211-1.789-4-4-4H4c-2.211,0-4,1.789-4,4V48c0,2.211,1.789,4,4,4h48 c2.211,0,4-1.789,4-4v-4h4c2.211,0,4-1.789,4-4V24C64,21.789,62.211,20,60,20z M32,40H12V24h28L32,40z"
+      ></path> -->
+    </svg>
     <VideoCanvas id="default" :className="className" />
     <AppCanvas
       v-for="key in ['preview']"
@@ -183,5 +191,9 @@ onMounted(() => {
 
 canvas {
   border: 2px solid #9e9e9e;
+}
+
+#drawing-board {
+  opacity: 0;
 }
 </style>

@@ -30,7 +30,7 @@ export const MAX_DOMAIN_Y = 6;
 // included
 export const MIN_DOMAIN_Y = 1;
 
-const colorArray = d3["schemeCategory10"];
+const colorArray = d3["schemeTableau10"];
 
 export enum ChartType {
   LINE = "line",

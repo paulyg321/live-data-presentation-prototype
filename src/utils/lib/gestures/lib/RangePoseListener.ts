@@ -13,6 +13,7 @@ import {
   DEFAULT_POSE_DURATION,
   DEFAULT_RESET_PAUSE_DURATION,
   SupportedGestures,
+  AffectOptions,
 } from "@/utils";
 
 const REFERENCE_POINT_BOUNDS = 30;
@@ -236,7 +237,7 @@ export class RangePoseListener extends GestureListener {
             const foreshadowingArea = this.state.useBounds
               ? this.getRangeDataFromState()
               : undefined;
-            this.publishToSubject(foreshadowingArea);
+            this.publishToSubject(foreshadowingArea, AffectOptions.NEUTRAL);
             this.resetTimer(this.state.resetPauseDuration);
           } else {
             this.resetTimer();

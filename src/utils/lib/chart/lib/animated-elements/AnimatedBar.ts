@@ -11,6 +11,8 @@ import {
   type HandleSelectionArgs,
   type HandleSelectionReturnValue,
   type VisualState,
+  type SVGPrimitive,
+  FORESHADOW_OPACITY,
 } from "@/utils";
 
 export class AnimatedBar extends AnimatedElement {
@@ -92,7 +94,7 @@ export class AnimatedBar extends AnimatedElement {
       const isBelowLastValue = circleBounds.y > maxBottom;
 
       if (!isOffChart) {
-        opacity = 1;
+        opacity = FORESHADOW_OPACITY;
         // is next index
         itemAnimationState.label = {
           position: {
@@ -165,7 +167,7 @@ export class AnimatedBar extends AnimatedElement {
     let shouldPulse = false;
     if (index === finalForeshadowingIndex && isForeshadowed) {
       shouldPulse = true;
-      opacity = 1;
+      opacity = FORESHADOW_OPACITY;
       const [_, endYrange] = this.controllerState.yScale.range() as number[];
       const [startXrange, endXrange] =
         this.controllerState.xScale.range() as number[];
@@ -260,44 +262,51 @@ export class AnimatedBar extends AnimatedElement {
       y: position.y - padding,
     };
 
-    const rectElement = d3
-      .select("#test-svg")
-      .append("rect")
-      .attr("x", () => modifiedPosition.x)
-      .attr("y", () => modifiedPosition.y)
-      .attr("width", () => modifiedDimensions.width)
-      .attr("height", () => modifiedDimensions.height)
-      .node();
+    const element = d3
+      .select(args.selector ?? "#rect")
+      .clone()
+      .attr("id", "remove")
+      .attr("x", 0)
+      .attr("y", 0)
+      .attr("width", 1)
+      .attr("height", 1)
+      .node() as SVGPrimitive;
 
     return {
-      element: rectElement,
+      element,
       position: modifiedPosition,
       dimensions: modifiedDimensions,
+      xSize: element.getBoundingClientRect().width,
+      ySize: element.getBoundingClientRect().height,
     };
   }
 
   handleMainUpdate(args: HandleSelectionArgs): HandleSelectionReturnValue {
-    const { itemUnscaledPosition } = args;
     const { rectDimensions, topLeft: position } =
       AnimatedBar.createRectDataFromCoordinate({
-        coordinate: itemUnscaledPosition,
+        coordinate: args.itemUnscaledPosition,
         xScale: this.controllerState.xScale,
         yScale: this.controllerState.yScale,
       });
 
-    const rectElement = d3
-      .select("#test-svg")
-      .append("rect")
-      .attr("x", () => position.x)
-      .attr("y", () => position.y)
-      .attr("width", () => rectDimensions.width)
-      .attr("height", () => rectDimensions.height)
-      .node();
+    const element = d3
+      .select(args.selector ?? "#rect")
+      .clone()
+      .attr("id", "remove")
+      .attr("x", 0)
+      .attr("y", 0)
+      .attr("width", 1)
+      .attr("height", 1)
+      .node() as SVGPrimitive;
+
+    const elementSize = element?.getBoundingClientRect();
 
     return {
-      element: rectElement,
-      position: position,
+      element,
+      position,
       dimensions: rectDimensions,
+      xSize: elementSize.width,
+      ySize: elementSize.height,
     };
   }
 
@@ -365,14 +374,9 @@ export class AnimatedBar extends AnimatedElement {
 
   drawCurrentState() {
     const color = this.animationState.color;
-    const {
-      opacity,
-      parsedPath: path,
-      label,
-      position,
-      dimensions,
-    } = this.animationState.current;
-    const { opacity: selectionOpacity, parsedPath: selectionPath } =
+    const { opacity, path, label, position, dimensions } =
+      this.animationState.current;
+    const { opacity: selectionOpacity, path: selectionPath } =
       this.animationState.selection;
 
     const textPosition = {
@@ -382,21 +386,30 @@ export class AnimatedBar extends AnimatedElement {
 
     if (!path) return;
 
-    this.controllerState.drawingUtils.modifyContextStyleAndDraw(
-      {
-        strokeStyle: color,
-        fillStyle: color,
-        opacity,
-      },
-      (context: CanvasRenderingContext2D) => {
-        this.controllerState.clipBoundaries(context);
-        this.controllerState.drawingUtils.drawPath({
-          path,
-          mode: "fill",
-          context,
-        });
-      }
-    );
+    path.parsedPath.forEach((parsedPath: any, index: number) => {
+      this.controllerState.drawingUtils.modifyContextStyleAndDraw(
+        {
+          strokeStyle: color,
+          // fillStyle: color,
+          fillStyle: index % 2 === 0 ? color : "white",
+          opacity,
+          shadow: !(selectionPath && selectionOpacity),
+        },
+        (context: CanvasRenderingContext2D) => {
+          this.controllerState.clipBoundaries(context);
+          context.translate(position.x, position.y);
+          context.scale(
+            dimensions.width / path.xScale,
+            dimensions.height / path.yScale
+          );
+          this.controllerState.drawingUtils.drawPath({
+            path: parsedPath,
+            mode: "fill",
+            context,
+          });
+        }
+      );
+    });
 
     if (label) {
       this.controllerState.drawingUtils.modifyContextStyleAndDraw(
@@ -423,10 +436,11 @@ export class AnimatedBar extends AnimatedElement {
           strokeStyle: "white",
           opacity: selectionOpacity,
           lineWidth: 3,
+          shadow: true,
         },
         (context: CanvasRenderingContext2D) => {
           this.controllerState.drawingUtils.drawPath({
-            path: selectionPath,
+            path: selectionPath.parsedPath,
             mode: "stroke",
             context,
           });

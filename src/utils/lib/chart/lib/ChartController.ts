@@ -16,8 +16,10 @@ import {
   drawYAxis,
   StateUpdateType,
   AnimatedCircle,
+  type PlaybackSettingsConfig,
 } from "@/utils";
 import { markRaw } from "vue";
+import _ from "lodash";
 
 export interface AnimationChartElementData {
   x: number;
@@ -27,7 +29,7 @@ export interface AnimationChartElementData {
 
 export interface AnimatedElementPlaybackState {
   index: number;
-  shape?: any;
+  selector?: string;
   easeFn?: any;
 }
 
@@ -98,6 +100,8 @@ export interface ChartsControllerState {
   playbackTimeline?: ReturnType<typeof gsap.timeline>;
   playbackExtent: number;
   currentKeyframeIndex: number;
+  endKeyframeIndex: number;
+  playbackArgs?: AnimatedElementPlaybackArgs;
 }
 
 export type D3ScaleTypes =
@@ -140,10 +144,6 @@ export class ChartController {
       return;
     }
 
-    const activeSelection = Boolean(
-      this.state.currentSelection && this.state.currentSelection.length > 0
-    );
-
     // UTILITY FUNCTIONS FOR "upsertAnimatedItems"
     const getForeshadowingInfo = (key: string) => {
       let isForeshadowed;
@@ -166,6 +166,9 @@ export class ChartController {
       };
     };
 
+    const activeSelection = Boolean(
+      this.state.currentSelection && this.state.currentSelection.length > 0
+    );
     const getSelectionInfo = (key: string) => {
       return {
         isSelected: this.state.currentSelection?.includes(key) ?? false,
@@ -281,11 +284,34 @@ export class ChartController {
     }
   }
 
+  processPlaybackSubscriptionData(
+    playbackConfig: PlaybackSettingsConfig,
+    endKeyframe?: number,
+    selector?: string
+  ) {
+    return {
+      states: _.range(
+        this.state.currentKeyframeIndex,
+        endKeyframe ?? this.state.currentKeyframeIndex + 1
+      ).map((value: number) => {
+        return {
+          index: value,
+          selector: selector,
+        };
+      }),
+      duration: playbackConfig?.duration ?? 5,
+      easeFn: playbackConfig?.easeFn,
+      updateType:
+        playbackConfig?.playbackMode ?? StateUpdateType.GROUP_TIMELINE,
+    };
+  }
+
   play(
     args: {
       keys?: string[];
     } & AnimatedElementPlaybackArgs
   ) {
+    // console.log(args);
     this.state.animatedElements
       ?.filter((element) => {
         if (!args.keys) return true;
@@ -303,23 +329,30 @@ export class ChartController {
       this.state.keyframeTimeline?.to(this.state, {
         currentKeyframeIndex: state.index,
         duration: args.duration,
-        ease: args.easeFn,
+        ...(StateUpdateType.INDIVIDUAL_TWEENS === args.updateType
+          ? { ease: args.easeFn }
+          : {}),
       });
     });
 
     if (args.updateType === StateUpdateType.GROUP_TIMELINE) {
       this.state.playbackTimeline?.clear();
-      this.state.playbackTimeline?.to(this.state, {
-        playbackExtent: 1,
-        onUpdate: () => {
-          this.state.keyframeTimeline?.totalProgress(this.state.playbackExtent);
+      this.state.playbackTimeline?.fromTo(
+        this.state,
+        {
+          playbackExtent: 0,
         },
-        onComplete: () => {
-          this.state.playbackExtent = 0;
-        },
-        duration: args.duration,
-        ease: args.easeFn,
-      });
+        {
+          playbackExtent: 1,
+          onUpdate: () => {
+            this.state.keyframeTimeline?.totalProgress(
+              this.state.playbackExtent
+            );
+          },
+          duration: args.duration,
+          ease: args.easeFn,
+        }
+      );
 
       this.state.playbackTimeline?.play();
     } else if (args.updateType === StateUpdateType.INDIVIDUAL_TWEENS) {
@@ -600,9 +633,10 @@ export class ChartController {
       this.state.drawingUtils.modifyContextStyleAndDraw(
         {
           fontSize: this.state.dimensions.width * 0.15,
-          opacity: 0.2,
-          fillStyle: "red",
+          opacity: 0.7,
+          fillStyle: "#fc036b",
           textAlign: "right",
+          shadow: true,
         },
         (context) => {
           this.state.drawingUtils.drawText({
@@ -639,7 +673,10 @@ export class ChartController {
         3,
         undefined,
         false,
-        true
+        true,
+        {
+          shadow: true
+        }
       );
     }
 
@@ -650,7 +687,8 @@ export class ChartController {
           {
             fontSize: FONT_SIZE,
             bold: true,
-            strokeStyle: "black",
+            fillStyle: "white",
+            shadow: true,
           },
           (context: CanvasRenderingContext2D) => {
             if (this.state.xScale && this.state.yScale) {
@@ -700,7 +738,8 @@ export class ChartController {
         3,
         undefined,
         false,
-        true
+        true,
+        { shadow: true }
       );
       drawYAxis(
         this.state.drawingUtils,
@@ -711,7 +750,8 @@ export class ChartController {
         5,
         undefined,
         false,
-        true
+        true,
+        { shadow: true }
       );
     }
   }

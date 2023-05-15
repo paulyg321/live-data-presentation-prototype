@@ -10,6 +10,7 @@ import {
   type HandleSelectionArgs,
   type HandleSelectionReturnValue,
   type VisualState,
+  type SVGPrimitive,
 } from "@/utils";
 
 const RADIUS = 10;
@@ -146,18 +147,23 @@ export class AnimatedCircle extends AnimatedElement {
       height: RADIUS + padding,
     };
 
-    const circleElement = d3
-      .select("#test-svg")
-      .append("circle")
-      .attr("cx", () => position.x)
-      .attr("cy", () => position.y)
-      .attr("r", () => RADIUS)
-      .node();
+    const element = d3
+      .select(args.selector ?? "#circle")
+      .clone()
+      .attr("id", "remove")
+      .attr("cx", 0)
+      .attr("cy", 0)
+      .attr("r", 1)
+      .attr("width", 1)
+      .attr("height", 1)
+      .node() as SVGPrimitive;
 
     return {
-      element: circleElement,
+      element,
       position,
       dimensions: modifiedDimensions,
+      xSize: element.getBoundingClientRect().width,
+      ySize: element.getBoundingClientRect().height,
     };
   }
 
@@ -169,53 +175,63 @@ export class AnimatedCircle extends AnimatedElement {
     };
 
     const dimensions = {
-      width: RADIUS,
-      height: RADIUS,
+      width: RADIUS * 2,
+      height: RADIUS * 2,
     };
 
-    const circleElement = d3
-      .select("#test-svg")
-      .append("circle")
-      .attr("cx", () => position.x)
-      .attr("cy", () => position.y)
-      .attr("r", () => RADIUS)
-      .node();
+    const element = d3
+      .select(args.selector ?? "#circle")
+      .clone()
+      .attr("id", "remove")
+      .attr("cx", 0)
+      .attr("cy", 0)
+      .attr("r", 1)
+      .attr("width", 1)
+      .attr("height", 1)
+      .node() as SVGPrimitive;
 
+    console.log(element.getBoundingClientRect().width);
     return {
-      element: circleElement,
+      element,
       position,
       dimensions,
+      xSize: element.getBoundingClientRect().width,
+      ySize: element.getBoundingClientRect().height,
     };
   }
 
   drawCurrentState() {
     const color = this.animationState.color;
-    const {
-      opacity,
-      parsedPath: path,
-      label,
-      position,
-      dimensions,
-    } = this.animationState.current;
-    const { opacity: selectionOpacity, parsedPath: selectionPath } =
+    const { opacity, path, label, position, dimensions } =
+      this.animationState.current;
+    const { opacity: selectionOpacity, path: selectionPath } =
       this.animationState.selection;
 
     if (!path) return;
 
-    this.controllerState.drawingUtils.modifyContextStyleAndDraw(
-      {
-        strokeStyle: color,
-        fillStyle: color,
-        opacity,
-      },
-      (context: CanvasRenderingContext2D) => {
-        this.controllerState.drawingUtils.drawPath({
-          path,
-          mode: "fill",
-          context,
-        });
-      }
-    );
+    path.parsedPath.forEach((parsedPath: any, index: number) => {
+      this.controllerState.drawingUtils.modifyContextStyleAndDraw(
+        {
+          strokeStyle: color,
+          // fillStyle: color,
+          fillStyle: index % 2 === 0 ? color : "white",
+          opacity,
+          shadow: !(selectionPath && selectionOpacity),
+        },
+        (context: CanvasRenderingContext2D) => {
+          context.translate(position.x, position.y);
+          context.scale(
+            dimensions.width / path.xScale,
+            dimensions.height / path.yScale
+          );
+          this.controllerState.drawingUtils.drawPath({
+            path: parsedPath,
+            mode: "fill",
+            context,
+          });
+        }
+      );
+    });
 
     if (selectionPath && selectionOpacity) {
       this.controllerState.drawingUtils.modifyContextStyleAndDraw(
@@ -223,10 +239,11 @@ export class AnimatedCircle extends AnimatedElement {
           strokeStyle: "white",
           opacity: selectionOpacity,
           lineWidth: 3,
+          shadow: true,
         },
         (context: CanvasRenderingContext2D) => {
           this.controllerState.drawingUtils.drawPath({
-            path: selectionPath,
+            path: selectionPath.parsedPath,
             mode: "stroke",
             context,
           });

@@ -7,7 +7,7 @@ import {
   type ListenerProcessedFingerData,
   SupportedGestures,
   DEFAULT_TRIGGER_DURATION,
-  Affect,
+  AffectOptions,
 } from "@/utils";
 
 export type StrokeListenerConstructorArgs = GestureListenerConstructorArgs;
@@ -33,6 +33,7 @@ export class StrokeListener extends GestureListener {
     strokeTriggerName = "radial",
     triggerDuration = DEFAULT_TRIGGER_DURATION,
     numHands = 1,
+    ...rest
   }: StrokeListenerConstructorArgs) {
     super({
       position,
@@ -49,6 +50,7 @@ export class StrokeListener extends GestureListener {
       triggerDuration,
       numHands,
       trackedFingers,
+      ...rest,
     });
   }
 
@@ -57,9 +59,9 @@ export class StrokeListener extends GestureListener {
     const oneThirdRadius = radius * (1 / 3);
     const twoThirdRadius = radius * (2 / 3);
 
-    if (distance <= oneThirdRadius) return Affect.TENDERNESS;
-    if (distance <= twoThirdRadius) return Affect.EXCITEMENT;
-    return Affect.JOY;
+    if (distance <= oneThirdRadius) return AffectOptions.NEGATIVE;
+    if (distance <= twoThirdRadius) return AffectOptions.NEUTRAL;
+    return AffectOptions.POSITIVE;
   }
 
   private getCenterPoint(): Coordinate2D {
@@ -195,7 +197,7 @@ export class StrokeListener extends GestureListener {
             affect = this.convertDistanceToAffect(fit.radius);
           }
 
-          this.publishToSubject();
+          this.publishToSubject(undefined, affect);
           GestureListener.circleFitter.resetPoints();
         }
       }

@@ -7,11 +7,19 @@ import {
   ListenerType,
 } from "@/utils";
 import { StorySettings, GestureSettingsState } from "@/state";
-import { ForeshadowingSettings, PlaybackSettings, SelectionSettings } from "@/components";
+import {
+  ForeshadowingSettings,
+  PlaybackSettings,
+  SelectionSettings,
+  KeyframeSettings,
+} from "@/components";
 const currentWidget = ref<GestureListener>();
 const widgetType = ref<ListenerType>();
+const keyframes = ref<string[]>();
 
 watchEffect(() => {
+  // console.log(StorySettings.currentStory?.getCharts()[0].state.keyframes);
+  keyframes.value = StorySettings.currentStory?.getCharts()[0].state.keyframes;
   widgetType.value = StorySettings.currentStory?.currentWidget
     ?.type as ListenerType;
   currentWidget.value = StorySettings.currentStory?.currentWidget
@@ -35,6 +43,9 @@ const currentTitle = computed(() => {
 watch(currentWidget, () => {
   if (!currentWidget.value) return;
 
+  console.log({
+    currentWidget: currentWidget.value,
+  });
   if (
     [
       ListenerType.RECT_POSE,
@@ -42,6 +53,7 @@ watch(currentWidget, () => {
       ListenerType.POINT_POSE,
       ListenerType.OPEN_HAND_POSE,
       ListenerType.STROKE_LISTENER,
+      ListenerType.THUMB_POSE,
     ].includes(StorySettings.currentStory?.currentWidget?.type as ListenerType)
   ) {
     const {
@@ -58,6 +70,7 @@ watch(currentWidget, () => {
       foreshadowingStatesMode,
       useBounds,
       restrictToBounds,
+      endKeyframe,
     } = currentWidget.value.state;
 
     if (widgetType.value === ListenerType.STROKE_LISTENER) {
@@ -94,6 +107,9 @@ watch(currentWidget, () => {
     if (restrictToBounds) {
       GestureSettingsState.restrictToBounds = restrictToBounds;
     }
+    if (endKeyframe) {
+      GestureSettingsState.endKeyframe = endKeyframe;
+    }
 
     // GestureSettingsState.resetKey = resetKeys?.values().next().value;
   }
@@ -121,12 +137,87 @@ watch(
       foreshadowingStatesCount: GestureSettingsState.foreshadowingStatesCount,
       useBounds: GestureSettingsState.useBounds,
       restrictToBounds: GestureSettingsState.restrictToBounds,
+      endKeyframe: GestureSettingsState.endKeyframe,
     };
   },
   (state) => {
     currentWidget.value?.updateState(state);
+    console.log({ watchGestureListener: currentWidget.value });
+    StorySettings.saveStories();
   }
 );
+
+onMounted(() => {
+  if (!currentWidget.value) return;
+
+  if (
+    [
+      ListenerType.RECT_POSE,
+      ListenerType.RANGE_POSE,
+      ListenerType.POINT_POSE,
+      ListenerType.OPEN_HAND_POSE,
+      ListenerType.STROKE_LISTENER,
+      ListenerType.THUMB_POSE,
+    ].includes(StorySettings.currentStory?.currentWidget?.type as ListenerType)
+  ) {
+    const {
+      listenerMode,
+      handsToTrack,
+      strokeTriggerName,
+      poseDuration,
+      resetPauseDuration,
+      triggerDuration,
+      // resetKeys,
+      // mode,
+      selectionKeys,
+      foreshadowingStatesCount,
+      foreshadowingStatesMode,
+      useBounds,
+      restrictToBounds,
+      endKeyframe,
+    } = currentWidget.value.state;
+
+    if (widgetType.value === ListenerType.STROKE_LISTENER) {
+      GestureSettingsState.gestures = getGestures();
+    }
+    GestureSettingsState.dominantHand = handsToTrack.dominant;
+    if (listenerMode) {
+      GestureSettingsState.listenerMode = listenerMode;
+    }
+    if (strokeTriggerName) {
+      GestureSettingsState.strokeTriggerName = strokeTriggerName;
+    }
+    if (poseDuration) {
+      GestureSettingsState.poseDuration = poseDuration;
+    }
+    if (resetPauseDuration) {
+      GestureSettingsState.resetPauseDuration = resetPauseDuration;
+    }
+    if (triggerDuration) {
+      GestureSettingsState.triggerDuration = triggerDuration;
+    }
+    if (selectionKeys) {
+      GestureSettingsState.selectionKeys = selectionKeys.toString();
+    }
+    if (foreshadowingStatesCount) {
+      GestureSettingsState.foreshadowingStatesCount = foreshadowingStatesCount;
+    }
+    if (foreshadowingStatesMode) {
+      GestureSettingsState.foreshadowingStatesMode = foreshadowingStatesMode;
+    }
+    if (useBounds) {
+      GestureSettingsState.useBounds = useBounds;
+    }
+    if (restrictToBounds) {
+      GestureSettingsState.restrictToBounds = restrictToBounds;
+    }
+    if (endKeyframe) {
+      GestureSettingsState.endKeyframe = endKeyframe;
+    }
+
+    // GestureSettingsState.resetKey = resetKeys?.values().next().value;
+  }
+});
 
 function handleNext() {
   let addGesture = false;
@@ -235,6 +326,7 @@ function getGestures() {
             ListenerMode.FORESHADOWING,
             ListenerMode.SELECTION,
             ListenerMode.PLAYBACK,
+            ListenerMode.KEYFRAME,
           ]"
         ></v-select>
       </v-col>
@@ -248,8 +340,22 @@ function getGestures() {
       v-if="GestureSettingsState.listenerMode === ListenerMode.SELECTION"
     />
 
+    <KeyframeSettings
+      v-if="
+        GestureSettingsState.listenerMode === ListenerMode.KEYFRAME && keyframes
+      "
+      :keyframes="keyframes"
+    />
+
     <PlaybackSettings
-      v-if="GestureSettingsState.listenerMode === ListenerMode.PLAYBACK"
+      v-if="
+        GestureSettingsState.listenerMode === ListenerMode.PLAYBACK &&
+        currentWidget?.state.playbackSettings
+      "
+      @on-save-config="
+        (args) => currentWidget?.updateState({ playbackConfig: args })
+      "
+      :initialPlaybackSettings="currentWidget?.state.playbackSettings"
     />
 
     <v-row

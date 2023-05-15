@@ -1,6 +1,6 @@
 import { LineShape, type DrawingUtils } from "@/utils";
 
-const AXES_COLOR = "black";
+const AXES_COLOR = "white";
 
 // Extent is usually the min/max
 export function drawXAxis(
@@ -12,7 +12,12 @@ export function drawXAxis(
   tickCount?: number,
   rotateLabels?: boolean,
   drawLine?: boolean,
-  bold?: boolean
+  bold?: boolean,
+  shadowSettings?: {
+    shadow?: boolean;
+    shadowBlur?: number;
+    shadowColor?: string;
+  }
 ) {
   const [startX, endX] = range;
   const tickPadding = {
@@ -27,6 +32,7 @@ export function drawXAxis(
     {
       strokeStyle: AXES_COLOR,
       fontSize,
+      ...shadowSettings,
     },
     (context) => {
       xTicks.forEach((d: any) => {
@@ -64,6 +70,7 @@ export function drawXAxis(
       textBaseline: "top",
       fillStyle: AXES_COLOR,
       bold,
+      ...shadowSettings,
     },
     (context) => {
       // Determine if there's overlap
@@ -126,7 +133,12 @@ export function drawYAxis(
   tickCount?: number,
   scaleBand?: boolean,
   drawLine?: boolean,
-  bold?: boolean
+  bold?: boolean,
+  shadowSettings?: {
+    shadow?: boolean;
+    shadowBlur?: number;
+    shadowColor?: string;
+  },
 ) {
   const lineWidth = bold ? 2 : 1;
   const [startY, endY] = range;
@@ -148,6 +160,7 @@ export function drawYAxis(
     {
       strokeStyle: AXES_COLOR,
       fontSize,
+      ...shadowSettings
     },
     (context) => {
       yTicks.forEach((d: any) => {
@@ -184,6 +197,7 @@ export function drawYAxis(
       textAlign: "right",
       textBaseline: "middle",
       fillStyle: AXES_COLOR,
+      ...shadowSettings
     },
     (context) => {
       let labelAdjustment = 0;

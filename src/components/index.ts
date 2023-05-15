@@ -19,3 +19,4 @@ export { default as GestureSettings } from "./lib/panels/widget-settings/lib/ges
 export { default as ForeshadowingSettings } from "./lib/panels/widget-settings/lib/gesture-settings/lib/ForeshadowingSettings.vue";
 export { default as PlaybackSettings } from "./lib/panels/widget-settings/lib/gesture-settings/lib/PlaybackSettings.vue";
 export { default as SelectionSettings } from "./lib/panels/widget-settings/lib/gesture-settings/lib/SelectionSettings.vue";
+export { default as KeyframeSettings } from "./lib/panels/widget-settings/lib/gesture-settings/lib/KeyframeSettings.vue";

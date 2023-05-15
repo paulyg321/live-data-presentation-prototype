@@ -33,6 +33,9 @@ export interface ModifyContextStyleArgs {
   textAlign?: CanvasTextAlign;
   textBaseline?: CanvasTextBaseline;
   bold?: boolean;
+  shadow?: boolean;
+  shadowBlur?: number;
+  shadowColor?: string;
 }
 
 export interface DrawCircleArgs extends DrawingArgs {
@@ -448,6 +451,9 @@ export class DrawingUtils {
         textAlign,
         textBaseline,
         bold,
+        shadow,
+        shadowBlur,
+        shadowColor,
       } = settings;
 
       context.save();
@@ -482,6 +488,11 @@ export class DrawingUtils {
 
       if (textBaseline) {
         context.textBaseline = textBaseline;
+      }
+
+      if (shadow) {
+        context.shadowColor = shadowColor ?? "black";
+        context.shadowBlur = shadowBlur ?? 10;
       }
 
       drawFn(context, key);

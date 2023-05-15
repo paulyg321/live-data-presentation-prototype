@@ -13,6 +13,7 @@ import {
   DEFAULT_RESET_PAUSE_DURATION,
   DEFAULT_TRIGGER_DURATION,
   SupportedGestures,
+  AffectOptions,
 } from "@/utils";
 import { gsap } from "gsap";
 
@@ -199,7 +200,7 @@ export class OpenHandPoseListener extends GestureListener {
           }
 
           if (isInPlace) {
-            this.publishToSubject();
+            this.publishToSubject(undefined, AffectOptions.NEUTRAL);
             this.resetTimer(this.state.resetPauseDuration);
           } else {
             this.resetTimer();

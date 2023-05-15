@@ -14,6 +14,7 @@ import {
   DEFAULT_RESET_PAUSE_DURATION,
   DEFAULT_TRIGGER_DURATION,
   SupportedGestures,
+  AffectOptions,
 } from "@/utils";
 
 export type PointPoseListenerConstructorArgs = GestureListenerConstructorArgs;
@@ -196,7 +197,7 @@ export class PointPoseListener extends GestureListener {
           }
 
           if (isInPlace) {
-            this.publishToSubject();
+            this.publishToSubject(undefined, AffectOptions.NEUTRAL);
             this.resetTimer(this.state.resetPauseDuration);
           } else {
             this.resetTimer();

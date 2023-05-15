@@ -1,7 +1,6 @@
 import { ChartType, DrawingUtils, ListenerType, Story } from "@/utils";
 import { reactive, watch } from "vue";
 import { CanvasSettings } from "./canvas-settings";
-import { ChartSettings } from "./chart-settings";
 import { parse, stringify } from "flatted";
 
 export const widgetIconMap = {
@@ -9,17 +8,12 @@ export const widgetIconMap = {
   [ChartType.LINE]: "mdi-chart-line",
   [ChartType.SCATTER]: "mdi-chart-scatter-plot",
 
-  // OLD
-  [ListenerType.TEMPORAL]: "mdi-play-box",
-  [ListenerType.RADIAL]: "mdi-play-circle",
-  [ListenerType.FORESHADOWING]: "mdi-crystal-ball",
-  [ListenerType.SELECTION]: "mdi-select-group",
-
   // NEW
   [ListenerType.RECT_POSE]: "mdi-shape-rectangle-plus",
   [ListenerType.RANGE_POSE]: "mdi-hands-pray",
   [ListenerType.POINT_POSE]: "mdi-hand-pointing-up",
   [ListenerType.OPEN_HAND_POSE]: "mdi-hand-back-left",
+  [ListenerType.THUMB_POSE]: "mdi-thumbs-up-down",
   [ListenerType.STROKE_LISTENER]: "mdi-draw",
 };
 
@@ -43,6 +37,7 @@ export const StorySettings = reactive<{
   stories: Story[];
   currentStory?: Story;
   currentStoryIndex?: number;
+  saveStories: () => void;
   addNewStory: (title: string) => number | undefined;
   setCurrentStory: (index: number) => void;
   deleteStory: (title: string) => void;
@@ -52,9 +47,17 @@ export const StorySettings = reactive<{
   currentStoryIndex: undefined,
   setCurrentStory(index: number) {
     const storedStories = this.stories;
-    this.currentStory = storedStories[index];
-    this.currentStory.loadStoredLayers();
-    this.currentStoryIndex = index;
+    if (storedStories.length > 0) {
+      this.currentStory = storedStories[index];
+      this.currentStory?.loadStoredLayers();
+      this.currentStoryIndex = index;
+    }
+  },
+  saveStories() {
+    localStorage.setItem("stories", stringify(this.stories));
+    this.stories.forEach((story: Story) => {
+      story.saveLayers();
+    });
   },
   addNewStory(title: string) {
     if (!CanvasSettings.generalDrawingUtils) return;
@@ -67,7 +70,7 @@ export const StorySettings = reactive<{
       }),
     ];
     this.stories = newStories;
-    localStorage.setItem("stories", stringify(newStories));
+    this.saveStories();
 
     const newStoryIndex = newStories.length - 1;
     this.setCurrentStory(newStoryIndex);
@@ -83,7 +86,6 @@ export const StorySettings = reactive<{
     const newStoryIndex = newStories.length - 1;
     this.setCurrentStory(newStoryIndex);
 
-    localStorage.removeItem(title);
-    localStorage.setItem("stories", stringify(newStories));
+    this.saveStories();
   },
 });

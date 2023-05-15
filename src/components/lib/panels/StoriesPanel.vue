@@ -62,7 +62,7 @@ function closeMenu() {
           </v-row>
         </v-container>
       </v-col>
-      <!-- <v-col cols="1" class="d-flex justify-center">
+      <v-col cols="1" class="d-flex justify-center">
         <v-btn color="success" prepend-icon="mdi-plus" variant="tonal">
           Add Story
           <v-menu
@@ -91,7 +91,7 @@ function closeMenu() {
             </v-card>
           </v-menu>
         </v-btn>
-      </v-col> -->
+      </v-col>
     </v-row>
   </v-container>
 </template>
