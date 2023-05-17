@@ -186,9 +186,6 @@ export function pathDistance(pts1: Coordinate2D[], pts2: Coordinate2D[]) {
     i < pts1.length;
     i++ // assumes pts1.length == pts2.length
   ) {
-	  if (pts1[i] === undefined || pts2[i] === undefined) {
-		  debugger;
-	  }
 	  d += distance(pts1[i], pts2[i]);
   }
   return d / pts1.length;
@@ -196,18 +193,11 @@ export function pathDistance(pts1: Coordinate2D[], pts2: Coordinate2D[]) {
 export function pathLength(points: Coordinate2D[]) {
   let d = 0.0;
   for (let i = 1; i < points.length; i++) {
-	  if (points[i] === undefined || points[i - 1] === undefined) {
-		  debugger;
-	  }
-	  d += distance(points[i - 1], points[i]);
+    d += distance(points[i - 1], points[i]);
   }
   return d;
 }
 export function distance(p1: Coordinate2D, p2: Coordinate2D) {
-	if (p1 === undefined || p2 === undefined) {
-		debugger;
-	}
-	// debugger;
   const dx = p2.x - p1.x;
   const dy = p2.y - p1.y;
   return Math.sqrt(dx * dx + dy * dy);

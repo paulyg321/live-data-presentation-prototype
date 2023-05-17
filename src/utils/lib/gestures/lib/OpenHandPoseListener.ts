@@ -14,6 +14,7 @@ import {
   DEFAULT_TRIGGER_DURATION,
   SupportedGestures,
   AffectOptions,
+  ListenerMode,
 } from "@/utils";
 import { gsap } from "gsap";
 
@@ -57,11 +58,6 @@ export class OpenHandPoseListener extends GestureListener {
       selectionKeys,
       trackedFingers,
     });
-  }
-
-  draw() {
-    this.renderBorder();
-    this.drawPoseState();
   }
 
   private drawPoseState() {
@@ -227,5 +223,15 @@ export class OpenHandPoseListener extends GestureListener {
     }
 
     this.handlePoseGesture(dominantHand.fingerPositions);
+  }
+
+  draw() {
+    this.renderBorder();
+    if (this.state.timer) {
+      this.drawPoseState();
+    }
+    if (this.state.listenerMode === ListenerMode.KEYFRAME) {
+      this.renderKeyframe();
+    }
   }
 }

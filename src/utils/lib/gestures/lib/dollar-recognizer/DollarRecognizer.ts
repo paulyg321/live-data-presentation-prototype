@@ -73,7 +73,11 @@ export class Result {
 
 export class DollarRecognizer {
   unistrokes: Unistroke[] = new Array(numUnistrokes);
-  constructor() {
+  constructor(unistrokes?: Unistroke[]) {
+    if (unistrokes) {
+      this.unistrokes = unistrokes;
+      return;
+    }
     //
     // one built-in unistroke per gesture type
     //

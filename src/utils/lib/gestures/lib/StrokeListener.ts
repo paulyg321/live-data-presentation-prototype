@@ -8,6 +8,7 @@ import {
   SupportedGestures,
   DEFAULT_TRIGGER_DURATION,
   AffectOptions,
+  ListenerMode,
 } from "@/utils";
 
 export type StrokeListenerConstructorArgs = GestureListenerConstructorArgs;
@@ -134,24 +135,22 @@ export class StrokeListener extends GestureListener {
     const twoThirdRadius = radius * (2 / 3);
 
     const centerPoint = this.getCenterPoint();
-    [oneThirdRadius, twoThirdRadius].forEach(
-      (value: number) => {
-        this.state.drawingUtils.modifyContextStyleAndDraw(
-          {
-            strokeStyle: "skyblue",
-          },
-          (context) => {
-            this.state.drawingUtils.drawCircle({
-              coordinates: centerPoint,
-              radius: value,
-              stroke: true,
-              context,
-            });
-          }
-        );
-      },
-      ["preview", "presenter"]
-    );
+    [oneThirdRadius, twoThirdRadius].forEach((value: number) => {
+      this.state.drawingUtils.modifyContextStyleAndDraw(
+        {
+          strokeStyle: "skyblue",
+        },
+        (context) => {
+          this.state.drawingUtils.drawCircle({
+            coordinates: centerPoint,
+            radius: value,
+            stroke: true,
+            context,
+          });
+        },
+        ["preview", "presenter"]
+      );
+    });
   }
 
   resetHandler(): void {
@@ -248,5 +247,8 @@ export class StrokeListener extends GestureListener {
     this.renderStrokePath();
     this.renderReferenceCircles();
     this.renderDetectionState();
+    if (this.state.listenerMode === ListenerMode.KEYFRAME) {
+      this.renderKeyframe();
+    }
   }
 }

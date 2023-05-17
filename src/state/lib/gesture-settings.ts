@@ -45,7 +45,7 @@ watchEffect(() => {
 
 export const GestureSettingsState = reactive<{
   gestureName: string;
-  endKeyframe?: number;
+  endKeyframe?: { value: string; index: number };
   gestures: ListItems[];
   dominantHand: HANDS;
   resetKey?: string;

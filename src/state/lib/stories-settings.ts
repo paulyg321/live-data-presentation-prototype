@@ -23,13 +23,12 @@ export function initializeStories() {
   if (localStorage.getItem("stories") && CanvasSettings.generalDrawingUtils) {
     StorySettings.stories = (
       parse(localStorage.getItem("stories") ?? "[]") as any[]
-    ).map(
-      (story) =>
-        new Story({
-          ...story,
-          drawingUtils: CanvasSettings.generalDrawingUtils as DrawingUtils,
-        })
-    );
+    ).map((story) => {
+      return new Story({
+        ...story,
+        drawingUtils: CanvasSettings.generalDrawingUtils as DrawingUtils,
+      });
+    });
   }
 }
 
@@ -49,15 +48,12 @@ export const StorySettings = reactive<{
     const storedStories = this.stories;
     if (storedStories.length > 0) {
       this.currentStory = storedStories[index];
-      this.currentStory?.loadStoredLayers();
+      // this.currentStory?.loadStoredLayers();
       this.currentStoryIndex = index;
     }
   },
   saveStories() {
     localStorage.setItem("stories", stringify(this.stories));
-    this.stories.forEach((story: Story) => {
-      story.saveLayers();
-    });
   },
   addNewStory(title: string) {
     if (!CanvasSettings.generalDrawingUtils) return;

@@ -7,6 +7,8 @@ import {
   type ListenerProcessedFingerData,
   SupportedGestures,
   DEFAULT_TRIGGER_DURATION,
+  ListenerMode,
+  startTimeoutInstance,
 } from "@/utils";
 
 export type ThumbPoseListenerConstructorArgs = GestureListenerConstructorArgs;
@@ -37,10 +39,7 @@ export class ThumbPoseListener extends GestureListener {
     super({
       ...rest,
       position,
-      dimensions: {
-        width: dimensions.width,
-        height: dimensions.width,
-      },
+      dimensions,
       handsToTrack,
       gestureTypes,
       canvasDimensions,
@@ -65,18 +64,16 @@ export class ThumbPoseListener extends GestureListener {
     ] as Coordinate2D;
 
     const isInBounds = this.isWithinObjectBounds(thumbPosition);
-    console.log(isInBounds);
 
-    if (isInBounds) {
+    if (isInBounds && !this.state.timer) {
       this.publishToSubject();
+      this.state.timer = startTimeoutInstance({
+        onCompletion: () => {
+          this.resetTimer();
+        },
+        timeout: this.state.resetPauseDuration ?? 0,
+      });
     }
-  }
-
-  private getCenterPoint(): Coordinate2D {
-    return {
-      x: this.state.position.x + this.state.dimensions.width / 2,
-      y: this.state.position.y + this.state.dimensions.width / 2,
-    };
   }
 
   // Implemented to only track one finger and one hand
@@ -98,7 +95,8 @@ export class ThumbPoseListener extends GestureListener {
 
   draw() {
     this.renderBorder();
-    this.renderStrokePath();
-    this.renderDetectionState();
+    if (this.state.listenerMode === ListenerMode.KEYFRAME) {
+      this.renderKeyframe();
+    }
   }
 }

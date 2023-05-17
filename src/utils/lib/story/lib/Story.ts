@@ -12,7 +12,7 @@ import {
   type Coordinate2D,
   ThumbPoseListener,
 } from "@/utils";
-import { parse, stringify } from "flatted";
+import { stringify } from "flatted";
 
 export type StoryLayer =
   | RangePoseListener
@@ -43,18 +43,31 @@ export class Story {
   constructor({
     title,
     drawingUtils,
+    layers = [],
   }: {
     title: string;
     drawingUtils: DrawingUtils;
+    layers?: {
+      type: LayerType;
+      id: string;
+      layer: StoryLayer;
+    }[];
   }) {
     this.title = title;
     this.drawingUtils = drawingUtils;
+    // this.layers = layers;
+    this.loadStoredLayers(layers);
   }
 
-  loadStoredLayers() {
-    const storedLayerString = localStorage.getItem(this.title);
-    if (storedLayerString) {
-      this.layers = parse(storedLayerString).map(({ layer, type, id }: any) => {
+  loadStoredLayers(
+    layers: {
+      type: LayerType;
+      id: string;
+      layer: StoryLayer;
+    }[]
+  ) {
+    this.layers = layers
+      .map(({ layer, type, id }: any) => {
         const arg = {
           ...layer.state,
           drawingUtils: this.drawingUtils,
@@ -77,7 +90,6 @@ export class Story {
             };
           }
           case ListenerType.OPEN_HAND_POSE: {
-            console.log({arg});
             return {
               type,
               id,
@@ -113,12 +125,14 @@ export class Story {
             };
           }
           default:
-            return {};
+            return undefined;
         }
-      });
-    } else {
-      this.layers = [];
-    }
+      })
+      .filter((layer) => layer !== undefined) as {
+      type: LayerType;
+      id: string;
+      layer: StoryLayer;
+    }[];
   }
 
   isChartLayer(type: string) {
@@ -151,8 +165,6 @@ export class Story {
       this.layers = [{ type, id, layer }, ...this.layers];
     }
 
-    this.saveLayers();
-
     return {
       type,
       id,
@@ -160,15 +172,10 @@ export class Story {
     };
   }
 
-  saveLayers() {
-    localStorage.setItem(this.title, stringify(this.layers));
-  }
-
   removeLayer(layerId: string) {
     const updatedLayers = this.layers.filter((layer) => layer.id !== layerId);
     this.layers = updatedLayers;
 
-    this.saveLayers();
     return this.layers;
   }
 
@@ -186,12 +193,19 @@ export class Story {
       .map(({ layer }) => layer) as Chart[];
   }
 
-  handleDeleteLayer(id: string) {
+  handleDeleteLayer(id: string, save?: () => void) {
     this.removeLayer(id);
     this.setCurrentWidget();
+    if (save) {
+      save();
+    }
   }
 
-  canvasEventListener(eventType: CanvasEvent, eventData: Coordinate2D) {
+  canvasEventListener(
+    eventType: CanvasEvent,
+    eventData: Coordinate2D,
+    save?: () => void
+  ) {
     const currentWidget = this.currentWidget;
     if (!currentWidget) return;
 
@@ -202,13 +216,11 @@ export class Story {
       const { isInDeleteBounds } = boundsInformation;
 
       if (isInDeleteBounds && eventType === CanvasEvent.CLICK) {
-        this.handleDeleteLayer(currentWidget.id);
+        this.handleDeleteLayer(currentWidget.id, save);
       } else {
-        listener?.handleEvent(eventType, eventData);
+        listener?.handleEvent(eventType, eventData, save);
       }
     }
-
-    localStorage.setItem(this.title, stringify(this.layers));
   }
 
   saveThumbnail() {

@@ -250,6 +250,8 @@ export class DrawingUtils {
     xScale = defaultScale,
     yScale = defaultScale,
     context,
+    drawArrowHead,
+    radius = 10,
   }: {
     coordinates: { x: any; y: any }[];
     shape?: LineShape;
@@ -261,6 +263,8 @@ export class DrawingUtils {
     xScale?: (value: number) => number;
     yScale?: (value: number) => number;
     context: CanvasRenderingContext2D;
+    drawArrowHead?: boolean;
+    radius?: number;
   }) {
     let line = d3
       .line<Coordinate2D>()
@@ -305,17 +309,26 @@ export class DrawingUtils {
 
     const drawLine = line.context(context);
 
-    context.save();
     context.beginPath();
     drawLine(coordinates);
     context.stroke();
-    context.restore();
+
+    if (drawArrowHead) {
+      const from = coordinates.at(0);
+      const to = coordinates.at(-1);
+      drawArrowhead(
+        context,
+        from,
+        to,
+        radius
+      )
+    }
   }
 
   drawPath(args: {
     path: number[];
     context: CanvasRenderingContext2D;
-    mode: 'fill' | 'stroke';
+    mode: "fill" | "stroke";
   }) {
     const { path, context, mode } = args;
     context.beginPath();
@@ -331,7 +344,7 @@ export class DrawingUtils {
       );
     }
     context.closePath();
-    if (mode === 'stroke') {
+    if (mode === "stroke") {
       context.stroke();
     } else {
       context.fill();
@@ -467,7 +480,7 @@ export class DrawingUtils {
       }
 
       if (fontSize) {
-        context.font = `${bold ? "bold " : "" }${fontSize}px Arial`;
+        context.font = `${bold ? "bold " : ""}${fontSize}px Arial`;
       }
 
       if (opacity) {
@@ -500,4 +513,50 @@ export class DrawingUtils {
       context.restore();
     }, filters);
   }
+}
+
+/**
+ * Draw an arrowhead on a line on an HTML5 canvas.
+ *
+ * Based almost entirely off of http://stackoverflow.com/a/36805543/281460 with some modifications
+ * for readability and ease of use.
+ *
+ * @param context The drawing context on which to put the arrowhead.
+ * @param from A point, specified as an object with 'x' and 'y' properties, where the arrow starts
+ *             (not the arrowhead, the arrow itself).
+ * @param to   A point, specified as an object with 'x' and 'y' properties, where the arrow ends
+ *             (not the arrowhead, the arrow itself).
+ * @param radius The radius of the arrowhead. This controls how "thick" the arrowhead looks.
+ */
+function drawArrowhead(context: any, from: any, to: any, radius: any) {
+  const x_center = to.x;
+  const y_center = to.y;
+
+  let angle;
+  let x;
+  let y;
+
+  context.beginPath();
+
+  angle = Math.atan2(to.y - from.y, to.x - from.x);
+  x = radius * Math.cos(angle) + x_center;
+  y = radius * Math.sin(angle) + y_center;
+
+  context.moveTo(x, y);
+
+  angle += (1.0 / 3.0) * (2 * Math.PI);
+  x = radius * Math.cos(angle) + x_center;
+  y = radius * Math.sin(angle) + y_center;
+
+  context.lineTo(x, y);
+
+  angle += (1.0 / 3.0) * (2 * Math.PI);
+  x = radius * Math.cos(angle) + x_center;
+  y = radius * Math.sin(angle) + y_center;
+
+  context.lineTo(x, y);
+
+  context.closePath();
+
+  context.fill();
 }

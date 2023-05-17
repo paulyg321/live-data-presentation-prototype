@@ -89,7 +89,7 @@ export class CanvasElementListener {
         x: this.position.x + this.dimensions.width,
         y: this.position.y + this.dimensions.height,
       },
-      radius: this.anchorPadding,
+      radius: this.anchorPadding / 2,
     };
   }
 
@@ -99,7 +99,7 @@ export class CanvasElementListener {
         x: this.position.x + this.dimensions.width,
         y: this.position.y,
       },
-      radius: this.anchorPadding,
+      radius: this.anchorPadding / 2,
     };
   }
 
@@ -161,7 +161,11 @@ export class CanvasElementListener {
     this.resizeSettings.lastPosition = mousePosition;
   }
 
-  handleEvent(type: CanvasEvent, eventData: Coordinate2D) {
+  handleEvent(
+    type: CanvasEvent,
+    eventData: Coordinate2D,
+    save?: () => void
+  ) {
     switch (type) {
       case CanvasEvent.MOUSE_DOWN: {
         const { isInDraggingBounds, isInResizeBounds } =
@@ -200,6 +204,9 @@ export class CanvasElementListener {
             active: false,
             lastPosition: eventData,
           };
+        }
+        if (save) {
+          save();
         }
         break;
       }
@@ -242,6 +249,7 @@ export class CanvasElementListener {
     this.drawingUtils.modifyContextStyleAndDraw(
       {
         fillStyle: "red",
+        opacity: 0.5,
       },
       (context) => {
         this.drawingUtils.drawCircle({

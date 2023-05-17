@@ -217,38 +217,23 @@ export abstract class AnimatedElement {
   }
 
   play(args: AnimatedElementPlaybackArgs) {
+    const canMorph = this.controllerState.isSelected;
     const currentItemAnimationState = this.animationState.current;
     const selectionAnimationState = this.animationState.selection;
 
-    currentItemAnimationState.pathTimeline?.totalProgress(0);
     currentItemAnimationState.pathTimeline?.clear();
-
-    currentItemAnimationState.opacityTimeline?.totalProgress(0);
     currentItemAnimationState.opacityTimeline?.clear();
-
-    currentItemAnimationState.positionTimeline?.totalProgress(0);
     currentItemAnimationState.positionTimeline?.clear();
-
-    currentItemAnimationState.sizeTimeline?.totalProgress(0);
     currentItemAnimationState.sizeTimeline?.clear();
-
-    currentItemAnimationState.scaleTimeline?.totalProgress(0);
     currentItemAnimationState.scaleTimeline?.clear();
-
-    selectionAnimationState.opacityTimeline?.totalProgress(0);
     selectionAnimationState.opacityTimeline?.clear();
-
-    selectionAnimationState.pathTimeline?.totalProgress(0);
     selectionAnimationState.pathTimeline?.clear();
-
-    selectionAnimationState.positionTimeline?.totalProgress(0);
     selectionAnimationState.positionTimeline?.clear();
-
-    selectionAnimationState.sizeTimeline?.totalProgress(0);
     selectionAnimationState.sizeTimeline?.clear();
 
     args.states.forEach(
       (state: AnimatedElementPlaybackState, index: number) => {
+        const selector = canMorph ? state.selector : undefined;
         let isLastTween = false;
         if (index === args.states.length - 1) {
           isLastTween = true;
@@ -256,7 +241,7 @@ export abstract class AnimatedElement {
         this.controllerState.currentKeyframeIndex = state.index;
         this.updateCurrentAnimationState(
           args.updateType,
-          state.selector,
+          selector,
           StateUpdateType.INDIVIDUAL_TWEENS === args.updateType
             ? args.easeFn
             : undefined,
@@ -265,7 +250,7 @@ export abstract class AnimatedElement {
         );
         this.updateSelectionState(
           args.updateType,
-          state.selector,
+          selector,
           args.easeFn,
           args.duration
         );
@@ -595,7 +580,6 @@ export abstract class AnimatedElement {
     duration?: number,
     isLastTween?: boolean
   ) {
-    // console.log(easeFn);
     const FONT_SIZE = 16;
     const unscaledPosition =
       this.controllerState.unscaledData[
@@ -702,7 +686,6 @@ export abstract class AnimatedElement {
             morphSVG: {
               shape: newPath,
               render: (rawPath: any) => {
-                // console.log(rawPath);
                 const path = rawPath[0];
                 currentItemAnimationState.path.parsedPath = rawPath;
               },

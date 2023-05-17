@@ -108,7 +108,8 @@ export interface GestureListenerConstructorArgs {
     key: AffectOptions;
     value: PlaybackSettingsConfig;
   };
-  endKeyframe?: number;
+  endKeyframe?: { value: string; index: number };
+  strokeRecognizer?: DollarRecognizer;
 }
 
 export interface GestureListenerState {
@@ -159,7 +160,7 @@ export interface GestureListenerState {
   triggerDuration?: number;
 
   playbackSettings: PlaybackSettings;
-  endKeyframe?: number;
+  endKeyframe?: { value: string; index: number };
 
   selectionKeys: string[];
   foreshadowingStatesMode?: ForeshadowingStatesMode;
@@ -223,6 +224,8 @@ export abstract class GestureListener {
     foreshadowingStatesMode,
     foreshadowingStatesCount,
     endKeyframe,
+    strokeRecognizer = new DollarRecognizer(),
+    playbackSettings = DEFAULT_PLAYBACK_SETTINGS,
   }: GestureListenerConstructorArgs) {
     this.state = {
       position,
@@ -253,7 +256,7 @@ export abstract class GestureListener {
       },
       drawingUtils,
       addGesture: false,
-      strokeRecognizer: new DollarRecognizer(),
+      strokeRecognizer: new DollarRecognizer(strokeRecognizer.unistrokes),
       trackedFingers,
       listenerMode,
       animationState,
@@ -270,7 +273,7 @@ export abstract class GestureListener {
       resetKeys,
       detectionTimer: undefined,
       startDetecting: false,
-      playbackSettings: DEFAULT_PLAYBACK_SETTINGS,
+      playbackSettings,
       endKeyframe,
     };
 
@@ -404,7 +407,7 @@ export abstract class GestureListener {
       case ListenerMode.KEYFRAME:
         this.publishToSubjectIfExists(GestureListener.playbackSubjectKey, {
           type: "keyframe",
-          data: this.state.endKeyframe,
+          data: this.state.endKeyframe?.index,
         });
         break;
       default:
@@ -473,6 +476,26 @@ export abstract class GestureListener {
     } else {
       this.state.timer = undefined;
     }
+  }
+
+  protected renderKeyframe() {
+    this.state.drawingUtils.modifyContextStyleAndDraw(
+      {
+        fillStyle: "skyblue",
+        fontSize: 16,
+      },
+      (context) => {
+        this.state.drawingUtils.drawText({
+          coordinates: {
+            x: this.state.position.x + 10,
+            y: this.state.position.y + 20,
+          },
+          text: this.state.endKeyframe?.value ?? "",
+          context,
+        });
+      },
+      ["presenter", "preview"]
+    );
   }
 
   protected renderBorder() {

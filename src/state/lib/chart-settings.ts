@@ -37,8 +37,6 @@ export enum PlaybackType {
 export const ChartSettings = reactive<{
   canvasKeys: string[];
   setCanvasKeys: () => void;
-  // animationMode: DrawingMode;
-  // setAnimationMode: (mode: DrawingMode) => void;
   handlePlay: (
     type?: string,
     callbackFn?: any,
@@ -48,9 +46,6 @@ export const ChartSettings = reactive<{
   selectedChartItems: string[];
   addSelectedChartItem: (itemKey: string) => void;
   removeSelectedChartItem: (itemKey: string) => void;
-  // isItemSelected: (itemKey: AnimatedCircle | AnimatedLine | string) => boolean;
-  playbackExtent: number;
-  setPlaybackExtent: (value: number) => void;
   extentVisualizer?: AnimationExtentVisualizer;
   setExtentVisualizer: () => void;
   playbackTimer?: d3.Timer;
@@ -105,79 +100,6 @@ export const ChartSettings = reactive<{
         // easeFn: "circ.out",
       });
     });
-    // const affectPlaybackSettings = {
-    //   [Affect.JOY]: { duration: 2000, easeFn: d3.easeBounce },
-    //   [Affect.EXCITEMENT]: { duration: 3000, easeFn: d3.easeLinear },
-    //   [Affect.TENDERNESS]: { duration: 5000, easeFn: d3.easeQuadIn },
-    // };
-
-    // this.resetTimer();
-    // const play = (timestep: number) => {
-    //   this.setPlaybackExtent(timestep);
-    //   if (timestep === 1) {
-    //     this.extentVisualizer?.updateState({
-    //       extent: 0,
-    //     });
-    //   } else {
-    //     this.extentVisualizer?.updateState({
-    //       extent: timestep,
-    //     });
-    //   }
-    //   if (callbackFn) {
-    //     callbackFn(timestep);
-    //   }
-    // };
-
-    // if (type === "prev") {
-    //   /**
-    //    * TODO: Determine if it makes sense to animate to previouss state
-    //    * this might be a rewind or something
-    //    * (starting from 1 and going to 0 - then decrementing state)
-    //    * */
-    // } else if (type === PlaybackType.NEXT) {
-    //   this.playbackTimer = d3.timer((elapsed: number) => {
-    //     // TODO_Paul - Try this!
-    //     // const startingPoint = this.playbackExtent + elapsed / playbackDuration;
-    //     const playbackSettings = affect
-    //       ? affectPlaybackSettings[affect]
-    //       : { duration: 3000, easeFn: d3.easeLinear };
-    //     const startingPoint = Math.max(
-    //       this.playbackExtent,
-    //       elapsed / playbackSettings.duration
-    //     );
-
-    //     const boundedTimeStep = Math.min(startingPoint, 1);
-
-    //     play(playbackSettings.easeFn(boundedTimeStep));
-    //     if (boundedTimeStep === 1) {
-    //       StorySettings.currentStory?.getCharts().map((chart: Chart) => {
-    //         chart.chart?.setStates("increment");
-    //       });
-    //       this.setPlaybackExtent(0);
-    //       this.resetTimer();
-    //     }
-    //   });
-    // } else if (type === PlaybackType.ALL) {
-    //   this.playbackTimer = d3.timer((elapsed: number) => {
-    //     const playbackSettings = affect
-    //       ? affectPlaybackSettings[affect]
-    //       : { duration: 3000, easeFn: d3.easeLinear };
-
-    //     const startingPoint = Math.max(
-    //       this.playbackExtent,
-    //       elapsed / playbackSettings.duration
-    //     );
-    //     const boundedTimeStep = Math.min(startingPoint, 1);
-    //     play(playbackSettings.easeFn(boundedTimeStep));
-    //     if (boundedTimeStep === 1) {
-    //       StorySettings.currentStory?.getCharts().map((chart: Chart) => {
-    //         chart.chart?.setStates("increment");
-    //       });
-    //       this.setPlaybackExtent(0);
-    //       this.handlePlay("all", callbackFn);
-    //     }
-    //   });
-    // }
   },
   selectedChartItems: [],
   removeSelectedChartItem(itemKey: string) {
@@ -187,10 +109,6 @@ export const ChartSettings = reactive<{
   },
   addSelectedChartItem(itemKey: string) {
     this.selectedChartItems = [...this.selectedChartItems, itemKey];
-  },
-  playbackExtent: 0,
-  setPlaybackExtent(value: number) {
-    console.log("");
   },
   extentVisualizer: undefined,
   setExtentVisualizer() {

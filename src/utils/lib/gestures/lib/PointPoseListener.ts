@@ -15,6 +15,7 @@ import {
   DEFAULT_TRIGGER_DURATION,
   SupportedGestures,
   AffectOptions,
+  ListenerMode,
 } from "@/utils";
 
 export type PointPoseListenerConstructorArgs = GestureListenerConstructorArgs;
@@ -56,11 +57,6 @@ export class PointPoseListener extends GestureListener {
       selectionKeys,
       trackedFingers,
     });
-  }
-
-  draw() {
-    this.renderBorder();
-    this.drawPoseState();
   }
 
   private drawPoseState() {
@@ -187,7 +183,9 @@ export class PointPoseListener extends GestureListener {
               Object.values(
                 this.state.posePositionToMatch[this.state.handsToTrack.dominant]
               ),
-              Object.values(this.state.posePosition[this.state.handsToTrack.dominant])
+              Object.values(
+                this.state.posePosition[this.state.handsToTrack.dominant]
+              )
             ).map((diff: any) => diff.euclideanDistance);
 
             isInPlace = !containsValueLargerThanMax(
@@ -224,5 +222,15 @@ export class PointPoseListener extends GestureListener {
     }
 
     this.handlePoseGesture(dominantHand.fingerPositions);
+  }
+
+  draw() {
+    this.renderBorder();
+    if (this.state.timer) {
+      this.drawPoseState();
+    }
+    if (this.state.listenerMode === ListenerMode.KEYFRAME) {
+      this.renderKeyframe();
+    }
   }
 }

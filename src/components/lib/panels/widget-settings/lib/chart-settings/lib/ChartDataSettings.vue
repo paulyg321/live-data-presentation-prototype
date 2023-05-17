@@ -75,6 +75,7 @@ function createChart() {
         drawingUtils,
       })
     );
+    StorySettings.saveStories();
     resetForm();
   } else {
     console.log("All required fields were not provided");

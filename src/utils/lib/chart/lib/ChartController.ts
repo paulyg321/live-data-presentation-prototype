@@ -289,14 +289,16 @@ export class ChartController {
     endKeyframe?: number,
     selector?: string
   ) {
+    const startKeyframe = this.state.currentKeyframeIndex + 1;
+    const _endKeyframe = endKeyframe ?? this.state.currentKeyframeIndex;
+    // const lastKeyframe =
+    //   _endKeyframe >= startKeyframe ? _endKeyframe + 1 : _endKeyframe - 1;
+    const states = _.range(startKeyframe, _endKeyframe);
     return {
-      states: _.range(
-        this.state.currentKeyframeIndex,
-        endKeyframe ?? this.state.currentKeyframeIndex + 1
-      ).map((value: number) => {
+      states: states.map((value: number, index: number) => {
         return {
           index: value,
-          selector: selector,
+          selector: index < states.length - 1 ? selector : undefined,
         };
       }),
       duration: playbackConfig?.duration ?? 5,
@@ -311,7 +313,6 @@ export class ChartController {
       keys?: string[];
     } & AnimatedElementPlaybackArgs
   ) {
-    // console.log(args);
     this.state.animatedElements
       ?.filter((element) => {
         if (!args.keys) return true;
@@ -321,10 +322,7 @@ export class ChartController {
         element.play(args);
       });
 
-    // let from = this.state.currentKeyframe = this.state.keyframes[state.index];
-
     this.state.keyframeTimeline?.clear();
-    this.state.keyframeTimeline?.totalProgress(0);
     args.states.forEach((state: AnimatedElementPlaybackState) => {
       this.state.keyframeTimeline?.to(this.state, {
         currentKeyframeIndex: state.index,
@@ -675,7 +673,7 @@ export class ChartController {
         false,
         true,
         {
-          shadow: true
+          shadow: true,
         }
       );
     }

@@ -18,7 +18,6 @@ const widgetType = ref<ListenerType>();
 const keyframes = ref<string[]>();
 
 watchEffect(() => {
-  // console.log(StorySettings.currentStory?.getCharts()[0].state.keyframes);
   keyframes.value = StorySettings.currentStory?.getCharts()[0].state.keyframes;
   widgetType.value = StorySettings.currentStory?.currentWidget
     ?.type as ListenerType;
@@ -42,10 +41,6 @@ const currentTitle = computed(() => {
 
 watch(currentWidget, () => {
   if (!currentWidget.value) return;
-
-  console.log({
-    currentWidget: currentWidget.value,
-  });
   if (
     [
       ListenerType.RECT_POSE,
@@ -142,7 +137,6 @@ watch(
   },
   (state) => {
     currentWidget.value?.updateState(state);
-    console.log({ watchGestureListener: currentWidget.value });
     StorySettings.saveStories();
   }
 );
@@ -214,7 +208,6 @@ onMounted(() => {
     if (endKeyframe) {
       GestureSettingsState.endKeyframe = endKeyframe;
     }
-
     // GestureSettingsState.resetKey = resetKeys?.values().next().value;
   }
 });
@@ -239,6 +232,7 @@ function handleNext() {
   currentWidget.value?.updateState({
     addGesture,
   });
+  StorySettings.saveStories();
 }
 
 function handleGestureDelete(name: string) {
@@ -246,6 +240,7 @@ function handleGestureDelete(name: string) {
 
   currentWidget.value.state.strokeRecognizer.deleteGestureByName(name);
   GestureSettingsState.gestures = getGestures();
+  StorySettings.saveStories();
 }
 
 function getGestures() {
@@ -305,6 +300,7 @@ function getGestures() {
           ListenerType.RANGE_POSE,
           ListenerType.POINT_POSE,
           ListenerType.OPEN_HAND_POSE,
+          ListenerType.THUMB_POSE,
         ].includes(widgetType as ListenerType)
       "
     >
@@ -353,7 +349,10 @@ function getGestures() {
         currentWidget?.state.playbackSettings
       "
       @on-save-config="
-        (args) => currentWidget?.updateState({ playbackConfig: args })
+        (args) => {
+          currentWidget?.updateState({ playbackConfig: args });
+          StorySettings.saveStories();
+        }
       "
       :initialPlaybackSettings="currentWidget?.state.playbackSettings"
     />

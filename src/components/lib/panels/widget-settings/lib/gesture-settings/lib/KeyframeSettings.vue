@@ -11,12 +11,25 @@ const props = defineProps<KeyframeSettingsProps>();
 const endKeyframe = ref();
 
 watch(endKeyframe, () => {
-  GestureSettingsState.endKeyframe = props.keyframes.indexOf(endKeyframe.value);
+  GestureSettingsState.endKeyframe = {
+    index: props.keyframes.indexOf(endKeyframe.value),
+    value: endKeyframe.value,
+  };
 });
+
+watch(
+  () => GestureSettingsState.endKeyframe,
+  () => {
+    if (GestureSettingsState.endKeyframe) {
+      endKeyframe.value =
+        props.keyframes[GestureSettingsState.endKeyframe.index];
+    }
+  }
+);
 
 onMounted(() => {
   if (GestureSettingsState.endKeyframe) {
-    endKeyframe.value = props.keyframes[GestureSettingsState.endKeyframe];
+    endKeyframe.value = props.keyframes[GestureSettingsState.endKeyframe.index];
   }
 });
 </script>

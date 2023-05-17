@@ -18,7 +18,10 @@ const RADIUS = 10;
 export class AnimatedCircle extends AnimatedElement {
   constructor(args: AnimatedChartElementArgs) {
     super(args);
-    console.log(args.selectionKey);
+    console.log({
+      key: args.selectionKey,
+      color: args.color,
+    });
   }
 
   handleForeshadowCount(
@@ -169,9 +172,14 @@ export class AnimatedCircle extends AnimatedElement {
 
   handleMainUpdate(args: HandleSelectionArgs): HandleSelectionReturnValue {
     const { itemUnscaledPosition } = args;
+    const offset = RADIUS;
     const position = {
-      x: this.controllerState.xScale(itemUnscaledPosition.x) as number,
-      y: this.controllerState.yScale(itemUnscaledPosition.y) as number,
+      x:
+        (this.controllerState.xScale(itemUnscaledPosition.x) as number) -
+        offset,
+      y:
+        (this.controllerState.yScale(itemUnscaledPosition.y) as number) -
+        offset,
     };
 
     const dimensions = {
@@ -183,14 +191,8 @@ export class AnimatedCircle extends AnimatedElement {
       .select(args.selector ?? "#circle")
       .clone()
       .attr("id", "remove")
-      .attr("cx", 0)
-      .attr("cy", 0)
-      .attr("r", 1)
-      .attr("width", 1)
-      .attr("height", 1)
       .node() as SVGPrimitive;
 
-    console.log(element.getBoundingClientRect().width);
     return {
       element,
       position,
@@ -219,6 +221,7 @@ export class AnimatedCircle extends AnimatedElement {
           shadow: !(selectionPath && selectionOpacity),
         },
         (context: CanvasRenderingContext2D) => {
+          context.save();
           context.translate(position.x, position.y);
           context.scale(
             dimensions.width / path.xScale,
@@ -229,6 +232,7 @@ export class AnimatedCircle extends AnimatedElement {
             mode: "fill",
             context,
           });
+          context.restore();
         }
       );
     });
@@ -283,7 +287,6 @@ export class AnimatedCircle extends AnimatedElement {
       if (!path.length || path.length > 1) return;
       this.controllerState.drawingUtils.modifyContextStyleAndDraw(
         {
-          fillStyle: "white",
           strokeStyle: color,
           lineWidth: 3,
           opacity,
@@ -302,15 +305,19 @@ export class AnimatedCircle extends AnimatedElement {
       if (!path.length) return;
       this.controllerState.drawingUtils.modifyContextStyleAndDraw(
         {
+          // for arrow head
+          fillStyle: color,
           strokeStyle: color,
-          lineWidth: 5,
+          lineWidth: 3,
           opacity,
         },
         (context: CanvasRenderingContext2D) => {
           this.controllerState.drawingUtils.drawLine({
             coordinates: path,
-            shape: LineShape.CURVED,
+            shape: LineShape.SHARP,
             context,
+            drawArrowHead: true,
+            radius: 6,
           });
         }
       );

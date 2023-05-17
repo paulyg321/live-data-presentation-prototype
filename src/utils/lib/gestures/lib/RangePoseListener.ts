@@ -14,6 +14,7 @@ import {
   DEFAULT_RESET_PAUSE_DURATION,
   SupportedGestures,
   AffectOptions,
+  ListenerMode,
 } from "@/utils";
 
 const REFERENCE_POINT_BOUNDS = 30;
@@ -93,13 +94,6 @@ export class RangePoseListener extends GestureListener {
       undefined
     );
     this.resetGestureState();
-  }
-
-  draw() {
-    this.renderBorder();
-    if (this.state.timer) {
-      this.drawPoseState();
-    }
   }
 
   private drawPoseState() {
@@ -270,5 +264,15 @@ export class RangePoseListener extends GestureListener {
     }
 
     this.handlePoseGesture(rightHand.fingerPositions, leftHand.fingerPositions);
+  }
+
+  draw() {
+    this.renderBorder();
+    if (this.state.timer) {
+      this.drawPoseState();
+    }
+    if (this.state.listenerMode === ListenerMode.KEYFRAME) {
+      this.renderKeyframe();
+    }
   }
 }
