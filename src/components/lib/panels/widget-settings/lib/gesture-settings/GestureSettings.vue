@@ -6,7 +6,13 @@ import {
   ListenerMode,
   ListenerType,
 } from "@/utils";
-import { StorySettings, GestureSettingsState } from "@/state";
+import {
+  StorySettings,
+  GestureSettingsState,
+  currentChart,
+  handlePlay,
+  playbackSliderRange
+} from "@/state";
 import {
   ForeshadowingSettings,
   PlaybackSettings,
@@ -18,7 +24,7 @@ const widgetType = ref<ListenerType>();
 const keyframes = ref<string[]>();
 
 watchEffect(() => {
-  keyframes.value = StorySettings.currentStory?.getCharts()[0].state.keyframes;
+  keyframes.value = currentChart.value?.state.keyframes;
   widgetType.value = StorySettings.currentStory?.currentWidget
     ?.type as ListenerType;
   currentWidget.value = StorySettings.currentStory?.currentWidget
@@ -361,6 +367,26 @@ function getGestures() {
         (args) => {
           currentWidget?.updateState({ playbackConfig: args });
           StorySettings.saveStories();
+        }
+      "
+      @on-play-backward="
+        (args) => {
+          handlePlay(
+            args,
+            args.svg,
+            playbackSliderRange[1],
+            playbackSliderRange[0]
+          );
+        }
+      "
+      @on-play-forward="
+        (args) => {
+          handlePlay(
+            args,
+            args.svg,
+            playbackSliderRange[0],
+            playbackSliderRange[1]
+          );
         }
       "
       :initialPlaybackSettings="currentWidget?.state.playbackSettings"

@@ -1,4 +1,4 @@
-import { reactive } from "vue";
+import { computed, reactive, ref, watchEffect } from "vue";
 import {
   Affect,
   AnimationExtentVisualizer,
@@ -13,9 +13,12 @@ import {
   type Dimensions,
   type PartialCoordinate2D,
   StateUpdateType,
+  type PlaybackSettingsConfig,
+  type AnimatedElementPlaybackArgs,
 } from "@/utils";
 import { StorySettings } from "./stories-settings";
 import { CanvasSettings } from "./canvas-settings";
+import * as d3 from "d3";
 
 export const initialChartWidth = 400;
 export const initialChartDimensions = {
@@ -127,3 +130,31 @@ export const ChartSettings = reactive<{
   },
   playbackType: PlaybackType.NEXT,
 });
+
+export const playbackSliderRange = ref<number[]>([0, 1]);
+export const currentChart = computed(() => {
+  return StorySettings.currentStory?.getCharts()[0];
+});
+
+export function handlePlay(
+  config: PlaybackSettingsConfig,
+  svg?: string,
+  startKeyframe?: number,
+  endKeyframe?: number
+) {
+  let selector: string | undefined;
+  if (svg) {
+    selector = "#st0";
+    d3.select("#st0").attr("d", svg);
+  }
+
+  const args = currentChart.value?.state.chart?.processPlaybackSubscriptionData(
+    config,
+    endKeyframe,
+    startKeyframe,
+    selector
+  );
+  if (args) {
+    currentChart.value?.state.chart?.play(args as AnimatedElementPlaybackArgs);
+  }
+}

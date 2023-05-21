@@ -553,7 +553,7 @@ onMounted(() => {
           <v-tooltip text="Portals">
             <template v-slot:activator="{ props }">
               <v-list-item
-                prepend-icon="mdi-dock-window"
+                prepend-icon="mdi-presentation-play"
                 :value="AvailableWidgets.PORTALS"
                 v-bind="props"
               >
@@ -573,7 +573,7 @@ onMounted(() => {
           </v-tooltip>
         </v-list>
       </v-navigation-drawer>
-      <v-navigation-drawer permanent location="right" width="600">
+      <v-navigation-drawer permanent location="left" width="600">
         <div v-if="currentTab === SettingsTab.WIDGET_SETTINGS">
           <WidgetSettings />
         </div>
@@ -587,7 +587,7 @@ onMounted(() => {
           <PortalSettings />
         </div>
       </v-navigation-drawer>
-      <v-navigation-drawer permanent location="bottom" width="300">
+      <v-navigation-drawer permanent location="bottom" width="200">
         <StoriesPanel />
       </v-navigation-drawer>
 

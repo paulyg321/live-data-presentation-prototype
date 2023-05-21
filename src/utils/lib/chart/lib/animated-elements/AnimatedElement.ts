@@ -239,21 +239,39 @@ export abstract class AnimatedElement {
           isLastTween = true;
         }
         this.controllerState.currentKeyframeIndex = state.index;
-        this.updateCurrentAnimationState(
-          args.updateType,
-          selector,
-          StateUpdateType.INDIVIDUAL_TWEENS === args.updateType
-            ? args.easeFn
-            : undefined,
-          args.duration,
-          isLastTween
-        );
-        this.updateSelectionState(
-          args.updateType,
-          selector,
-          args.easeFn,
-          args.duration
-        );
+        if (index === 0) {
+          this.updateCurrentAnimationState(
+            StateUpdateType.SET,
+            selector,
+            StateUpdateType.INDIVIDUAL_TWEENS === args.updateType
+              ? args.easeFn
+              : undefined,
+            args.duration,
+            isLastTween
+          );
+          this.updateSelectionState(
+            StateUpdateType.SET,
+            selector,
+            args.easeFn,
+            args.duration
+          );
+        } else {
+          this.updateCurrentAnimationState(
+            args.updateType,
+            selector,
+            StateUpdateType.INDIVIDUAL_TWEENS === args.updateType
+              ? args.easeFn
+              : undefined,
+            args.duration,
+            isLastTween
+          );
+          this.updateSelectionState(
+            args.updateType,
+            selector,
+            args.easeFn,
+            args.duration
+          );
+        }
       }
     );
 

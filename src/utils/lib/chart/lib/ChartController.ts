@@ -292,16 +292,18 @@ export class ChartController {
   processPlaybackSubscriptionData(
     playbackConfig: PlaybackSettingsConfig,
     endKeyframe?: number,
+    startKeyframe?: number,
     selector?: string
   ) {
-    const startKeyframe = this.state.currentKeyframeIndex;
+    const _startKeyframe = startKeyframe ?? this.state.currentKeyframeIndex;
     const _endKeyframe = endKeyframe ?? this.state.currentKeyframeIndex;
-    const states = [..._.range(startKeyframe, _endKeyframe), _endKeyframe];
+    const states = [..._.range(_startKeyframe, _endKeyframe), _endKeyframe];
     return {
       states: states.map((value: number, index: number) => {
         return {
           index: value,
-          selector: index < states.length - 1 ? selector : undefined,
+          selector:
+            index < states.length - 1 && index !== 0 ? selector : undefined,
         };
       }),
       duration: playbackConfig?.duration ?? 5,
@@ -326,15 +328,23 @@ export class ChartController {
       });
 
     this.state.keyframeTimeline?.clear();
-    args.states.forEach((state: AnimatedElementPlaybackState) => {
-      this.state.keyframeTimeline?.to(this.state, {
-        currentKeyframeIndex: state.index,
-        duration: args.duration,
-        ...(StateUpdateType.INDIVIDUAL_TWEENS === args.updateType
-          ? { ease: args.easeFn }
-          : {}),
-      });
-    });
+    args.states.forEach(
+      (state: AnimatedElementPlaybackState, index: number) => {
+        if (index === 0) {
+          this.state.keyframeTimeline?.set(this.state, {
+            currentKeyframeIndex: state.index,
+          });
+        } else {
+          this.state.keyframeTimeline?.to(this.state, {
+            currentKeyframeIndex: state.index,
+            duration: args.duration,
+            ...(StateUpdateType.INDIVIDUAL_TWEENS === args.updateType
+              ? { ease: args.easeFn }
+              : {}),
+          });
+        }
+      }
+    );
 
     if (args.updateType === StateUpdateType.GROUP_TIMELINE) {
       this.state.playbackTimeline?.clear();

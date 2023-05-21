@@ -7,19 +7,25 @@ import {
   selectionSubject,
   type PlaybackSettingsConfig,
   StateUpdateType,
-  type AnimatedElementPlaybackArgs,
 } from "@/utils";
-import { onMounted, ref } from "vue";
-import { ChartSettings, CanvasSettings, StorySettings } from "@/state";
+import { onMounted, ref, watchEffect } from "vue";
+import {
+  ChartSettings,
+  CanvasSettings,
+  StorySettings,
+  playbackSliderRange,
+  currentChart,
+  handlePlay,
+} from "@/state";
 import { CanvasWrapper, VideoCanvas, AppCanvas } from "@/components";
-import * as d3 from "d3";
+
 import { gsap } from "gsap";
 import { MorphSVGPlugin } from "gsap/MorphSVGPlugin";
 import { CustomEase } from "gsap/CustomEase";
+
 gsap.registerPlugin(MorphSVGPlugin);
 gsap.registerPlugin(CustomEase);
 
-const selector = ref<string | undefined>();
 const snackbar = ref<boolean>(false);
 const snackbarText = ref<string>("");
 const snackbarVariant = ref<string>("");
@@ -28,6 +34,11 @@ const playbackConfig = ref<PlaybackSettingsConfig>({
   duration: 5,
   easeFn: "none",
   playbackMode: StateUpdateType.GROUP_TIMELINE,
+});
+const keyframes = ref<string[]>();
+
+watchEffect(() => {
+  keyframes.value = currentChart.value?.state.keyframes;
 });
 
 snackbarSubject.subscribe({
@@ -58,26 +69,13 @@ playbackSubject.subscribe({
       endKeyframe.value = config.data;
     } else {
       playbackConfig.value = config.data;
-      if (config.data.svg) {
-        selector.value = "#st0";
-        d3.select("#st0").attr("d", config.data.svg);
-      } else {
-        selector.value = undefined;
-      }
 
-      const charts = StorySettings.currentStory?.getCharts();
-      if (!charts) return;
-
-      charts.forEach((chart) => {
-        const args = chart.state.chart?.processPlaybackSubscriptionData(
-          playbackConfig.value,
-          endKeyframe.value,
-          selector.value ? "#st0" : undefined
-        );
-        if (args) {
-          chart.state.chart?.play(args as AnimatedElementPlaybackArgs);
-        }
-      });
+      handlePlay(
+        playbackConfig.value,
+        config.data.svg,
+        undefined,
+        endKeyframe.value
+      );
     }
   },
 });
@@ -193,6 +191,28 @@ onMounted(() => {
       :ref="(el) => CanvasSettings.setCanvas(el as HTMLCanvasElement, 'events')"
     ></canvas>
   </CanvasWrapper>
+  <v-container>
+    <v-row>
+      <v-col>
+        <v-range-slider
+          v-model="playbackSliderRange"
+          :ticks="Object.assign({}, keyframes)"
+          show-ticks="always"
+          thumb-label="always"
+          min="0"
+          :max="(keyframes?.length ?? 1) - 1"
+          :step="1"
+          density="compact"
+        >
+          <template v-slot:thumb-label="{ modelValue }">
+            <div class="text-body" v-if="keyframes">
+              {{ keyframes[modelValue] }}
+            </div>
+          </template>
+        </v-range-slider>
+      </v-col>
+    </v-row>
+  </v-container>
   <v-snackbar :timeout="2000" :color="snackbarVariant" v-model="snackbar">
     {{ snackbarText }}
   </v-snackbar>

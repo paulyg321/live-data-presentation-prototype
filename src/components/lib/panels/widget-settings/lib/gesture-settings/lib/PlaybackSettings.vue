@@ -28,6 +28,8 @@ const emit = defineEmits<{
       value: PlaybackSettingsConfig;
     }
   ): void;
+  (e: "on-play-forward", config: PlaybackSettingsConfig): void;
+  (e: "on-play-backward", config: PlaybackSettingsConfig): void;
 }>();
 const props = defineProps<PlaybackSettingsProps>();
 
@@ -51,6 +53,25 @@ onMounted(() => {
     "
   >
     <v-container>
+      <v-row>
+        <v-col>
+          <div class="text-h5">Preview Animation</div>
+        </v-col>
+      </v-row>
+      <v-row class="mb-5">
+        <v-col lg="6">
+          <v-btn
+            @click="emit('on-play-backward', playbackSettings[affectKey])"
+            icon="mdi-step-backward"
+          ></v-btn>
+        </v-col>
+        <v-col lg="6" class="d-flex flex-row justify-end">
+          <v-btn
+            @click="emit('on-play-forward', playbackSettings[affectKey])"
+            icon="mdi-step-forward"
+          ></v-btn>
+        </v-col>
+      </v-row>
       <v-row>
         <v-col>
           <div class="text-h5">Affect Settings</div>
