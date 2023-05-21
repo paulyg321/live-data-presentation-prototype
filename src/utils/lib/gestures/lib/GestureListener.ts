@@ -110,6 +110,7 @@ export interface GestureListenerConstructorArgs {
   };
   endKeyframe?: { value: string; index: number };
   strokeRecognizer?: DollarRecognizer;
+  selectionLabelKey?: string;
 }
 
 export interface GestureListenerState {
@@ -163,6 +164,7 @@ export interface GestureListenerState {
   endKeyframe?: { value: string; index: number };
 
   selectionKeys: string[];
+  selectionLabelKey?: string;
   foreshadowingStatesMode?: ForeshadowingStatesMode;
   foreshadowingStatesCount?: number;
 
@@ -226,6 +228,7 @@ export abstract class GestureListener {
     endKeyframe,
     strokeRecognizer = new DollarRecognizer(),
     playbackSettings = DEFAULT_PLAYBACK_SETTINGS,
+    selectionLabelKey
   }: GestureListenerConstructorArgs) {
     this.state = {
       position,
@@ -275,6 +278,7 @@ export abstract class GestureListener {
       startDetecting: false,
       playbackSettings,
       endKeyframe,
+      selectionLabelKey,
     };
 
     this.setResetHandler();
@@ -300,6 +304,7 @@ export abstract class GestureListener {
     foreshadowingStatesCount,
     playbackConfig,
     endKeyframe,
+    selectionLabelKey,
   }: Partial<GestureListenerConstructorArgs>) {
     if (position) {
       this.state.position = position;
@@ -358,6 +363,7 @@ export abstract class GestureListener {
     if (endKeyframe) {
       this.state.endKeyframe = endKeyframe;
     }
+    this.state.selectionLabelKey = selectionLabelKey;
   }
 
   private setResetHandler() {
@@ -395,6 +401,7 @@ export abstract class GestureListener {
           keys: this.state.selectionKeys,
           bounds,
           requireKeyInBounds: this.state.restrictToBounds,
+          selectionLabelKey: this.state.selectionLabelKey,
         });
         break;
       case ListenerMode.PLAYBACK:

@@ -8,3 +8,4 @@ export * from "./lib/drawing";
 export * from "./lib/timer";
 export * from "./lib/story";
 export * from "./lib/interactions";
+export * from "./lib/annotation";

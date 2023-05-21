@@ -224,12 +224,14 @@ export class Chart {
             unscaledData.push({
               x: dataAtKeyframe[this.state.xField],
               y: dataAtKeyframe[this.state.yField],
+              ...dataAtKeyframe,
               keyframe,
             });
           } else {
             unscaledData.push({
               x: undefined,
               y: undefined,
+              ...dataAtKeyframe,
               keyframe,
             });
           }
@@ -294,6 +296,7 @@ export class Chart {
             unscaledData.push({
               x: dataAtKeyframe[this.state.xField],
               y: dataAtKeyframe.rank,
+              ...dataAtKeyframe,
               keyframe,
             });
           } else {
@@ -301,6 +304,7 @@ export class Chart {
               x: undefined,
               y: undefined,
               keyframe,
+              ...dataAtKeyframe,
             });
           }
         });

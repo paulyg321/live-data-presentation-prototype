@@ -10,6 +10,12 @@ import { GestureSettingsState } from "@/state";
         hint="Enter the keys for the items you wish to select"
       ></v-text-field>
     </v-col>
+    <v-col>
+      <v-text-field
+        label="Label to display"
+        v-model="GestureSettingsState.selectionLabelKey"
+      ></v-text-field>
+    </v-col>
     <v-col lg="12">
       <v-checkbox
         label="Emit to items within bounds"

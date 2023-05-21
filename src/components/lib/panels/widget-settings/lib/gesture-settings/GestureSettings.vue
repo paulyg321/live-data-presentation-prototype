@@ -66,6 +66,7 @@ watch(currentWidget, () => {
       useBounds,
       restrictToBounds,
       endKeyframe,
+      selectionLabelKey,
     } = currentWidget.value.state;
 
     if (widgetType.value === ListenerType.STROKE_LISTENER) {
@@ -105,6 +106,9 @@ watch(currentWidget, () => {
     if (endKeyframe) {
       GestureSettingsState.endKeyframe = endKeyframe;
     }
+    if (selectionLabelKey) {
+      GestureSettingsState.selectionLabelKey = selectionLabelKey;
+    }
 
     // GestureSettingsState.resetKey = resetKeys?.values().next().value;
   }
@@ -133,6 +137,7 @@ watch(
       useBounds: GestureSettingsState.useBounds,
       restrictToBounds: GestureSettingsState.restrictToBounds,
       endKeyframe: GestureSettingsState.endKeyframe,
+      selectionLabelKey: GestureSettingsState.selectionLabelKey,
     };
   },
   (state) => {
@@ -169,6 +174,7 @@ onMounted(() => {
       useBounds,
       restrictToBounds,
       endKeyframe,
+      selectionLabelKey,
     } = currentWidget.value.state;
 
     if (widgetType.value === ListenerType.STROKE_LISTENER) {
@@ -207,6 +213,9 @@ onMounted(() => {
     }
     if (endKeyframe) {
       GestureSettingsState.endKeyframe = endKeyframe;
+    }
+    if (selectionLabelKey) {
+      GestureSettingsState.selectionLabelKey = selectionLabelKey;
     }
     // GestureSettingsState.resetKey = resetKeys?.values().next().value;
   }

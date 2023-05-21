@@ -15,6 +15,8 @@ import {
   FORESHADOW_OPACITY,
 } from "@/utils";
 
+const padding = 5;
+
 export class AnimatedBar extends AnimatedElement {
   constructor(args: AnimatedChartElementArgs) {
     super(args);
@@ -250,24 +252,20 @@ export class AnimatedBar extends AnimatedElement {
         yScale: this.controllerState.yScale,
       });
 
-    const padding = 5;
-
     const modifiedDimensions = {
-      width: rectDimensions.width + 2 * padding,
-      height: rectDimensions.height + 2 * padding,
+      width: rectDimensions.width + padding,
+      height: rectDimensions.height + padding,
     };
 
     const modifiedPosition = {
-      x: position.x - padding,
-      y: position.y - padding,
+      x: position.x - padding / 2,
+      y: position.y - padding / 2,
     };
 
     const element = d3
       .select(args.selector ?? "#rect")
       .clone()
       .attr("id", "remove")
-      .attr("x", 0)
-      .attr("y", 0)
       .attr("width", 1)
       .attr("height", 1)
       .node() as SVGPrimitive;
@@ -293,8 +291,6 @@ export class AnimatedBar extends AnimatedElement {
       .select(args.selector ?? "#rect")
       .clone()
       .attr("id", "remove")
-      .attr("x", 0)
-      .attr("y", 0)
       .attr("width", 1)
       .attr("height", 1)
       .node() as SVGPrimitive;
@@ -376,11 +372,15 @@ export class AnimatedBar extends AnimatedElement {
     const color = this.animationState.color;
     const { opacity, path, label, position, dimensions } =
       this.animationState.current;
-    const { opacity: selectionOpacity, path: selectionPath } =
-      this.animationState.selection;
+    const { opacity: selectionOpacity } = this.animationState.selection;
 
     const textPosition = {
       x: position.x + 10,
+      y: position.y + dimensions.height * 0.5 + (label?.fontSize ?? 0) / 2,
+    };
+
+    const selectionLabelPosition = {
+      x: position.x + dimensions.width + 10,
       y: position.y + dimensions.height * 0.5 + (label?.fontSize ?? 0) / 2,
     };
 
@@ -390,10 +390,9 @@ export class AnimatedBar extends AnimatedElement {
       this.controllerState.drawingUtils.modifyContextStyleAndDraw(
         {
           strokeStyle: color,
-          // fillStyle: color,
           fillStyle: index % 2 === 0 ? color : "white",
           opacity,
-          shadow: !(selectionPath && selectionOpacity),
+          shadow: true,
         },
         (context: CanvasRenderingContext2D) => {
           this.controllerState.clipBoundaries(context);
@@ -430,18 +429,25 @@ export class AnimatedBar extends AnimatedElement {
       );
     }
 
-    if (selectionPath && selectionOpacity) {
+    if (this.controllerState.selectionLabelKey && selectionOpacity) {
+      const key = this.controllerState.selectionLabelKey;
+      const labelText =
+        this.controllerState.unscaledData[
+          this.controllerState.currentKeyframeIndex
+        ][key].toLocaleString();
       this.controllerState.drawingUtils.modifyContextStyleAndDraw(
         {
-          strokeStyle: "white",
+          fillStyle: "white",
           opacity: selectionOpacity,
-          lineWidth: 3,
           shadow: true,
+          fontSize: label?.fontSize,
+          textAlign: label?.align as CanvasTextAlign,
         },
         (context: CanvasRenderingContext2D) => {
-          this.controllerState.drawingUtils.drawPath({
-            path: selectionPath.parsedPath,
-            mode: "stroke",
+          this.controllerState.clipBoundaries(context);
+          this.controllerState.drawingUtils.drawText({
+            text: labelText,
+            coordinates: selectionLabelPosition,
             context,
           });
         }

@@ -161,11 +161,7 @@ export class CanvasElementListener {
     this.resizeSettings.lastPosition = mousePosition;
   }
 
-  handleEvent(
-    type: CanvasEvent,
-    eventData: Coordinate2D,
-    save?: () => void
-  ) {
+  handleEvent(type: CanvasEvent, eventData: Coordinate2D, save?: () => void) {
     switch (type) {
       case CanvasEvent.MOUSE_DOWN: {
         const { isInDraggingBounds, isInResizeBounds } =

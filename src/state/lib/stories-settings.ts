@@ -1,4 +1,4 @@
-import { ChartType, DrawingUtils, ListenerType, Story } from "@/utils";
+import { AnnotationType, ChartType, DrawingUtils, ListenerType, Story } from "@/utils";
 import { reactive, watch } from "vue";
 import { CanvasSettings } from "./canvas-settings";
 import { parse, stringify } from "flatted";
@@ -15,6 +15,12 @@ export const widgetIconMap = {
   [ListenerType.OPEN_HAND_POSE]: "mdi-hand-back-left",
   [ListenerType.THUMB_POSE]: "mdi-thumbs-up-down",
   [ListenerType.STROKE_LISTENER]: "mdi-draw",
+
+  [AnnotationType.LINE]: "mdi-vector-line",
+  [AnnotationType.TEXT]: "mdi-alpha-t-box-outline",
+  [AnnotationType.SVG]: "mdi-svg",
+  [AnnotationType.CIRCLE]: "mdi-vector-circle",
+  [AnnotationType.RECT]: "mdi-vector-rectangle",
 };
 
 watch(() => CanvasSettings.generalDrawingUtils, initializeStories);

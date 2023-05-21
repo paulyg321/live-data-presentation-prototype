@@ -63,6 +63,7 @@ export const GestureSettingsState = reactive<{
   playbackMode:
     | StateUpdateType.INDIVIDUAL_TWEENS
     | StateUpdateType.GROUP_TIMELINE;
+  selectionLabelKey?: string;
 }>({
   endKeyframe: undefined,
   gestureName: "",

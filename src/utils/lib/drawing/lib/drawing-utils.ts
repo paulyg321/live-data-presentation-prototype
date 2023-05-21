@@ -316,12 +316,7 @@ export class DrawingUtils {
     if (drawArrowHead) {
       const from = coordinates.at(0);
       const to = coordinates.at(-1);
-      drawArrowhead(
-        context,
-        from,
-        to,
-        radius
-      )
+      drawArrowhead(context, from, to, radius);
     }
   }
 
@@ -471,6 +466,10 @@ export class DrawingUtils {
 
       context.save();
 
+      if (opacity) {
+        context.globalAlpha = opacity;
+      }
+
       if (fillStyle) {
         context.fillStyle = fillStyle;
       }
@@ -481,10 +480,6 @@ export class DrawingUtils {
 
       if (fontSize) {
         context.font = `${bold ? "bold " : ""}${fontSize}px Arial`;
-      }
-
-      if (opacity) {
-        context.globalAlpha = opacity;
       }
 
       if (lineWidth) {

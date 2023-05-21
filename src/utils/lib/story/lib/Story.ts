@@ -11,8 +11,13 @@ import {
   Chart,
   type Coordinate2D,
   ThumbPoseListener,
+  AnnotationType,
+  Line,
+  Circle,
+  Rect,
+  Text,
+  SvgAnnotation,
 } from "@/utils";
-import { stringify } from "flatted";
 
 export type StoryLayer =
   | RangePoseListener
@@ -21,9 +26,14 @@ export type StoryLayer =
   | OpenHandPoseListener
   | StrokeListener
   | ThumbPoseListener
+  | Line
+  | Circle
+  | Rect
+  | Text
+  | SvgAnnotation
   | Chart;
 
-export type LayerType = ChartType | ListenerType;
+export type LayerType = ChartType | ListenerType | AnnotationType;
 
 export class Story {
   title: string;
@@ -122,6 +132,41 @@ export class Story {
               type,
               id,
               layer: new StrokeListener(arg),
+            };
+          }
+          case AnnotationType.LINE: {
+            return {
+              type,
+              id,
+              layer: new Line(arg),
+            };
+          }
+          case AnnotationType.CIRCLE: {
+            return {
+              type,
+              id,
+              layer: new Circle(arg),
+            };
+          }
+          case AnnotationType.RECT: {
+            return {
+              type,
+              id,
+              layer: new Rect(arg),
+            };
+          }
+          case AnnotationType.TEXT: {
+            return {
+              type,
+              id,
+              layer: new Text(arg),
+            };
+          }
+          case AnnotationType.SVG: {
+            return {
+              type,
+              id,
+              layer: new SvgAnnotation(arg),
             };
           }
           default:

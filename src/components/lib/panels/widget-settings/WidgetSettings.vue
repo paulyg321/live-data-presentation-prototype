@@ -1,8 +1,8 @@
 <script lang="ts" setup>
-import { ChartType, ListenerType } from "@/utils";
+import { AnnotationType, ChartType, ListenerType } from "@/utils";
 import { onMounted, watch } from "vue";
 import { StorySettings } from "@/state";
-import { ChartSettings, GestureSettings } from "@/components";
+import { AnnotationSettings, ChartSettings, GestureSettings } from "@/components";
 
 watch(
   () => StorySettings.currentStory?.layers.length,
@@ -86,6 +86,13 @@ onMounted(() => {
       v-if="
               [ListenerType.RECT_POSE, ListenerType.RANGE_POSE, ListenerType.POINT_POSE, ListenerType.OPEN_HAND_POSE, ListenerType.STROKE_LISTENER, ListenerType.THUMB_POSE].includes(
                 StorySettings.currentStory?.currentWidget?.type as ListenerType
+              )
+            "
+    />
+    <AnnotationSettings
+      v-if="
+              [AnnotationType.LINE, AnnotationType.SVG, AnnotationType.TEXT, AnnotationType.RECT, AnnotationType.CIRCLE].includes(
+                StorySettings.currentStory?.currentWidget?.type as AnnotationType
               )
             "
     />

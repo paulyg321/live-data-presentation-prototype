@@ -10,11 +10,11 @@ import type {
 import * as d3 from "d3";
 import type { Coordinate2D, Dimensions } from "../../types";
 import { ForeshadowingStatesMode } from "../../../gestures";
-import { CustomEase } from "gsap/CustomEase";
 
 export const FORESHADOW_OPACITY = 0.6;
-export const SELECTED_OPACITY = 1;
+export const SELECTED_OPACITY = 1.0;
 export const UNSELECTED_OPACITY = 0.3;
+export const TRANSPARENT = 0.0;
 
 export type AnimatedElementState = AnimatedChartElementArgs & {
   playback: {
@@ -133,7 +133,7 @@ export abstract class AnimatedElement {
 
     args.unscaledData.forEach((element: AnimationChartElementData) => {
       foreshadow[element.keyframe] = {
-        opacity: 0,
+        opacity: TRANSPARENT,
         position: { x: 0, y: 0 },
         dimensions: { width: 0, height: 0 },
         path: {
@@ -149,7 +149,7 @@ export abstract class AnimatedElement {
     this.animationState = {
       color: args.color,
       current: {
-        opacity: 0,
+        opacity: SELECTED_OPACITY,
         position: { x: 0, y: 0 },
         dimensions: { width: 0, height: 0 },
         path: {
@@ -166,7 +166,7 @@ export abstract class AnimatedElement {
       },
       foreshadow: foreshadow,
       selection: {
-        opacity: 0,
+        opacity: TRANSPARENT,
         position: { x: 0, y: 0 },
         dimensions: { width: 0, height: 0 },
         path: {
@@ -258,8 +258,11 @@ export abstract class AnimatedElement {
     );
 
     if (args.updateType === StateUpdateType.GROUP_TIMELINE) {
-      this.controllerState.playback.playbackTimeline.clear();
-      this.controllerState.playback.playbackTimeline.fromTo(
+      // this.controllerState.playback.playbackTimeline.clear();
+      const tl1 = gsap.timeline();
+      const tl2 = gsap.timeline();
+
+      tl1.fromTo(
         this.controllerState.playback,
         { extent: 0 },
         {
@@ -268,25 +271,13 @@ export abstract class AnimatedElement {
             currentItemAnimationState.pathTimeline?.totalProgress(
               this.controllerState.playback.extent
             );
-            currentItemAnimationState.positionTimeline?.totalProgress(
-              this.controllerState.playback.extent
-            );
             currentItemAnimationState.sizeTimeline?.totalProgress(
-              this.controllerState.playback.extent
-            );
-            currentItemAnimationState.opacityTimeline?.totalProgress(
               this.controllerState.playback.extent
             );
             currentItemAnimationState.scaleTimeline?.totalProgress(
               this.controllerState.playback.extent
             );
-            selectionAnimationState.opacityTimeline?.totalProgress(
-              this.controllerState.playback.extent
-            );
             selectionAnimationState.pathTimeline?.totalProgress(
-              this.controllerState.playback.extent
-            );
-            selectionAnimationState.positionTimeline?.totalProgress(
               this.controllerState.playback.extent
             );
             selectionAnimationState.sizeTimeline?.totalProgress(
@@ -301,7 +292,35 @@ export abstract class AnimatedElement {
         }
       );
 
-      this.controllerState.playback.playbackTimeline.play();
+      tl2.fromTo(
+        this.controllerState.playback,
+        { extent: 0 },
+        {
+          extent: 1,
+          onUpdate: () => {
+            currentItemAnimationState.positionTimeline?.totalProgress(
+              this.controllerState.playback.extent
+            );
+            currentItemAnimationState.opacityTimeline?.totalProgress(
+              this.controllerState.playback.extent
+            );
+            selectionAnimationState.opacityTimeline?.totalProgress(
+              this.controllerState.playback.extent
+            );
+            selectionAnimationState.positionTimeline?.totalProgress(
+              this.controllerState.playback.extent
+            );
+          },
+          onComplete: () => {
+            this.updateForeshadowingAnimationState();
+          },
+          duration: args.duration,
+          ease: args.easeFn,
+        }
+      );
+
+      tl1.play();
+      tl2.play();
     } else if (args.updateType === StateUpdateType.INDIVIDUAL_TWEENS) {
       currentItemAnimationState.sizeTimeline?.play();
       currentItemAnimationState.scaleTimeline?.play();
@@ -338,7 +357,7 @@ export abstract class AnimatedElement {
         const currentItemAnimationState =
           this.animationState.foreshadow[keyframe];
 
-        let opacity = 0;
+        let opacity = TRANSPARENT;
 
         const foreshadowFnArgs = {
           itemAnimationState: currentItemAnimationState,
@@ -368,7 +387,7 @@ export abstract class AnimatedElement {
               break;
             }
             default:
-              opacity = 0;
+              opacity = TRANSPARENT;
           }
         }
 
@@ -380,7 +399,7 @@ export abstract class AnimatedElement {
           currentItemAnimationState.opacityTimeline?.fromTo(
             currentItemAnimationState,
             {
-              opacity: 0,
+              opacity: TRANSPARENT,
             },
             {
               opacity,
@@ -393,7 +412,7 @@ export abstract class AnimatedElement {
           currentItemAnimationState.opacityTimeline?.fromTo(
             currentItemAnimationState,
             {
-              opacity: 0,
+              opacity: TRANSPARENT,
             },
             {
               opacity,
@@ -416,20 +435,24 @@ export abstract class AnimatedElement {
     updateType: StateUpdateType = StateUpdateType.SET,
     selector?: string,
     easeFn?: any,
-    duration?: number,
-    isLastTween?: boolean
+    duration?: number
+    // isLastTween?: boolean
   ) {
-
     const unscaledPosition =
       this.controllerState.unscaledData[
         this.controllerState.currentKeyframeIndex
       ];
 
-    const isSelected = this.controllerState.isSelected || !this.controllerState.activeSelection;
+    const isSelected = this.controllerState.activeSelection
+      ? this.controllerState.isSelected
+      : true;
     const newCurrentItemOpacity = isSelected
       ? SELECTED_OPACITY
       : UNSELECTED_OPACITY;
-    const newSelectedItemOpacity = isSelected && this.controllerState.activeSelection ? SELECTED_OPACITY : 0;
+    const newSelectedItemOpacity =
+      isSelected && this.controllerState.activeSelection
+        ? SELECTED_OPACITY
+        : TRANSPARENT;
 
     const currentItemAnimationState = this.animationState.current;
     const selectionAnimationState = this.animationState.selection;
@@ -524,7 +547,6 @@ export abstract class AnimatedElement {
             morphSVG: {
               shape: newPath,
               render: (rawPath: any) => {
-                const path = rawPath[0];
                 selectionAnimationState.path.parsedPath = rawPath;
               },
             },
@@ -636,7 +658,6 @@ export abstract class AnimatedElement {
             morphSVG: {
               shape: newPath,
               render: (rawPath: any) => {
-                const path = rawPath[0];
                 currentItemAnimationState.path.parsedPath = rawPath;
               },
             },
@@ -686,7 +707,6 @@ export abstract class AnimatedElement {
             morphSVG: {
               shape: newPath,
               render: (rawPath: any) => {
-                const path = rawPath[0];
                 currentItemAnimationState.path.parsedPath = rawPath;
               },
             },
@@ -770,7 +790,7 @@ export abstract class AnimatedElement {
   }
 
   updateSelection(args: Partial<AnimatedElementState>) {
-    const { isSelected, activeSelection } = args;
+    const { isSelected, activeSelection, selectionLabelKey } = args;
 
     if (isSelected !== undefined) {
       this.controllerState.isSelected = isSelected;
@@ -779,6 +799,8 @@ export abstract class AnimatedElement {
     if (activeSelection !== undefined) {
       this.controllerState.activeSelection = activeSelection;
     }
+
+    this.controllerState.selectionLabelKey = selectionLabelKey;
 
     this.updateSelectionState(StateUpdateType.ANIMATE);
   }

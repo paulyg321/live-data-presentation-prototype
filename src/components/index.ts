@@ -20,3 +20,8 @@ export { default as ForeshadowingSettings } from "./lib/panels/widget-settings/l
 export { default as PlaybackSettings } from "./lib/panels/widget-settings/lib/gesture-settings/lib/PlaybackSettings.vue";
 export { default as SelectionSettings } from "./lib/panels/widget-settings/lib/gesture-settings/lib/SelectionSettings.vue";
 export { default as KeyframeSettings } from "./lib/panels/widget-settings/lib/gesture-settings/lib/KeyframeSettings.vue";
+export { default as AnnotationSettings } from "./lib/panels/widget-settings/lib/annotation-settings/AnnotationSettings.vue";
+export { default as LineAnnotationSettings } from "./lib/panels/widget-settings/lib/annotation-settings/lib/LineAnnotationSettings.vue";
+export { default as ShapeAnnotationSettings } from "./lib/panels/widget-settings/lib/annotation-settings/lib/ShapeAnnotationSettings.vue";
+export { default as TextAnnotationSettings } from "./lib/panels/widget-settings/lib/annotation-settings/lib/TextAnnotationSettings.vue";
+export { default as SvgAnnotationSettings } from "./lib/panels/widget-settings/lib/annotation-settings/lib/SvgAnnotationSettings.vue";

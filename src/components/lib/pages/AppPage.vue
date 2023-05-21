@@ -36,16 +36,23 @@ import {
   OpenHandPoseListener,
   PointPoseListener,
   ThumbPoseListener,
+  AnnotationType,
+  Line,
+  Circle,
+  Rect,
+  Text,
+SvgAnnotation,
 } from "@/utils";
 
 enum AvailableWidgets {
   // Not really widgets
   VIDEO = "video",
   LAYERS = "layers",
-  // widgets
+  // chart widgets
   LINE_CHART = "line-chart",
   BAR_CHART = "bar-chart",
   SCATTER_PLOT = "scatter-plot",
+  // pose widgets
   PORTALS = "portals",
   RECT_POSE = "rect-pose",
   RANGE_POSE = "range-pose",
@@ -53,6 +60,12 @@ enum AvailableWidgets {
   OPEN_HAND_POSE = "open-hand-pose",
   THUMB_POSE = "thumb-touch",
   STROKE_LISTENER = "stroke-listener",
+  // annotation widgets
+  LINE_ANNOTATION = "line-annotation",
+  TEXT_ANNOTATION = "text-annotation",
+  SVG_ANNOTATION = "svg-annotation",
+  CIRCLE_ANNOTATION = "circle-annotation",
+  RECT_ANNOTATION = "rect-annotation",
 }
 
 enum SettingsTab {
@@ -83,6 +96,11 @@ function handleChartWidget(value: SettingsTab, type?: ChartType) {
   currentTab.value = value;
 }
 
+function handleAnnotationWidget(value: SettingsTab, type: AnnotationType) {
+  currentTab.value = value;
+  addWidget(type);
+}
+
 function handleGestureWidget(value: SettingsTab, type: ListenerType) {
   currentTab.value = value;
   addWidget(type);
@@ -110,8 +128,35 @@ function handleAddWidget(value: {
       case AvailableWidgets.SCATTER_PLOT:
         handleChartWidget(SettingsTab.CHART_SETTINGS, ChartType.SCATTER);
         break;
-      case AvailableWidgets.LINE_CHART:
-        handleChartWidget(SettingsTab.CHART_SETTINGS, ChartType.LINE);
+      // case AvailableWidgets.LINE_CHART:
+      //   handleChartWidget(SettingsTab.CHART_SETTINGS, ChartType.LINE);
+      //   break;
+      case AvailableWidgets.LINE_ANNOTATION:
+        handleAnnotationWidget(
+          SettingsTab.WIDGET_SETTINGS,
+          AnnotationType.LINE
+        );
+        break;
+      case AvailableWidgets.TEXT_ANNOTATION:
+        handleAnnotationWidget(
+          SettingsTab.WIDGET_SETTINGS,
+          AnnotationType.TEXT
+        );
+        break;
+      case AvailableWidgets.SVG_ANNOTATION:
+        handleAnnotationWidget(SettingsTab.WIDGET_SETTINGS, AnnotationType.SVG);
+        break;
+      case AvailableWidgets.RECT_ANNOTATION:
+        handleAnnotationWidget(
+          SettingsTab.WIDGET_SETTINGS,
+          AnnotationType.RECT
+        );
+        break;
+      case AvailableWidgets.CIRCLE_ANNOTATION:
+        handleAnnotationWidget(
+          SettingsTab.WIDGET_SETTINGS,
+          AnnotationType.CIRCLE
+        );
         break;
       case AvailableWidgets.RECT_POSE:
         handleGestureWidget(
@@ -238,6 +283,46 @@ function addWidget(type: string) {
       StorySettings.currentStory?.addLayer(type, newListener);
       break;
     }
+    case AnnotationType.LINE: {
+      const newListener = new Line({
+        drawingUtils,
+      });
+
+      StorySettings.currentStory?.addLayer(type, newListener);
+      break;
+    }
+    case AnnotationType.CIRCLE: {
+      const newListener = new Circle({
+        drawingUtils,
+      });
+
+      StorySettings.currentStory?.addLayer(type, newListener);
+      break;
+    }
+    case AnnotationType.RECT: {
+      const newListener = new Rect({
+        drawingUtils,
+      });
+
+      StorySettings.currentStory?.addLayer(type, newListener);
+      break;
+    }
+    case AnnotationType.TEXT: {
+      const newListener = new Text({
+        drawingUtils,
+      });
+
+      StorySettings.currentStory?.addLayer(type, newListener);
+      break;
+    }
+    case AnnotationType.SVG: {
+      const newListener = new SvgAnnotation({
+        drawingUtils,
+      });
+
+      StorySettings.currentStory?.addLayer(type, newListener);
+      break;
+    }
     default:
       break;
   }
@@ -315,6 +400,66 @@ onMounted(() => {
               <v-list-item
                 :prepend-icon="widgetIconMap.bar"
                 :value="AvailableWidgets.BAR_CHART"
+                v-bind="props"
+                :disabled="disableChartType"
+              >
+              </v-list-item>
+            </template>
+          </v-tooltip>
+
+          <v-tooltip text="Line Annotation">
+            <template v-slot:activator="{ props }">
+              <v-list-item
+                :prepend-icon="widgetIconMap['annotation-line']"
+                :value="AvailableWidgets.LINE_ANNOTATION"
+                v-bind="props"
+                :disabled="disableChartType"
+              >
+              </v-list-item>
+            </template>
+          </v-tooltip>
+
+          <v-tooltip text="Text Annotation">
+            <template v-slot:activator="{ props }">
+              <v-list-item
+                :prepend-icon="widgetIconMap['annotation-text']"
+                :value="AvailableWidgets.TEXT_ANNOTATION"
+                v-bind="props"
+                :disabled="disableChartType"
+              >
+              </v-list-item>
+            </template>
+          </v-tooltip>
+
+          <v-tooltip text="SVG Annotation">
+            <template v-slot:activator="{ props }">
+              <v-list-item
+                :prepend-icon="widgetIconMap['annotation-svg']"
+                :value="AvailableWidgets.SVG_ANNOTATION"
+                v-bind="props"
+                :disabled="disableChartType"
+              >
+              </v-list-item>
+            </template>
+          </v-tooltip>
+
+          <v-tooltip text="Rect Annotation">
+            <template v-slot:activator="{ props }">
+              <v-list-item
+                :prepend-icon="widgetIconMap['annotation-rect']"
+                :value="AvailableWidgets.RECT_ANNOTATION"
+                v-bind="props"
+                :disabled="disableChartType"
+              >
+              </v-list-item>
+            </template>
+          </v-tooltip>
+
+          <v-tooltip text="Circle Annotation">
+            <template v-slot:activator="{ props }">
+              <v-list-item
+                :prepend-icon="widgetIconMap['annotation-circle']"
+                :value="AvailableWidgets.CIRCLE_ANNOTATION"
                 v-bind="props"
                 :disabled="disableChartType"
               >

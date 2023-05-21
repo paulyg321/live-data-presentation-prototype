@@ -21,11 +21,11 @@ import {
 import { markRaw } from "vue";
 import _ from "lodash";
 
-export interface AnimationChartElementData {
+export type AnimationChartElementData = {
   x: number;
   y: number;
   keyframe: any;
-}
+} & Record<string, any>;
 
 export interface AnimatedElementPlaybackState {
   index: number;
@@ -61,6 +61,7 @@ export type AnimatedChartElementArgs = {
   activeSelection: boolean;
   currentKeyframeIndex: number;
   clipBoundaries: (context: CanvasRenderingContext2D) => void;
+  selectionLabelKey?: string;
 } & AnimatedElementForeshadowingSettings;
 
 export interface ChartsControllerState {
@@ -139,7 +140,10 @@ export class ChartController {
     this.upsertAnimatedItems();
   }
 
-  upsertAnimatedItems(type?: "scale" | "foreshadow" | "select") {
+  upsertAnimatedItems(
+    type?: "scale" | "foreshadow" | "select",
+    selectionLabelKey?: string
+  ) {
     if (!this.state.xScale || !this.state.yScale) {
       return;
     }
@@ -173,6 +177,7 @@ export class ChartController {
       return {
         isSelected: this.state.currentSelection?.includes(key) ?? false,
         activeSelection,
+        selectionLabelKey,
       };
     };
 
@@ -289,11 +294,9 @@ export class ChartController {
     endKeyframe?: number,
     selector?: string
   ) {
-    const startKeyframe = this.state.currentKeyframeIndex + 1;
+    const startKeyframe = this.state.currentKeyframeIndex;
     const _endKeyframe = endKeyframe ?? this.state.currentKeyframeIndex;
-    // const lastKeyframe =
-    //   _endKeyframe >= startKeyframe ? _endKeyframe + 1 : _endKeyframe - 1;
-    const states = _.range(startKeyframe, _endKeyframe);
+    const states = [..._.range(startKeyframe, _endKeyframe), _endKeyframe];
     return {
       states: states.map((value: number, index: number) => {
         return {
@@ -430,6 +433,7 @@ export class ChartController {
     };
     keys?: string[];
     requireKeyInBounds?: boolean;
+    selectionLabelKey?: string;
   }) {
     const selectionList: string[] = [];
     this.state.animatedElements?.forEach((element) => {
@@ -467,7 +471,7 @@ export class ChartController {
       }
     });
     this.state.currentSelection = selectionList;
-    this.upsertAnimatedItems("select");
+    this.upsertAnimatedItems("select", args.selectionLabelKey);
   }
 
   getRange(args: {
