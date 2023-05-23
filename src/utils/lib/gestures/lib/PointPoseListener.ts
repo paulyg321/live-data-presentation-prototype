@@ -128,14 +128,6 @@ export class PointPoseListener extends GestureListener {
     });
   }
 
-  resetHandler(): void {
-    this.publishToSubjectIfExists(
-      GestureListener.selectionSubjectKey,
-      undefined
-    );
-    this.resetGestureState();
-  }
-
   private resetGestureState() {
     this.state.posePosition = undefined;
     this.state.posePositionToMatch = undefined;

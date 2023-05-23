@@ -120,31 +120,18 @@ export class SvgAnnotation {
     const tl1 = gsap.timeline();
     const tl2 = gsap.timeline();
 
-    tl1.fromTo(
-      this.animationState,
-      {
-        opacity: 0,
-      },
-      {
-        opacity: 1,
-        duration: this.state.animationDuration,
-        ease: this.state.animationEase,
-      }
-    );
+    tl1.to(this.animationState, {
+      opacity: 1,
+      duration: this.state.animationDuration,
+      ease: this.state.animationEase,
+    });
 
-    tl2.fromTo(
-      this.animationState.dimensions,
-      {
-        width: 0,
-        height: 0,
-      },
-      {
-        width: this.state.dimensions.width,
-        height: this.state.dimensions.height,
-        duration: this.state.animationDuration,
-        ease: this.state.animationEase,
-      }
-    );
+    tl2.to(this.animationState.dimensions, {
+      width: this.state.dimensions.width,
+      height: this.state.dimensions.height,
+      duration: this.state.animationDuration,
+      ease: this.state.animationEase,
+    });
 
     tl1.play();
     tl2.play();
@@ -154,31 +141,18 @@ export class SvgAnnotation {
     const tl1 = gsap.timeline();
     const tl2 = gsap.timeline();
 
-    tl1.fromTo(
-      this.animationState,
-      {
-        opacity: 1,
-      },
-      {
-        opacity: 0,
-        duration: this.state.animationDuration,
-        ease: this.state.animationEase,
-      }
-    );
+    tl1.to(this.animationState, {
+      opacity: 0,
+      duration: this.state.animationDuration,
+      ease: this.state.animationEase,
+    });
 
-    tl2.fromTo(
-      this.animationState.dimensions,
-      {
-        width: this.state.dimensions.width,
-        height: this.state.dimensions.height,
-      },
-      {
-        width: 0,
-        height: 0,
-        duration: this.state.animationDuration,
-        ease: this.state.animationEase,
-      }
-    );
+    tl2.to(this.animationState.dimensions, {
+      width: 0,
+      height: 0,
+      duration: this.state.animationDuration,
+      ease: this.state.animationEase,
+    });
 
     tl1.play();
     tl2.play();

@@ -30,7 +30,8 @@ const dataAccessor = ref<string>();
 const xField = ref<string>();
 const yField = ref<string>();
 const zField = ref<string>();
-const useGroups = ref<boolean>(false);
+const groupBy = ref<string>();
+const selectionField = ref<string>();
 const columnOptions = ref<any>([]);
 
 function resetForm() {
@@ -42,10 +43,11 @@ function resetForm() {
   xField.value = undefined;
   yField.value = undefined;
   zField.value = undefined;
-  useGroups.value = false;
+  groupBy.value = undefined;
+  selectionField.value = undefined;
 }
 
-function createChart() {
+async function createChart() {
   if (
     StorySettings.currentStory?.title &&
     chartType.value &&
@@ -58,23 +60,25 @@ function createChart() {
     const drawingUtils = CanvasSettings.generalDrawingUtils;
     if (!drawingUtils) return;
 
-    StorySettings.currentStory.addLayer(
-      chartType.value,
-      new Chart({
-        title: StorySettings.currentStory?.title,
-        type: chartType.value,
-        data: chartData.value,
-        field: keyframe_field.value,
-        key: unique_key.value,
-        xField: xField.value,
-        yField: yField.value,
-        zField: zField.value,
-        position: { x: 0, y: 0 },
-        dimensions: initialChartDimensions,
-        canvasDimensions: initialCanvasDimensions,
-        drawingUtils,
-      })
-    );
+    const newChart = new Chart({
+      title: StorySettings.currentStory?.title,
+      type: chartType.value,
+      data: chartData.value,
+      field: keyframe_field.value,
+      key: unique_key.value,
+      xField: xField.value,
+      yField: yField.value,
+      zField: zField.value,
+      groupBy: groupBy.value,
+      selectionField: selectionField.value,
+      dimensions: initialChartDimensions,
+      canvasDimensions: initialCanvasDimensions,
+      drawingUtils,
+    });
+
+    await newChart.init();
+
+    StorySettings.currentStory.addLayer(chartType.value, newChart);
     StorySettings.saveStories();
     resetForm();
   } else {
@@ -244,15 +248,24 @@ onMounted(() => {
           <v-col lg="12">
             <v-text-field
               v-if="chartType === ChartType.SCATTER"
-              label="Z Field"
+              label="Size Field"
+              hint="If you want the sizes to vary use this field"
               v-model="zField"
             ></v-text-field>
           </v-col>
-          <v-col lg="12" v-if="zField !== undefined">
-            <v-checkbox
-              label="Group Items by Z Field"
-              v-model="useGroups"
-            ></v-checkbox>
+          <v-col lg="12">
+            <v-text-field
+              label="Group By Field"
+              hint="If you want to groups to be colored differently"
+              v-model="groupBy"
+            ></v-text-field>
+          </v-col>
+          <v-col lg="12">
+            <v-text-field
+              label="Selection Field"
+              hint="Field you want to select items by - the value you put into selection poses will compare with this field"
+              v-model="selectionField"
+            ></v-text-field>
           </v-col>
         </v-row>
         <v-row v-if="!props.tab">

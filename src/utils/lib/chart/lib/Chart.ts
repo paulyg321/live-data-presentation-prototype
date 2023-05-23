@@ -6,6 +6,8 @@ import {
   type Dimensions,
   ChartController,
   type ChartsControllerState,
+  getStoredData,
+  storeData,
 } from "@/utils";
 
 export enum ScaleTypes {
@@ -44,20 +46,24 @@ export interface NewChartArgs {
   // Settings
   title: string;
   type: ChartType;
-  data: any;
+  data?: any;
   field: string;
   key: string;
-  xField: string;
-  yField: string;
-  zField?: string;
-  selectionField?: string;
-  colorKey?: string;
+  xField: string; // position
+  yField: string; // position
+  zField?: string; // size
 
-  position: Coordinate2D;
+  // NEW
+  selectionField?: string; // field to use to match when selecting (default is key)
+  groupBy?: string; // grouping to use when coloring
+
+  position?: Coordinate2D;
   dimensions: Dimensions;
   canvasDimensions: Dimensions;
   // Utils
   drawingUtils: DrawingUtils;
+  beginningKeyframeIndex?: number;
+  dataId?: string;
 }
 
 export type ChartState = NewChartArgs & {
@@ -71,10 +77,12 @@ export type ChartState = NewChartArgs & {
   yScaleType: ScaleTypes;
   xDomain?: any[];
   yDomain?: any[];
+  zDomain?: any[];
   colorDomain?: any[];
   keyframes?: any[];
   chart?: ChartController;
   drawingUtils: DrawingUtils;
+  beginningKeyframeIndex: number;
 };
 
 export class Chart {
@@ -94,32 +102,36 @@ export class Chart {
   constructor({
     title,
     type,
-    data = [],
+    data,
+    dataId,
     field,
     key,
     xField,
     yField,
     zField,
-    position,
+    position = { x: 0, y: 0 },
     canvasDimensions,
     dimensions,
     drawingUtils,
     selectionField,
-    colorKey,
+    groupBy,
+    beginningKeyframeIndex = 0,
   }: NewChartArgs) {
     this.state = {
-      title: title,
-      type: type,
-      data: data,
-      field: field,
-      key: key,
-      xField: xField,
-      yField: yField,
-      zField: zField,
-      selectionField: selectionField,
-      position: position,
-      dimensions: dimensions,
-      drawingUtils: drawingUtils,
+      title,
+      type,
+      data,
+      dataId,
+      field,
+      key,
+      xField,
+      yField,
+      zField,
+      selectionField,
+      groupBy,
+      position,
+      dimensions,
+      drawingUtils,
       canvasListener: new CanvasElementListener({
         position,
         dimensions,
@@ -129,18 +141,37 @@ export class Chart {
         },
         drawingUtils,
       }),
-      canvasDimensions: canvasDimensions,
-      colorKey: colorKey,
+      canvasDimensions,
       xScaleType: ScaleTypes.LINEAR,
       yScaleType: ScaleTypes.LINEAR,
       keyframes: [],
+      beginningKeyframeIndex,
     };
+  }
 
-    this.setDataDomains(type);
+  async init() {
+    if (!this.state.data && !this.state.dataId)
+      throw new Error("Unable to get the chart dataset");
+
+    if (!this.state.data && this.state.dataId) {
+      // get from db
+      this.state.data = await getStoredData(this.state.dataId);
+    }
+
+    if (this.state.data && !this.state.dataId) {
+      // Store in DB
+      this.state.dataId = await storeData(JSON.stringify(this.state.data));
+    }
+
+    this.setDataDomains(this.state.type);
     this.initializeChartItems();
   }
 
-  updateState(args: { position?: Coordinate2D; dimensions?: Dimensions }) {
+  updateState(args: {
+    position?: Coordinate2D;
+    dimensions?: Dimensions;
+    beginningKeyframeIndex?: number;
+  }) {
     if (args.position) {
       this.state.position = args.position;
     }
@@ -150,13 +181,19 @@ export class Chart {
         ...args.dimensions,
       };
     }
-    this.state.chart?.updateState(args);
+    if (args.beginningKeyframeIndex) {
+      this.state.beginningKeyframeIndex = args.beginningKeyframeIndex;
+    }
+    this.state.chart?.updateState({
+      ...args,
+      currentKeyframeIndex: args.beginningKeyframeIndex,
+    });
   }
 
   getColorScale() {
     const colorGroupMap = d3.group(
       this.state.data,
-      (data: Record<string, any>) => data[this.state.colorKey ?? this.state.key]
+      (data: Record<string, any>) => data[this.state.groupBy ?? this.state.key]
     );
 
     this.state.colorDomain = Array.from(colorGroupMap, ([key]: any) => key);
@@ -178,6 +215,15 @@ export class Chart {
         this.state.data,
         (data: Record<string, any>) => data[this.state.yField]
       );
+      if (this.state.zField) {
+        this.state.zDomain = d3.extent(
+          this.state.data,
+          (data: Record<string, any>) => {
+            if (!this.state.zField) return;
+            return data[this.state.zField];
+          }
+        );
+      }
     }
 
     if (type === ChartType.BAR) {
@@ -220,10 +266,11 @@ export class Chart {
           if (dataAtKeyframe) {
             selectionKey =
               dataAtKeyframe[this.state.selectionField ?? this.state.key];
-            colorKey = dataAtKeyframe[this.state.colorKey ?? this.state.key];
+            colorKey = dataAtKeyframe[this.state.groupBy ?? this.state.key];
             unscaledData.push({
               x: dataAtKeyframe[this.state.xField],
               y: dataAtKeyframe[this.state.yField],
+              size: this.state.zField ? dataAtKeyframe[this.state.zField] : 10,
               ...dataAtKeyframe,
               keyframe,
             });
@@ -291,7 +338,7 @@ export class Chart {
           if (dataAtKeyframe) {
             selectionKey =
               dataAtKeyframe[this.state.selectionField ?? this.state.key];
-            colorKey = dataAtKeyframe[this.state.colorKey ?? this.state.key];
+            colorKey = dataAtKeyframe[this.state.groupBy ?? this.state.key];
 
             unscaledData.push({
               x: dataAtKeyframe[this.state.xField],
@@ -351,6 +398,7 @@ export class Chart {
       colorScale,
       xDomain: this.state.xDomain,
       yDomain: this.state.yDomain,
+      zDomain: this.state.zDomain,
       dimensions: this.state.dimensions,
       position: this.state.position,
       canvasDimensions: this.state.canvasDimensions,
@@ -358,7 +406,7 @@ export class Chart {
       drawingUtils: this.state.drawingUtils,
       xScaleType: this.state.xScaleType,
       yScaleType: this.state.yScaleType,
-      currentKeyframeIndex: 0,
+      currentKeyframeIndex: this.state.beginningKeyframeIndex,
       playbackExtent: 0,
       chartType: this.state.type,
     } as ChartsControllerState;

@@ -19,6 +19,8 @@ import {
   SvgAnnotation,
 } from "@/utils";
 
+export type AnnotationLayers = Line | Circle | Rect | Text | SvgAnnotation;
+
 export type StoryLayer =
   | RangePoseListener
   | RectPoseListener
@@ -26,11 +28,7 @@ export type StoryLayer =
   | OpenHandPoseListener
   | StrokeListener
   | ThumbPoseListener
-  | Line
-  | Circle
-  | Rect
-  | Text
-  | SvgAnnotation
+  | AnnotationLayers
   | Chart;
 
 export type LayerType = ChartType | ListenerType | AnnotationType;
@@ -49,6 +47,11 @@ export class Story {
   };
   drawingUtils: DrawingUtils;
   thumbNail: any;
+  unParsedLayers: {
+    type: LayerType;
+    id: string;
+    layer: StoryLayer;
+  }[] = [];
 
   constructor({
     title,
@@ -65,115 +68,119 @@ export class Story {
   }) {
     this.title = title;
     this.drawingUtils = drawingUtils;
-    // this.layers = layers;
-    this.loadStoredLayers(layers);
+    this.unParsedLayers = layers;
   }
 
-  loadStoredLayers(
-    layers: {
-      type: LayerType;
-      id: string;
-      layer: StoryLayer;
-    }[]
-  ) {
-    this.layers = layers
-      .map(({ layer, type, id }: any) => {
-        const arg = {
-          ...layer.state,
-          drawingUtils: this.drawingUtils,
-        };
+  updateState({ title }: { title?: string }) {
+    if (title) {
+      this.title = title;
+    }
+  }
 
-        switch (type) {
-          case ChartType.BAR:
-          case ChartType.LINE:
-          case ChartType.SCATTER:
-            return {
-              type,
-              id,
-              layer: new Chart(arg),
-            };
-          case ListenerType.POINT_POSE: {
-            return {
-              type,
-              id,
-              layer: new PointPoseListener(arg),
-            };
+  async loadStoredLayers() {
+    this.layers = (
+      await Promise.all(
+        this.unParsedLayers.map(async ({ layer, type, id }: any) => {
+          const arg = {
+            ...layer.state,
+            drawingUtils: this.drawingUtils,
+          };
+
+          switch (type) {
+            case ChartType.BAR:
+            case ChartType.LINE:
+            case ChartType.SCATTER: {
+              const newChart = new Chart(arg);
+              await newChart.init();
+              return {
+                type,
+                id,
+                layer: newChart,
+              };
+            }
+            case ListenerType.POINT_POSE: {
+              return {
+                type,
+                id,
+                layer: new PointPoseListener(arg),
+              };
+            }
+            case ListenerType.OPEN_HAND_POSE: {
+              return {
+                type,
+                id,
+                layer: new OpenHandPoseListener(arg),
+              };
+            }
+            case ListenerType.RECT_POSE: {
+              return {
+                type,
+                id,
+                layer: new RectPoseListener(arg),
+              };
+            }
+            case ListenerType.RANGE_POSE: {
+              return {
+                type,
+                id,
+                layer: new RangePoseListener(arg),
+              };
+            }
+            case ListenerType.THUMB_POSE: {
+              return {
+                type,
+                id,
+                layer: new ThumbPoseListener(arg),
+              };
+            }
+            case ListenerType.STROKE_LISTENER: {
+              return {
+                type,
+                id,
+                layer: new StrokeListener(arg),
+              };
+            }
+            case AnnotationType.LINE: {
+              return {
+                type,
+                id,
+                layer: new Line(arg),
+              };
+            }
+            case AnnotationType.CIRCLE: {
+              return {
+                type,
+                id,
+                layer: new Circle(arg),
+              };
+            }
+            case AnnotationType.RECT: {
+              return {
+                type,
+                id,
+                layer: new Rect(arg),
+              };
+            }
+            case AnnotationType.TEXT: {
+              return {
+                type,
+                id,
+                layer: new Text(arg),
+              };
+            }
+            case AnnotationType.SVG: {
+              return {
+                type,
+                id,
+                layer: new SvgAnnotation(arg),
+              };
+            }
+            default:
+              return undefined;
           }
-          case ListenerType.OPEN_HAND_POSE: {
-            return {
-              type,
-              id,
-              layer: new OpenHandPoseListener(arg),
-            };
-          }
-          case ListenerType.RECT_POSE: {
-            return {
-              type,
-              id,
-              layer: new RectPoseListener(arg),
-            };
-          }
-          case ListenerType.RANGE_POSE: {
-            return {
-              type,
-              id,
-              layer: new RangePoseListener(arg),
-            };
-          }
-          case ListenerType.THUMB_POSE: {
-            return {
-              type,
-              id,
-              layer: new ThumbPoseListener(arg),
-            };
-          }
-          case ListenerType.STROKE_LISTENER: {
-            return {
-              type,
-              id,
-              layer: new StrokeListener(arg),
-            };
-          }
-          case AnnotationType.LINE: {
-            return {
-              type,
-              id,
-              layer: new Line(arg),
-            };
-          }
-          case AnnotationType.CIRCLE: {
-            return {
-              type,
-              id,
-              layer: new Circle(arg),
-            };
-          }
-          case AnnotationType.RECT: {
-            return {
-              type,
-              id,
-              layer: new Rect(arg),
-            };
-          }
-          case AnnotationType.TEXT: {
-            return {
-              type,
-              id,
-              layer: new Text(arg),
-            };
-          }
-          case AnnotationType.SVG: {
-            return {
-              type,
-              id,
-              layer: new SvgAnnotation(arg),
-            };
-          }
-          default:
-            return undefined;
-        }
-      })
-      .filter((layer) => layer !== undefined) as {
+        })
+      )
+    ).filter((layer) => layer !== undefined) as {
       type: LayerType;
       id: string;
       layer: StoryLayer;
@@ -184,6 +191,16 @@ export class Story {
     return [ChartType.BAR, ChartType.SCATTER, ChartType.LINE].includes(
       type as ChartType
     );
+  }
+
+  isAnnotationLayer(type: string) {
+    return [
+      AnnotationType.CIRCLE,
+      AnnotationType.LINE,
+      AnnotationType.SVG,
+      AnnotationType.RECT,
+      AnnotationType.TEXT,
+    ].includes(type as AnnotationType);
   }
 
   getCurrentWidget() {
@@ -233,9 +250,31 @@ export class Story {
   getCharts() {
     return this.layers
       .filter(({ type }) => {
-        return this.isChartLayer(type as ChartType);
+        return this.isChartLayer(type);
       })
       .map(({ layer }) => layer) as Chart[];
+  }
+
+  getAnnotations() {
+    return this.layers.filter(({ type }) => {
+      return this.isAnnotationLayer(type);
+    });
+  }
+
+  revealAnnotations(annotationIds: string[]) {
+    const annotationsToReveal = this.layers.filter(({ id, type }) => {
+      return this.isAnnotationLayer(type) && annotationIds.includes(id);
+    });
+    const annotationsToHide = this.layers.filter(({ id, type }) => {
+      return this.isAnnotationLayer(type) && !annotationIds.includes(id);
+    });
+
+    annotationsToReveal.forEach((annotation) => {
+      (annotation.layer as AnnotationLayers).handleUnveil();
+    });
+    annotationsToHide.forEach((annotation) => {
+      (annotation.layer as AnnotationLayers).handleHide();
+    });
   }
 
   handleDeleteLayer(id: string, save?: () => void) {

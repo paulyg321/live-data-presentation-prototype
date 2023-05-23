@@ -21,9 +21,12 @@ import {
 import { markRaw } from "vue";
 import _ from "lodash";
 
+const RADIUS_RANGE = [7, 30];
+
 export type AnimationChartElementData = {
   x: number;
   y: number;
+  size: number;
   keyframe: any;
 } & Record<string, any>;
 
@@ -57,6 +60,7 @@ export type AnimatedChartElementArgs = {
   drawingUtils: DrawingUtils;
   xScale: D3ScaleTypes;
   yScale: D3ScaleTypes;
+  zScale?: D3ScaleTypes;
   isSelected: boolean;
   activeSelection: boolean;
   currentKeyframeIndex: number;
@@ -80,10 +84,12 @@ export interface ChartsControllerState {
   keyframes: string[];
   xDomain: number[];
   yDomain: number[];
+  zDomain: number[];
   xScaleType: ScaleTypes;
   yScaleType: ScaleTypes;
   xScale?: D3ScaleTypes;
   yScale?: D3ScaleTypes;
+  zScale?: D3ScaleTypes;
   xRange?: number[];
   yRange?: number[];
   animatedElements?: AnimatedElement[];
@@ -120,9 +126,9 @@ export class ChartController {
     const newState = {
       ...args,
       currentSelection: args.currentSelection ?? [],
-    };
+    } as ChartsControllerState;
     const { xRange, yRange } = this.getRange(newState);
-    const { xScale, yScale } = this.getScalesByOption({
+    const { xScale, yScale, zScale } = this.getScalesByOption({
       ...newState,
       xRange,
       yRange,
@@ -134,6 +140,7 @@ export class ChartController {
       yRange,
       xScale,
       yScale,
+      zScale,
       keyframeTimeline: gsap.timeline(),
       playbackTimeline: gsap.timeline(),
     });
@@ -207,13 +214,14 @@ export class ChartController {
                 animatedElement.controllerState.colorKey
               ),
               drawingUtils: this.state.drawingUtils,
+              currentKeyframeIndex: this.state.currentKeyframeIndex,
             });
           }
         }
       );
     } else {
       this.state.animatedElements = this.state.items
-        .filter((_, index) => index < 10)
+        // .filter((_, index) => index < 10)
         .map(
           (item: {
             unscaledData: AnimationChartElementData[];
@@ -228,7 +236,7 @@ export class ChartController {
                 drawingUtils: this.state.drawingUtils,
                 xScale: this.state.xScale ?? d3.scaleLinear(),
                 yScale: this.state.yScale ?? d3.scaleLinear(),
-                currentKeyframeIndex: 0,
+                currentKeyframeIndex: this.state.currentKeyframeIndex,
                 ...getForeshadowingInfo(item.selectionKey),
                 ...getSelectionInfo(item.selectionKey),
                 clipBoundaries: generateClipRect,
@@ -241,7 +249,8 @@ export class ChartController {
                 drawingUtils: this.state.drawingUtils,
                 xScale: this.state.xScale ?? d3.scaleLinear(),
                 yScale: this.state.yScale ?? d3.scaleLinear(),
-                currentKeyframeIndex: 0,
+                zScale: this.state.zScale,
+                currentKeyframeIndex: this.state.currentKeyframeIndex,
                 ...getForeshadowingInfo(item.selectionKey),
                 ...getSelectionInfo(item.selectionKey),
                 clipBoundaries: generateClipRect,
@@ -254,7 +263,8 @@ export class ChartController {
                 drawingUtils: this.state.drawingUtils,
                 xScale: this.state.xScale ?? d3.scaleLinear(),
                 yScale: this.state.yScale ?? d3.scaleLinear(),
-                currentKeyframeIndex: 0,
+                zScale: this.state.zScale ?? d3.scaleLinear(),
+                currentKeyframeIndex: this.state.currentKeyframeIndex,
                 ...getForeshadowingInfo(item.selectionKey),
                 ...getSelectionInfo(item.selectionKey),
                 clipBoundaries: generateClipRect,
@@ -267,8 +277,15 @@ export class ChartController {
   }
 
   updateState(args: Partial<ChartsControllerState>) {
-    const { position, dimensions, xDomain, yDomain, drawingUtils, colorScale } =
-      args;
+    const {
+      position,
+      dimensions,
+      xDomain,
+      yDomain,
+      drawingUtils,
+      colorScale,
+      currentKeyframeIndex,
+    } = args;
 
     if (position || dimensions || xDomain || yDomain) {
       this.updateScales({
@@ -284,6 +301,9 @@ export class ChartController {
       }
       if (colorScale) {
         this.state.colorScale = colorScale;
+      }
+      if (currentKeyframeIndex) {
+        this.state.currentKeyframeIndex = currentKeyframeIndex;
       }
       this.upsertAnimatedItems();
     }
@@ -371,7 +391,7 @@ export class ChartController {
     }
   }
 
-  setForeshadow(args: {
+  setForeshadow(args?: {
     bounds?: {
       coordinates: Coordinate2D;
       dimensions?: Dimensions;
@@ -387,55 +407,64 @@ export class ChartController {
       AnimatedElementForeshadowingSettings
     > = {};
     this.state.animatedElements?.forEach((element) => {
-      let bounded = false;
-      const keyIncluded = args.keys?.includes(
-        element.controllerState.selectionKey
-      );
-      if (args.bounds && this.state.xScale && this.state.yScale) {
-        bounded = isInBound(
-          {
-            x: this.state.xScale(
-              element.controllerState.unscaledData[
-                element.controllerState.currentKeyframeIndex
-              ].x
-            ) as number,
-            y: this.state.yScale(
-              element.controllerState.unscaledData[
-                element.controllerState.currentKeyframeIndex
-              ].y
-            ) as number,
-          },
-          {
-            ...args.bounds,
-            position: args.bounds.coordinates,
-          }
-        );
-      }
-
-      const isForeshadowed = args.requireKeyInBounds
-        ? Boolean(keyIncluded && bounded)
-        : Boolean(keyIncluded || bounded);
-
-      if (isForeshadowed) {
+      if (!args) {
         foreshadowingMap[element.controllerState.selectionKey] = {
-          isForeshadowed,
-          foreshadowingMode: args.mode,
-          foreshadowingStateCount: args.stateCount ?? 1,
-        };
-      } else {
-        foreshadowingMap[element.controllerState.selectionKey] = {
-          isForeshadowed,
+          isForeshadowed: false,
           foreshadowingMode: element.controllerState.foreshadowingMode,
           foreshadowingStateCount:
             element.controllerState.foreshadowingStateCount,
         };
+      } else {
+        let bounded = false;
+        const keyIncluded = args.keys?.includes(
+          element.controllerState.selectionKey
+        );
+        if (args.bounds && this.state.xScale && this.state.yScale) {
+          bounded = isInBound(
+            {
+              x: this.state.xScale(
+                element.controllerState.unscaledData[
+                  element.controllerState.currentKeyframeIndex
+                ].x
+              ) as number,
+              y: this.state.yScale(
+                element.controllerState.unscaledData[
+                  element.controllerState.currentKeyframeIndex
+                ].y
+              ) as number,
+            },
+            {
+              ...args.bounds,
+              position: args.bounds.coordinates,
+            }
+          );
+        }
+
+        const isForeshadowed = args.requireKeyInBounds
+          ? Boolean(keyIncluded && bounded)
+          : Boolean(keyIncluded || bounded);
+
+        if (isForeshadowed) {
+          foreshadowingMap[element.controllerState.selectionKey] = {
+            isForeshadowed,
+            foreshadowingMode: args.mode,
+            foreshadowingStateCount: args.stateCount ?? 1,
+          };
+        } else {
+          foreshadowingMap[element.controllerState.selectionKey] = {
+            isForeshadowed,
+            foreshadowingMode: element.controllerState.foreshadowingMode,
+            foreshadowingStateCount:
+              element.controllerState.foreshadowingStateCount,
+          };
+        }
       }
     });
     this.state.currentForeshadow = foreshadowingMap;
     this.upsertAnimatedItems("foreshadow");
   }
 
-  setSelection(args: {
+  setSelection(args?: {
     bounds?: {
       coordinates: Coordinate2D;
       dimensions?: Dimensions;
@@ -446,42 +475,44 @@ export class ChartController {
     selectionLabelKey?: string;
   }) {
     const selectionList: string[] = [];
-    this.state.animatedElements?.forEach((element) => {
-      let bounded = false;
-      const keyIncluded = args.keys?.includes(
-        element.controllerState.selectionKey
-      );
-      if (args.bounds && this.state.xScale && this.state.yScale) {
-        bounded = isInBound(
-          {
-            x: this.state.xScale(
-              element.controllerState.unscaledData[
-                element.controllerState.currentKeyframeIndex
-              ].x
-            ) as number,
-            y: this.state.yScale(
-              element.controllerState.unscaledData[
-                element.controllerState.currentKeyframeIndex
-              ].y
-            ) as number,
-          },
-          {
-            ...args.bounds,
-            position: args.bounds.coordinates,
-          }
+    if (args) {
+      this.state.animatedElements?.forEach((element) => {
+        let bounded = false;
+        const keyIncluded = args.keys?.includes(
+          element.controllerState.selectionKey
         );
-      }
+        if (args.bounds && this.state.xScale && this.state.yScale) {
+          bounded = isInBound(
+            {
+              x: this.state.xScale(
+                element.controllerState.unscaledData[
+                  element.controllerState.currentKeyframeIndex
+                ].x
+              ) as number,
+              y: this.state.yScale(
+                element.controllerState.unscaledData[
+                  element.controllerState.currentKeyframeIndex
+                ].y
+              ) as number,
+            },
+            {
+              ...args.bounds,
+              position: args.bounds.coordinates,
+            }
+          );
+        }
 
-      const isSelected = args.requireKeyInBounds
-        ? Boolean(keyIncluded && bounded)
-        : Boolean(keyIncluded || bounded);
+        const isSelected = args.requireKeyInBounds
+          ? Boolean(keyIncluded && bounded)
+          : Boolean(keyIncluded || bounded);
 
-      if (isSelected) {
-        selectionList.push(element.controllerState.selectionKey);
-      }
-    });
+        if (isSelected) {
+          selectionList.push(element.controllerState.selectionKey);
+        }
+      });
+    }
     this.state.currentSelection = selectionList;
-    this.upsertAnimatedItems("select", args.selectionLabelKey);
+    this.upsertAnimatedItems("select", args?.selectionLabelKey);
   }
 
   getRange(args: {
@@ -551,9 +582,10 @@ export class ChartController {
     yRange: any[];
     xDomain: any[];
     yDomain: any[];
+    zDomain?: any[];
     xScaleType: ScaleTypes;
     yScaleType: ScaleTypes;
-  }): { xScale: D3ScaleTypes; yScale: D3ScaleTypes } {
+  }): { xScale: D3ScaleTypes; yScale: D3ScaleTypes, zScale?: D3ScaleTypes } {
     const xScaleType = args.xScaleType;
     const xDomain = args.xDomain;
     const xRange = args.xRange;
@@ -574,9 +606,19 @@ export class ChartController {
       range: yRange,
     });
 
+    let zScale;
+    if (args.zDomain) {
+      zScale = this.getScales({
+        scaleType: ScaleTypes.LINEAR,
+        domain: args.zDomain,
+        range: RADIUS_RANGE,
+      });
+    }
+
     return {
       xScale,
       yScale,
+      zScale,
     };
   }
 
@@ -615,7 +657,7 @@ export class ChartController {
       this.state.xRange &&
       this.state.yRange
     ) {
-      const { xScale, yScale } = this.getScalesByOption({
+      const { xScale, yScale, zScale } = this.getScalesByOption({
         xRange,
         yRange,
         ...this.state,
@@ -623,6 +665,7 @@ export class ChartController {
 
       this.state.xScale = xScale;
       this.state.yScale = yScale;
+      this.state.zScale = zScale;
     }
   }
 

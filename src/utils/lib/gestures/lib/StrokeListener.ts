@@ -153,10 +153,6 @@ export class StrokeListener extends GestureListener {
     });
   }
 
-  resetHandler(): void {
-    console.log("RESET - RADIAL");
-  }
-
   handleTrigger() {
     if (this.state.detectionTimer) return;
     this.triggerDetection(() => {

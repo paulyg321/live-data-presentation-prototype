@@ -109,29 +109,17 @@ export class Circle {
     const tl1 = gsap.timeline();
     const tl2 = gsap.timeline();
 
-    tl1.fromTo(
-      this.animationState,
-      {
-        opacity: 0,
-      },
-      {
-        opacity: 1,
-        duration: this.state.animationDuration,
-        ease: this.state.animationEase,
-      }
-    );
+    tl1.to(this.animationState, {
+      opacity: 1,
+      duration: this.state.animationDuration,
+      ease: this.state.animationEase,
+    });
 
-    tl2.fromTo(
-      this.animationState,
-      {
-        radius: 0,
-      },
-      {
-        radius: this.state.dimensions.width / 2,
-        duration: this.state.animationDuration,
-        ease: this.state.animationEase,
-      }
-    );
+    tl2.to(this.animationState, {
+      radius: this.state.dimensions.width / 2,
+      duration: this.state.animationDuration,
+      ease: this.state.animationEase,
+    });
 
     tl1.play();
     tl2.play();
@@ -148,29 +136,17 @@ export class Circle {
     const tl1 = gsap.timeline();
     const tl2 = gsap.timeline();
 
-    tl1.fromTo(
-      this.animationState,
-      {
-        opacity: 1,
-      },
-      {
-        opacity: 0,
-        duration: this.state.animationDuration,
-        ease: this.state.animationEase,
-      }
-    );
+    tl1.to(this.animationState, {
+      opacity: 0,
+      duration: this.state.animationDuration,
+      ease: this.state.animationEase,
+    });
 
-    tl2.fromTo(
-      this.animationState,
-      {
-        radius: this.state.dimensions.width / 2,
-      },
-      {
-        radius: 0,
-        duration: this.state.animationDuration,
-        ease: this.state.animationEase,
-      }
-    );
+    tl2.to(this.animationState, {
+      radius: 0,
+      duration: this.state.animationDuration,
+      ease: this.state.animationEase,
+    });
 
     tl1.play();
     tl2.play();

@@ -9,3 +9,4 @@ export * from "./lib/timer";
 export * from "./lib/story";
 export * from "./lib/interactions";
 export * from "./lib/annotation";
+export * from "./lib/firebase";

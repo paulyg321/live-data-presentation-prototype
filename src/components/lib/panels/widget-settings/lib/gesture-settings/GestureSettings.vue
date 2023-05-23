@@ -18,6 +18,7 @@ import {
   PlaybackSettings,
   SelectionSettings,
   KeyframeSettings,
+  AnnotationPoseSettings
 } from "@/components";
 const currentWidget = ref<GestureListener>();
 const widgetType = ref<ListenerType>();
@@ -338,6 +339,7 @@ function getGestures() {
             ListenerMode.SELECTION,
             ListenerMode.PLAYBACK,
             ListenerMode.KEYFRAME,
+            ListenerMode.ANNOTATE,
           ]"
         ></v-select>
       </v-col>
@@ -349,6 +351,10 @@ function getGestures() {
 
     <SelectionSettings
       v-if="GestureSettingsState.listenerMode === ListenerMode.SELECTION"
+    />
+
+    <AnnotationPoseSettings
+      v-if="GestureSettingsState.listenerMode === ListenerMode.ANNOTATE"
     />
 
     <KeyframeSettings

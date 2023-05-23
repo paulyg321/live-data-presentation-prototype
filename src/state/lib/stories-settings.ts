@@ -1,5 +1,13 @@
-import { AnnotationType, ChartType, DrawingUtils, ListenerType, Story } from "@/utils";
-import { reactive, watch } from "vue";
+import {
+  AnnotationType,
+  ChartType,
+  DrawingUtils,
+  ListenerType,
+  Story,
+  getStories,
+  storeStories,
+} from "@/utils";
+import { markRaw, reactive, watch } from "vue";
 import { CanvasSettings } from "./canvas-settings";
 import { parse, stringify } from "flatted";
 
@@ -25,15 +33,16 @@ export const widgetIconMap = {
 
 watch(() => CanvasSettings.generalDrawingUtils, initializeStories);
 
-export function initializeStories() {
-  if (localStorage.getItem("stories") && CanvasSettings.generalDrawingUtils) {
-    StorySettings.stories = (
-      parse(localStorage.getItem("stories") ?? "[]") as any[]
-    ).map((story) => {
-      return new Story({
+export async function initializeStories() {
+  const stories = (await getStories()) ?? "[]";
+  if (stories && CanvasSettings.generalDrawingUtils) {
+    StorySettings.stories = (parse(stories) as any[]).map((story) => {
+      const newStory = new Story({
         ...story,
         drawingUtils: CanvasSettings.generalDrawingUtils as DrawingUtils,
       });
+
+      return newStory;
     });
   }
 }
@@ -43,51 +52,75 @@ export const StorySettings = reactive<{
   currentStory?: Story;
   currentStoryIndex?: number;
   saveStories: () => void;
-  addNewStory: (title: string) => number | undefined;
-  setCurrentStory: (index: number) => void;
-  deleteStory: (title: string) => void;
+  addNewStory: (title: string) => Promise<number | undefined>;
+  setCurrentStory: (index: number) => Promise<void>;
+  deleteStory: (index: number) => Promise<void>;
+  duplicateStory: (index: number) => Promise<void>;
 }>({
   stories: [],
   currentStory: undefined,
   currentStoryIndex: undefined,
-  setCurrentStory(index: number) {
+  async setCurrentStory(index: number) {
     const storedStories = this.stories;
     if (storedStories.length > 0) {
       this.currentStory = storedStories[index];
-      // this.currentStory?.loadStoredLayers();
+      this.currentStory?.loadStoredLayers();
       this.currentStoryIndex = index;
     }
   },
   saveStories() {
-    localStorage.setItem("stories", stringify(this.stories));
+    storeStories(
+      stringify(markRaw(this.stories), (key: string, value: any) => {
+        if (["data", "chart", "keyframes"].includes(key)) return undefined;
+        return value;
+      })
+    );
   },
-  addNewStory(title: string) {
+  async duplicateStory(index: number) {
     if (!CanvasSettings.generalDrawingUtils) return;
+    const existingStory = this.stories[index];
+    const storyLength = this.stories.length;
 
-    const newStories = [
+    if (!existingStory) return;
+
+    this.stories = [
       ...this.stories,
       new Story({
-        title,
+        ...existingStory,
         drawingUtils: CanvasSettings.generalDrawingUtils,
+        title: `${existingStory.title}-${storyLength}`,
       }),
     ];
+
+    await this.setCurrentStory(this.stories.length - 1);
+  },
+  async addNewStory(title: string) {
+    if (!CanvasSettings.generalDrawingUtils) return;
+
+    const newStory = new Story({
+      title,
+      drawingUtils: CanvasSettings.generalDrawingUtils,
+    });
+
+    const newStories = [...this.stories, newStory];
     this.stories = newStories;
-    this.saveStories();
 
     const newStoryIndex = newStories.length - 1;
-    this.setCurrentStory(newStoryIndex);
-
+    await this.setCurrentStory(newStoryIndex);
     return newStoryIndex;
   },
-  deleteStory(title: string) {
-    const newStories = this.stories.filter((story) => {
-      return story.title !== title;
-    });
-    this.stories = newStories;
+  async deleteStory(index: number) {
+    this.stories.splice(index, 1);
 
-    const newStoryIndex = newStories.length - 1;
-    this.setCurrentStory(newStoryIndex);
-
+    const newStoryIndex = this.stories.length - 1;
+    await this.setCurrentStory(newStoryIndex);
     this.saveStories();
   },
 });
+
+watch(
+  () => StorySettings.stories,
+  () => {
+    StorySettings.saveStories();
+  }
+);

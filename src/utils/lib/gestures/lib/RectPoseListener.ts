@@ -82,10 +82,6 @@ export class RectPoseListener extends GestureListener {
     this.state.posePositionToMatch = undefined;
   }
 
-  resetHandler(): void {
-    this.resetGestureState();
-  }
-
   private drawPoseState() {
     // DRAW REFERENCE POINTS
     [HANDS.LEFT, HANDS.RIGHT].forEach((hand: HANDS) => {

@@ -88,14 +88,6 @@ export class RangePoseListener extends GestureListener {
     this.state.posePositionToMatch = undefined;
   }
 
-  resetHandler(): void {
-    this.publishToSubjectIfExists(
-      GestureListener.foreshadowingAreaSubjectKey,
-      undefined
-    );
-    this.resetGestureState();
-  }
-
   private drawPoseState() {
     // DRAW REFERENCE POINTS
     [HANDS.LEFT, HANDS.RIGHT].forEach((hand: HANDS) => {

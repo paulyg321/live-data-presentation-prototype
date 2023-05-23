@@ -111,31 +111,18 @@ export class Line {
     const tl1 = gsap.timeline();
     const tl2 = gsap.timeline();
 
-    tl1.fromTo(
-      this.animationState,
-      {
-        opacity: 0,
-      },
-      {
-        opacity: 1,
-        duration: this.state.animationDuration,
-        ease: this.state.animationEase,
-      }
-    );
+    tl1.to(this.animationState, {
+      opacity: 1,
+      duration: this.state.animationDuration,
+      ease: this.state.animationEase,
+    });
 
-    tl2.fromTo(
-      this.animationState.endCoord,
-      {
-        x: this.state.startCoord.x,
-        y: this.state.startCoord.y,
-      },
-      {
-        x: this.state.endCoord.x,
-        y: this.state.endCoord.y,
-        duration: this.state.animationDuration,
-        ease: this.state.animationEase,
-      }
-    );
+    tl2.to(this.animationState.endCoord, {
+      x: this.state.endCoord.x,
+      y: this.state.endCoord.y,
+      duration: this.state.animationDuration,
+      ease: this.state.animationEase,
+    });
 
     tl1.play();
     tl2.play();
@@ -145,31 +132,18 @@ export class Line {
     const tl1 = gsap.timeline();
     const tl2 = gsap.timeline();
 
-    tl1.fromTo(
-      this.animationState,
-      {
-        opacity: 1,
-      },
-      {
-        opacity: 0,
-        duration: this.state.animationDuration,
-        ease: this.state.animationEase,
-      }
-    );
+    tl1.to(this.animationState, {
+      opacity: 0,
+      duration: this.state.animationDuration,
+      ease: this.state.animationEase,
+    });
 
-    tl2.fromTo(
-      this.animationState.endCoord,
-      {
-        x: this.state.endCoord.x,
-        y: this.state.endCoord.y,
-      },
-      {
-        x: this.state.startCoord.x,
-        y: this.state.startCoord.y,
-        duration: this.state.animationDuration,
-        ease: this.state.animationEase,
-      }
-    );
+    tl2.to(this.animationState.endCoord, {
+      x: this.state.startCoord.x,
+      y: this.state.startCoord.y,
+      duration: this.state.animationDuration,
+      ease: this.state.animationEase,
+    });
 
     tl1.play();
     tl2.play();

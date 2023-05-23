@@ -2,7 +2,12 @@
 import { AnnotationType, ChartType, ListenerType } from "@/utils";
 import { onMounted, watch } from "vue";
 import { StorySettings } from "@/state";
-import { AnnotationSettings, ChartSettings, GestureSettings } from "@/components";
+import {
+  AnnotationSettings,
+  ChartSettings,
+  GestureSettings,
+} from "@/components";
+import draggable from "vuedraggable";
 
 watch(
   () => StorySettings.currentStory?.layers.length,
@@ -24,48 +29,44 @@ onMounted(() => {
     </v-row>
     <v-row>
       <v-col lg="12">
-        <v-list>
-          <template
-            v-for="(widget, index) in StorySettings.currentStory?.layers"
-            :key="widget.id"
-          >
-            <v-list-item
-              :title="`${widget.type}-${index}`"
-              :active="
-                widget.id === StorySettings.currentStory?.currentWidget?.id
-              "
-            >
-              <template v-slot:append>
-                <v-btn
-                  color="deep-purple-lighten-2"
-                  icon="mdi-select"
-                  variant="elevated"
-                  density="compact"
-                  @click="
-                    () =>
-                      StorySettings.currentStory?.setCurrentWidget(widget.id)
-                  "
-                  class="mr-2"
-                ></v-btn>
-                <v-btn
-                  color="deep-purple-lighten-2"
-                  icon="mdi-delete-empty"
-                  variant="elevated"
-                  density="compact"
-                  @click="
-                    () =>
-                      StorySettings.currentStory?.handleDeleteLayer(widget.id)
-                  "
-                ></v-btn>
-              </template>
-            </v-list-item>
-            <v-divider
-              v-if="
-                StorySettings.currentStory?.layers.length &&
-                index < StorySettings.currentStory?.layers.length - 1
-              "
-            />
-          </template>
+        <v-list v-if="StorySettings.currentStory">
+          <draggable v-model="StorySettings.currentStory.layers" item-key="id">
+            <template #item="{ element, index }">
+              <v-list-item
+                :key="index"
+                :title="`${index}-${element.type}`"
+                :active="
+                  element.id === StorySettings.currentStory?.currentWidget?.id
+                "
+                @click="
+                  () => StorySettings.currentStory?.setCurrentWidget(element.id)
+                "
+              >
+                <template v-slot:append>
+                  <v-btn
+                    color="deep-purple-lighten-2"
+                    icon="mdi-select"
+                    variant="elevated"
+                    density="compact"
+                    v-clipboard="() => element.id"
+                    class="mr-2"
+                  ></v-btn>
+                  <v-btn
+                    color="deep-purple-lighten-2"
+                    icon="mdi-delete-empty"
+                    variant="elevated"
+                    density="compact"
+                    @click="
+                      () =>
+                        StorySettings.currentStory?.handleDeleteLayer(
+                          element.id
+                        )
+                    "
+                  ></v-btn>
+                </template>
+              </v-list-item>
+            </template>
+          </draggable>
         </v-list>
       </v-col>
     </v-row>

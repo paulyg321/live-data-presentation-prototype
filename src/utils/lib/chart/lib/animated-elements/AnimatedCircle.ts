@@ -140,7 +140,13 @@ export class AnimatedCircle extends AnimatedElement {
 
   handleSelection(args: HandleSelectionArgs): HandleSelectionReturnValue {
     const { itemUnscaledPosition } = args;
-    const offset = RADIUS;
+    let radius = RADIUS;
+
+    if (this.controllerState.zScale && itemUnscaledPosition.size) {
+      radius = this.controllerState.zScale(itemUnscaledPosition.size) as number;
+    }
+
+    const offset = radius;
     const padding = 5;
 
     const position = {
@@ -155,8 +161,8 @@ export class AnimatedCircle extends AnimatedElement {
     };
 
     const dimensions = {
-      width: RADIUS * 2 + padding,
-      height: RADIUS * 2 + padding,
+      width: radius * 2 + padding,
+      height: radius * 2 + padding,
     };
 
     const element = d3
@@ -176,7 +182,13 @@ export class AnimatedCircle extends AnimatedElement {
 
   handleMainUpdate(args: HandleSelectionArgs): HandleSelectionReturnValue {
     const { itemUnscaledPosition } = args;
-    const offset = RADIUS;
+    let radius = RADIUS;
+
+    if (this.controllerState.zScale && itemUnscaledPosition.size) {
+      radius = this.controllerState.zScale(itemUnscaledPosition.size) as number;
+    }
+
+    const offset = radius;
     const position = {
       x:
         (this.controllerState.xScale(itemUnscaledPosition.x) as number) -
@@ -187,8 +199,8 @@ export class AnimatedCircle extends AnimatedElement {
     };
 
     const dimensions = {
-      width: RADIUS * 2,
-      height: RADIUS * 2,
+      width: radius * 2,
+      height: radius * 2,
     };
 
     const element = d3

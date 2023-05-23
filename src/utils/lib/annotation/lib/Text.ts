@@ -95,17 +95,11 @@ export class Text {
   handleUnveil() {
     const tl1 = gsap.timeline();
 
-    tl1.fromTo(
-      this.animationState,
-      {
-        opacity: 0,
-      },
-      {
-        opacity: 1,
-        duration: this.state.animationDuration,
-        ease: this.state.animationEase,
-      }
-    );
+    tl1.to(this.animationState, {
+      opacity: 1,
+      duration: this.state.animationDuration,
+      ease: this.state.animationEase,
+    });
 
     tl1.play();
   }
@@ -113,17 +107,11 @@ export class Text {
   handleHide() {
     const tl1 = gsap.timeline();
 
-    tl1.fromTo(
-      this.animationState,
-      {
-        opacity: 1,
-      },
-      {
-        opacity: 0,
-        duration: this.state.animationDuration,
-        ease: this.state.animationEase,
-      }
-    );
+    tl1.to(this.animationState, {
+      opacity: 0,
+      duration: this.state.animationDuration,
+      ease: this.state.animationEase,
+    });
 
     tl1.play();
   }

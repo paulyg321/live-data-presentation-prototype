@@ -52,10 +52,6 @@ export class ThumbPoseListener extends GestureListener {
     });
   }
 
-  resetHandler(): void {
-    console.log("RESET - RADIAL");
-  }
-
   handleTrigger(fingerData: ListenerProcessedFingerData) {
     const handOne = fingerData[this.state.handsToTrack.dominant];
 

@@ -95,7 +95,7 @@ export interface HandleForeshadowArgs {
 
 export interface HandleSelectionArgs {
   selector?: string;
-  itemUnscaledPosition: Coordinate2D;
+  itemUnscaledPosition: Coordinate2D & { size?: number };
 }
 
 export interface HandleSelectionReturnValue {
@@ -184,7 +184,7 @@ export abstract class AnimatedElement {
 
     this.controllerState = {
       ...args,
-      currentKeyframeIndex: 0,
+      currentKeyframeIndex: args.currentKeyframeIndex,
       foreshadowingMode: ForeshadowingStatesMode.NEXT,
       foreshadowingStateCount: 1,
       playback: {
@@ -377,37 +377,43 @@ export abstract class AnimatedElement {
 
         let opacity = TRANSPARENT;
 
-        const foreshadowFnArgs = {
-          itemAnimationState: currentItemAnimationState,
-          itemUnscaledPosition: nextUnscaledPosition,
-          index,
-          finalForeshadowingIndex,
-          keyframe,
-          currentUnscaledPosition:
-            this.controllerState.unscaledData[
-              this.controllerState.currentKeyframeIndex
-            ],
-        };
-
-        if (index > this.controllerState.currentKeyframeIndex) {
-          switch (this.controllerState.foreshadowingMode) {
-            case ForeshadowingStatesMode.ALL:
-            case ForeshadowingStatesMode.COUNT: {
-              // Check if its foreshadowed and whether should pulse - opacity = 0 and shouldPulse - false if not
-              ({ shouldPulse, opacity } =
-                this.handleForeshadowCount(foreshadowFnArgs));
-              break;
+        if (this.controllerState.isForeshadowed === true) {
+          const foreshadowFnArgs = {
+            itemAnimationState: currentItemAnimationState,
+            itemUnscaledPosition: nextUnscaledPosition,
+            index,
+            finalForeshadowingIndex,
+            keyframe,
+            currentUnscaledPosition:
+              this.controllerState.unscaledData[
+                this.controllerState.currentKeyframeIndex
+              ],
+          };
+  
+          if (index > this.controllerState.currentKeyframeIndex) {
+            switch (this.controllerState.foreshadowingMode) {
+              case ForeshadowingStatesMode.ALL:
+              case ForeshadowingStatesMode.COUNT: {
+                // Check if its foreshadowed and whether should pulse - opacity = 0 and shouldPulse - false if not
+                ({ shouldPulse, opacity } =
+                  this.handleForeshadowCount(foreshadowFnArgs));
+                break;
+              }
+              case ForeshadowingStatesMode.NEXT: {
+                // Check if its foreshadowed and whether should pulse - opacity = 0 and shouldPulse - false if not
+                ({ shouldPulse, opacity } =
+                  this.handleForeshadowNext(foreshadowFnArgs));
+                break;
+              }
+              default:
+                opacity = TRANSPARENT;
             }
-            case ForeshadowingStatesMode.NEXT: {
-              // Check if its foreshadowed and whether should pulse - opacity = 0 and shouldPulse - false if not
-              ({ shouldPulse, opacity } =
-                this.handleForeshadowNext(foreshadowFnArgs));
-              break;
-            }
-            default:
-              opacity = TRANSPARENT;
           }
+        } else {
+          opacity = TRANSPARENT;
+          shouldPulse = false;
         }
+
 
         if (updateType === StateUpdateType.SET) {
           currentItemAnimationState.opacity = opacity;
@@ -447,7 +453,65 @@ export abstract class AnimatedElement {
     this.updateScale(args);
     this.updateForeshadow(args);
     this.updateSelection(args);
+    this.updateKeyframe(args);
   }
+
+  updateKeyframe(args: { currentKeyframeIndex?: number }) {
+    if (args.currentKeyframeIndex) {
+      this.controllerState.currentKeyframeIndex = args.currentKeyframeIndex;
+      this.updateCurrentAnimationState(StateUpdateType.SET);
+    }
+  }
+
+  updateScale(args: { xScale?: D3ScaleTypes; yScale?: D3ScaleTypes }) {
+    const { xScale, yScale } = args;
+
+    if (xScale) {
+      this.controllerState.xScale = xScale;
+    }
+    if (yScale) {
+      this.controllerState.yScale = yScale;
+    }
+
+    if (xScale || yScale) {
+      this.updateCurrentAnimationState(StateUpdateType.SET);
+    }
+  }
+
+  updateForeshadow(args: Partial<AnimatedElementState>) {
+    const { isForeshadowed, foreshadowingMode, foreshadowingStateCount } = args;
+
+    if (isForeshadowed !== undefined) {
+      this.controllerState.isForeshadowed = isForeshadowed;
+    }
+
+    if (foreshadowingMode) {
+      this.controllerState.foreshadowingMode = foreshadowingMode;
+    }
+
+    if (foreshadowingStateCount) {
+      this.controllerState.foreshadowingStateCount = foreshadowingStateCount;
+    }
+
+    this.updateForeshadowingAnimationState();
+  }
+
+  updateSelection(args: Partial<AnimatedElementState>) {
+    const { isSelected, activeSelection, selectionLabelKey } = args;
+
+    if (isSelected !== undefined) {
+      this.controllerState.isSelected = isSelected;
+    }
+
+    if (activeSelection !== undefined) {
+      this.controllerState.activeSelection = activeSelection;
+    }
+
+    this.controllerState.selectionLabelKey = selectionLabelKey;
+
+    this.updateSelectionState(StateUpdateType.ANIMATE);
+  }
+
 
   updateSelectionState(
     updateType: StateUpdateType = StateUpdateType.SET,
@@ -772,55 +836,6 @@ export abstract class AnimatedElement {
         );
       }
     }
-  }
-
-  updateScale(args: { xScale?: D3ScaleTypes; yScale?: D3ScaleTypes }) {
-    const { xScale, yScale } = args;
-
-    if (xScale) {
-      this.controllerState.xScale = xScale;
-    }
-    if (yScale) {
-      this.controllerState.yScale = yScale;
-    }
-
-    if (xScale || yScale) {
-      this.updateCurrentAnimationState(StateUpdateType.SET);
-    }
-  }
-
-  updateForeshadow(args: Partial<AnimatedElementState>) {
-    const { isForeshadowed, foreshadowingMode, foreshadowingStateCount } = args;
-
-    if (isForeshadowed !== undefined) {
-      this.controllerState.isForeshadowed = isForeshadowed;
-    }
-
-    if (foreshadowingMode) {
-      this.controllerState.foreshadowingMode = foreshadowingMode;
-    }
-
-    if (foreshadowingStateCount) {
-      this.controllerState.foreshadowingStateCount = foreshadowingStateCount;
-    }
-
-    this.updateForeshadowingAnimationState();
-  }
-
-  updateSelection(args: Partial<AnimatedElementState>) {
-    const { isSelected, activeSelection, selectionLabelKey } = args;
-
-    if (isSelected !== undefined) {
-      this.controllerState.isSelected = isSelected;
-    }
-
-    if (activeSelection !== undefined) {
-      this.controllerState.activeSelection = activeSelection;
-    }
-
-    this.controllerState.selectionLabelKey = selectionLabelKey;
-
-    this.updateSelectionState(StateUpdateType.ANIMATE);
   }
 
   draw() {

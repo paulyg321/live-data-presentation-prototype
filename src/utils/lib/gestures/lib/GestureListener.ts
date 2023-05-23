@@ -21,6 +21,8 @@ import {
   type Coordinate2D,
   type Dimensions,
   AffectOptions,
+  RESET_ALL_KEY,
+  annotationSubject,
 } from "@/utils";
 import { StateUpdateType } from "../../chart";
 import type { Timer } from "d3";
@@ -186,6 +188,7 @@ export enum ListenerMode {
   SELECTION = "selection",
   PLAYBACK = "playback",
   KEYFRAME = "keyframe",
+  ANNOTATE = "annotate",
 }
 
 export abstract class GestureListener {
@@ -195,6 +198,7 @@ export abstract class GestureListener {
   static foreshadowingAreaSubjectKey = "foreshadowingAreaSubject";
   static highlighSubjectKey = "highlightSubject";
   static selectionSubjectKey = "selectionSubject";
+  static annotationSubjectKey = "annotationSubject";
   static circleFitter = getCircleFit();
 
   state: GestureListenerState;
@@ -228,7 +232,7 @@ export abstract class GestureListener {
     endKeyframe,
     strokeRecognizer = new DollarRecognizer(),
     playbackSettings = DEFAULT_PLAYBACK_SETTINGS,
-    selectionLabelKey
+    selectionLabelKey,
   }: GestureListenerConstructorArgs) {
     this.state = {
       position,
@@ -256,6 +260,7 @@ export abstract class GestureListener {
         [GestureListener.foreshadowingAreaSubjectKey]: foreshadowingAreaSubject,
         [GestureListener.snackbarSubjectKey]: snackbarSubject,
         [GestureListener.selectionSubjectKey]: selectionSubject,
+        [GestureListener.annotationSubjectKey]: annotationSubject,
       },
       drawingUtils,
       addGesture: false,
@@ -367,13 +372,13 @@ export abstract class GestureListener {
   }
 
   private setResetHandler() {
-    // this.state.resetKeys?.forEach((resetKey: string) => {
-    //   document.addEventListener("keypress", (event) => {
-    //     if (event.code == resetKey) {
-    //       this.resetHandler();
-    //     }
-    //   });
-    // });
+    [RESET_ALL_KEY].forEach((resetKey: string) => {
+      document.addEventListener("keypress", (event) => {
+        if (event.code == resetKey) {
+          this.resetHandler();
+        }
+      });
+    });
   }
 
   publishToSubject(
@@ -417,6 +422,11 @@ export abstract class GestureListener {
           data: this.state.endKeyframe?.index,
         });
         break;
+      case ListenerMode.ANNOTATE:
+        this.publishToSubjectIfExists(GestureListener.annotationSubjectKey, {
+          keys: this.state.selectionKeys,
+        });
+        break;
       default:
         break;
     }
@@ -451,7 +461,31 @@ export abstract class GestureListener {
     return undefined;
   }
 
-  abstract resetHandler(): void;
+  resetHandler() {
+    switch (this.state.listenerMode) {
+      case ListenerMode.FORESHADOWING:
+        this.publishToSubjectIfExists(
+          GestureListener.foreshadowingAreaSubjectKey,
+          undefined
+        );
+        break;
+      case ListenerMode.SELECTION:
+        this.publishToSubjectIfExists(
+          GestureListener.selectionSubjectKey,
+          undefined
+        );
+        break;
+      case ListenerMode.ANNOTATE:
+        this.publishToSubjectIfExists(
+          GestureListener.annotationSubjectKey,
+          undefined
+        );
+        break;
+      default:
+        break;
+    }
+  }
+
   abstract draw(): void;
 
   protected abstract handleNewData(
