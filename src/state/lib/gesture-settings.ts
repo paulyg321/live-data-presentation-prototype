@@ -54,7 +54,7 @@ export const GestureSettingsState = reactive<{
   poseDuration: number;
   resetPauseDuration: number;
   triggerDuration: number;
-  selectionKeys: string;
+  selectionKeys: string[];
   foreshadowingStatesMode: ForeshadowingStatesMode;
   foreshadowingStatesCount: number;
   useBounds: boolean;
@@ -74,9 +74,9 @@ export const GestureSettingsState = reactive<{
   poseDuration: 1000,
   resetPauseDuration: 1000,
   triggerDuration: 1000,
-  selectionKeys: "",
-  foreshadowingStatesCount: 0,
-  foreshadowingStatesMode: ForeshadowingStatesMode.ALL,
+  selectionKeys: [],
+  foreshadowingStatesCount: 1,
+  foreshadowingStatesMode: ForeshadowingStatesMode.TRAJECTORY,
   useBounds: false,
   restrictToBounds: false,
   playbackDuration: 5,

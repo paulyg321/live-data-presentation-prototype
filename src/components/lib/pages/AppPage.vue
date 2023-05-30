@@ -41,7 +41,7 @@ import {
   Circle,
   Rect,
   Text,
-SvgAnnotation,
+  SvgAnnotation,
 } from "@/utils";
 
 enum AvailableWidgets {
@@ -210,7 +210,10 @@ function addWidget(type: string) {
   switch (type) {
     case ListenerType.RECT_POSE: {
       const newListener = new RectPoseListener({
-        position: { x: 0, y: 0 },
+        position: {
+          x: CanvasSettings.dimensions.width / 2 - 25,
+          y: CanvasSettings.dimensions.height / 2 - 25,
+        },
         dimensions: { width: 50, height: 50 },
         canvasDimensions: CanvasSettings.dimensions,
         resetKeys: getGestureListenerResetKeys(),
@@ -223,7 +226,10 @@ function addWidget(type: string) {
     }
     case ListenerType.RANGE_POSE: {
       const newListener = new RangePoseListener({
-        position: { x: 0, y: 0 },
+        position: {
+          x: CanvasSettings.dimensions.width / 2 - 25,
+          y: CanvasSettings.dimensions.height / 2 - 25,
+        },
         dimensions: { width: 50, height: 50 },
         canvasDimensions: CanvasSettings.dimensions,
         resetKeys: getGestureListenerResetKeys(),
@@ -236,7 +242,10 @@ function addWidget(type: string) {
     }
     case ListenerType.POINT_POSE: {
       const newListener = new PointPoseListener({
-        position: { x: 0, y: 0 },
+        position: {
+          x: CanvasSettings.dimensions.width / 2 - 25,
+          y: CanvasSettings.dimensions.height / 2 - 25,
+        },
         dimensions: { width: 50, height: 50 },
         canvasDimensions: CanvasSettings.dimensions,
         resetKeys: getGestureListenerResetKeys(),
@@ -249,7 +258,10 @@ function addWidget(type: string) {
     }
     case ListenerType.OPEN_HAND_POSE: {
       const newListener = new OpenHandPoseListener({
-        position: { x: 0, y: 0 },
+        position: {
+          x: CanvasSettings.dimensions.width / 2 - 25,
+          y: CanvasSettings.dimensions.height / 2 - 25,
+        },
         dimensions: { width: 50, height: 50 },
         canvasDimensions: CanvasSettings.dimensions,
         resetKeys: getGestureListenerResetKeys(),
@@ -261,7 +273,10 @@ function addWidget(type: string) {
     }
     case ListenerType.THUMB_POSE: {
       const newListener = new ThumbPoseListener({
-        position: { x: 0, y: 0 },
+        position: {
+          x: CanvasSettings.dimensions.width / 2 - 25,
+          y: CanvasSettings.dimensions.height / 2 - 25,
+        },
         dimensions: { width: 50, height: 50 },
         canvasDimensions: CanvasSettings.dimensions,
         resetKeys: getGestureListenerResetKeys(),
@@ -273,7 +288,10 @@ function addWidget(type: string) {
     }
     case ListenerType.STROKE_LISTENER: {
       const newListener = new StrokeListener({
-        position: { x: 0, y: 0 },
+        position: {
+          x: CanvasSettings.dimensions.width / 2 - 25,
+          y: CanvasSettings.dimensions.height / 2 - 25,
+        },
         dimensions: { width: 50, height: 50 },
         canvasDimensions: CanvasSettings.dimensions,
         resetKeys: getGestureListenerResetKeys(),
@@ -286,6 +304,14 @@ function addWidget(type: string) {
     case AnnotationType.LINE: {
       const newListener = new Line({
         drawingUtils,
+        startCoord: {
+          x: CanvasSettings.dimensions.width / 2 - 25,
+          y: CanvasSettings.dimensions.height / 2 - 25,
+        },
+        endCoord: {
+          x: CanvasSettings.dimensions.width / 2 + 25,
+          y: CanvasSettings.dimensions.height / 2 + 25,
+        },
       });
 
       StorySettings.currentStory?.addLayer(type, newListener);
@@ -294,6 +320,10 @@ function addWidget(type: string) {
     case AnnotationType.CIRCLE: {
       const newListener = new Circle({
         drawingUtils,
+        position: {
+          x: CanvasSettings.dimensions.width / 2 - 25,
+          y: CanvasSettings.dimensions.height / 2 - 25,
+        },
       });
 
       StorySettings.currentStory?.addLayer(type, newListener);
@@ -302,6 +332,10 @@ function addWidget(type: string) {
     case AnnotationType.RECT: {
       const newListener = new Rect({
         drawingUtils,
+        position: {
+          x: CanvasSettings.dimensions.width / 2 - 25,
+          y: CanvasSettings.dimensions.height / 2 - 25,
+        },
       });
 
       StorySettings.currentStory?.addLayer(type, newListener);
@@ -310,6 +344,10 @@ function addWidget(type: string) {
     case AnnotationType.TEXT: {
       const newListener = new Text({
         drawingUtils,
+        position: {
+          x: CanvasSettings.dimensions.width / 2 - 25,
+          y: CanvasSettings.dimensions.height / 2 - 25,
+        },
       });
 
       StorySettings.currentStory?.addLayer(type, newListener);
@@ -318,6 +356,10 @@ function addWidget(type: string) {
     case AnnotationType.SVG: {
       const newListener = new SvgAnnotation({
         drawingUtils,
+        position: {
+          x: CanvasSettings.dimensions.width / 2 - 25,
+          y: CanvasSettings.dimensions.height / 2 - 25,
+        },
       });
 
       StorySettings.currentStory?.addLayer(type, newListener);

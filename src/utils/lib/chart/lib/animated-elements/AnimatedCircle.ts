@@ -20,13 +20,9 @@ const RADIUS = 10;
 export class AnimatedCircle extends AnimatedElement {
   constructor(args: AnimatedChartElementArgs) {
     super(args);
-    console.log({
-      key: args.selectionKey,
-      color: args.color,
-    });
   }
 
-  handleForeshadowCount(
+  handleForeshadowTrajectory(
     args: HandleForeshadowArgs
   ): HandleForeshadowReturnValue {
     const FONT_SIZE = 16;
@@ -39,11 +35,7 @@ export class AnimatedCircle extends AnimatedElement {
     } = args;
 
     const isForeshadowed = this.controllerState.isForeshadowed;
-    if (
-      (index <= finalForeshadowingIndex && isForeshadowed) ||
-      (this.controllerState.foreshadowingMode === ForeshadowingStatesMode.ALL &&
-        isForeshadowed)
-    ) {
+    if (index <= finalForeshadowingIndex && isForeshadowed) {
       const position = {
         x: this.controllerState.xScale(itemUnscaledPosition.x) as number,
         y: this.controllerState.yScale(itemUnscaledPosition.y) as number,
@@ -75,14 +67,12 @@ export class AnimatedCircle extends AnimatedElement {
     }
 
     return {
-      shouldPulse:
-        index === finalForeshadowingIndex ||
-        this.controllerState.foreshadowingMode === ForeshadowingStatesMode.ALL,
+      shouldPulse: true,
       opacity,
     };
   }
 
-  handleForeshadowNext(
+  handleForeshadowPoint(
     args: HandleForeshadowArgs
   ): HandleForeshadowReturnValue {
     const {
@@ -315,9 +305,9 @@ export class AnimatedCircle extends AnimatedElement {
 
     Object.values(this.animationState.foreshadow).forEach(
       (value: VisualState) => {
-        const { dimensions, position, opacity } = value;
+        const { position, opacity } = value;
 
-        if (dimensions.width > 0) {
+        if (opacity) {
           finalPath.push(position);
           finalOpacity = opacity;
         }
@@ -335,12 +325,13 @@ export class AnimatedCircle extends AnimatedElement {
     const { path, opacity } = this.generateLineData();
 
     if (
-      this.controllerState.foreshadowingMode === ForeshadowingStatesMode.NEXT
+      this.controllerState.foreshadowingMode === ForeshadowingStatesMode.POINT
     ) {
       if (!path.length || path.length > 1) return;
       this.controllerState.drawingUtils.modifyContextStyleAndDraw(
         {
           strokeStyle: color,
+          fillStyle: "white",
           lineWidth: 3,
           opacity,
         },

@@ -22,7 +22,7 @@ export class AnimatedBar extends AnimatedElement {
     super(args);
   }
 
-  handleForeshadowCount(
+  handleForeshadowTrajectory(
     args: HandleForeshadowArgs
   ): HandleForeshadowReturnValue {
     const FONT_SIZE = 16;
@@ -41,11 +41,7 @@ export class AnimatedBar extends AnimatedElement {
 
     const isForeshadowed = this.controllerState.isForeshadowed;
 
-    if (
-      (index <= finalForeshadowingIndex && isForeshadowed) ||
-      (this.controllerState.foreshadowingMode === ForeshadowingStatesMode.ALL &&
-        isForeshadowed)
-    ) {
+    if (index <= finalForeshadowingIndex && isForeshadowed) {
       const margin = 30;
 
       const lastPosition = this.controllerState.unscaledData[index - 1];
@@ -152,7 +148,7 @@ export class AnimatedBar extends AnimatedElement {
     };
   }
 
-  handleForeshadowNext(
+  handleForeshadowPoint(
     args: HandleForeshadowArgs
   ): HandleForeshadowReturnValue {
     const FONT_SIZE = 16;
@@ -484,7 +480,8 @@ export class AnimatedBar extends AnimatedElement {
 
       const applyLineDash =
         !arrow &&
-        this.controllerState.foreshadowingMode === ForeshadowingStatesMode.NEXT;
+        this.controllerState.foreshadowingMode ===
+          ForeshadowingStatesMode.TRAJECTORY;
 
       this.controllerState.drawingUtils.modifyContextStyleAndDraw(
         {

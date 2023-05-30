@@ -1,7 +1,6 @@
 export enum ForeshadowingStatesMode {
-  NEXT = "next",
-  ALL = "all",
-  COUNT = "count",
+  TRAJECTORY = "trajectory",
+  POINT = "point",
 }
 
 export enum PlaybackSubjectType {

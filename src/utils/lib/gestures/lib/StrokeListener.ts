@@ -10,6 +10,8 @@ import {
   AffectOptions,
   ListenerMode,
 } from "@/utils";
+import lineIntersect from "@turf/line-intersect";
+import { lineString } from "@turf/helpers";
 
 export type StrokeListenerConstructorArgs = GestureListenerConstructorArgs;
 
@@ -156,46 +158,47 @@ export class StrokeListener extends GestureListener {
   handleTrigger() {
     if (this.state.detectionTimer) return;
     this.triggerDetection(() => {
-      if (this.state.stroke.length < 5) {
-        this.state.stroke = [];
-        return;
-      }
+      console.log("DONE");
+      // if (this.state.stroke.length < 5) {
+      //   this.state.stroke = [];
+      //   return;
+      // }
 
-      if (this.state.addGesture) {
-        if (!this.state.gestureName) {
-          this.state.stroke = [];
-          return;
-        }
+      // if (this.state.addGesture) {
+      //   if (!this.state.gestureName) {
+      //     this.state.stroke = [];
+      //     return;
+      //   }
 
-        this.state.strokeRecognizer.addGesture(
-          this.state.gestureName,
-          this.state.stroke
-        );
-        this.publishToSubjectIfExists(GestureListener.snackbarSubjectKey, {
-          open: true,
-          text: "Added new dialing playback gesture",
-          variant: "success",
-        });
-      } else {
-        const result = this.state.strokeRecognizer.recognize(
-          this.state.stroke,
-          false
-        );
-        if (result.name === this.state.strokeTriggerName) {
-          let affect;
+      //   this.state.strokeRecognizer.addGesture(
+      //     this.state.gestureName,
+      //     this.state.stroke
+      //   );
+      //   this.publishToSubjectIfExists(GestureListener.snackbarSubjectKey, {
+      //     open: true,
+      //     text: "Added new dialing playback gesture",
+      //     variant: "success",
+      //   });
+      // } else {
+      //   const result = this.state.strokeRecognizer.recognize(
+      //     this.state.stroke,
+      //     false
+      //   );
+      //   if (result.name === this.state.strokeTriggerName) {
+      //     let affect;
 
-          if (this.state.strokeTriggerName === "radial") {
-            this.state.stroke.forEach((point: Coordinate2D) => {
-              GestureListener.circleFitter.addPoint(point.x, point.y);
-            });
-            const fit = GestureListener.circleFitter.compute();
-            affect = this.convertDistanceToAffect(fit.radius);
-          }
+      //     if (this.state.strokeTriggerName === "radial") {
+      //       this.state.stroke.forEach((point: Coordinate2D) => {
+      //         GestureListener.circleFitter.addPoint(point.x, point.y);
+      //       });
+      //       const fit = GestureListener.circleFitter.compute();
+      //       affect = this.convertDistanceToAffect(fit.radius);
+      //     }
 
-          this.publishToSubject(undefined, affect);
-          GestureListener.circleFitter.resetPoints();
-        }
-      }
+      //     this.publishToSubject(undefined, affect);
+      //     GestureListener.circleFitter.resetPoints();
+      //   }
+      // }
 
       this.state.stroke = [];
     });
@@ -204,14 +207,13 @@ export class StrokeListener extends GestureListener {
   // Implemented to only track one finger and one hand
   protected handleNewData(fingerData: ListenerProcessedFingerData): void {
     const dominantHand = fingerData[this.state.handsToTrack.dominant];
-    const trigger = this.thumbsTouch(fingerData);
+    // const trigger = this.thumbsTouch(fingerData);
 
-    if (trigger) {
-      this.handleTrigger();
-      return;
-    }
-
-    if (!dominantHand || !this.state.startDetecting) {
+    // if (trigger) {
+    //   this.handleTrigger();
+    //   return;
+    // }
+    if (!dominantHand) {
       return;
     }
     const indexFingerPosition = dominantHand.fingerPositions[
@@ -226,8 +228,37 @@ export class StrokeListener extends GestureListener {
 
     const isInBounds = this.isWithinObjectBounds(indexFingerPosition);
 
+    const isFirstDial = this.state.numRevolutions === 0;
     if (isInBounds) {
-      this.state.stroke.push(indexFingerPosition);
+      if (this.state.stroke.length === 0 && isFirstDial) {
+        this.state.gestureStartTime = new Date().getTime();
+      }
+      const newCoords = [indexFingerPosition.x, indexFingerPosition.y];
+      const allCoords = this.state.stroke.map((coord: Coordinate2D) => {
+        return [coord.x, coord.y];
+      });
+
+      const result = doesNewCoordClosePath(newCoords, allCoords);
+
+      if (result) {
+        this.state.stroke = [];
+        this.state.numRevolutions = this.state.numRevolutions + 1;
+        if (this.state.gestureStartTime && isFirstDial) {
+          const timeTaken =
+            (new Date().getTime() - this.state.gestureStartTime) / 1000;
+          // TODO: Map time taken to an affect
+          // console.log(timeTaken);
+          this.publishToSubject(undefined, AffectOptions.NEUTRAL);
+        }
+      } else {
+        this.state.stroke.push(indexFingerPosition);
+      }
+    } else {
+      if (!isFirstDial) {
+        this.pausePlayback();
+      }
+      this.state.numRevolutions = 0;
+      this.state.stroke = [];
     }
   }
 
@@ -247,4 +278,21 @@ export class StrokeListener extends GestureListener {
       this.renderKeyframe();
     }
   }
+}
+
+function doesNewCoordClosePath(newCoord: number[], coordinates: number[][]) {
+  const newSegment = lineString([
+    coordinates[coordinates.length - 1],
+    newCoord,
+  ]);
+
+  for (let i = 0; i < coordinates.length - 2; i++) {
+    const segment = lineString([coordinates[i], coordinates[i + 1]]);
+    const intersections = lineIntersect(segment, newSegment);
+
+    if (intersections.features.length > 0) {
+      return true;
+    }
+  }
+  return false;
 }

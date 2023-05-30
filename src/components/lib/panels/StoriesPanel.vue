@@ -29,12 +29,12 @@ function closeMenu() {
             <template #item="{ element, index }">
               <v-col cols="12" md="4" class="h-100" :key="index">
                 <v-card
-                  :theme="
-                    index === StorySettings.currentStoryIndex ? 'dark' : 'light'
+                  :color="
+                    index === StorySettings.currentStoryIndex
+                      ? '#D1C4E9'
+                      : 'white'
                   "
                   class="h-100 d-flex flex-column"
-                  variant="outlined"
-                  color="#9e9e9e"
                 >
                   <v-card-title class="text-deep-purple-lighten-2 flex-1">{{
                     element.title

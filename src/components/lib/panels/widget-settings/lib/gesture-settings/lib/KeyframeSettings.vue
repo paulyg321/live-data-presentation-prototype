@@ -36,12 +36,12 @@ onMounted(() => {
 <template>
   <v-row>
     <v-col lg="12">
-      <v-select
+      <v-autocomplete
         v-model="endKeyframe"
         label="Animation End Keyframe"
         :items="keyframes"
         hint="Select the final keyframe you to set playback to"
-      ></v-select>
+      ></v-autocomplete>
     </v-col>
   </v-row>
 </template>

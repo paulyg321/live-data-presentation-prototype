@@ -33,8 +33,11 @@ export const widgetIconMap = {
 
 watch(() => CanvasSettings.generalDrawingUtils, initializeStories);
 
+const LEFT = "ArrowLeft";
+const RIGHT = "ArrowRight";
+
 export async function initializeStories() {
-  const stories = (await getStories()) ?? "[]";
+  const stories = (await getStories()) ?? "[[]]";
   if (stories && CanvasSettings.generalDrawingUtils) {
     StorySettings.stories = (parse(stories) as any[]).map((story) => {
       const newStory = new Story({
@@ -52,6 +55,8 @@ export const StorySettings = reactive<{
   currentStory?: Story;
   currentStoryIndex?: number;
   saveStories: () => void;
+  loadNextStory: () => Promise<void>;
+  loadPrevStory: () => Promise<void>;
   addNewStory: (title: string) => Promise<number | undefined>;
   setCurrentStory: (index: number) => Promise<void>;
   deleteStory: (index: number) => Promise<void>;
@@ -64,14 +69,27 @@ export const StorySettings = reactive<{
     const storedStories = this.stories;
     if (storedStories.length > 0) {
       this.currentStory = storedStories[index];
-      this.currentStory?.loadStoredLayers();
+      await this.currentStory?.loadStoredLayers();
       this.currentStoryIndex = index;
+    }
+  },
+  async loadNextStory() {
+    if (
+      this.currentStoryIndex !== undefined &&
+      this.currentStoryIndex < this.stories.length - 1
+    ) {
+      await this.setCurrentStory(this.currentStoryIndex + 1);
+    }
+  },
+  async loadPrevStory() {
+    if (this.currentStoryIndex !== undefined && this.currentStoryIndex > 0) {
+      await this.setCurrentStory(this.currentStoryIndex - 1);
     }
   },
   saveStories() {
     storeStories(
       stringify(markRaw(this.stories), (key: string, value: any) => {
-        if (["data", "chart", "keyframes"].includes(key)) return undefined;
+        if (["data", "controller", "keyframes"].includes(key)) return undefined;
         return value;
       })
     );
@@ -83,16 +101,15 @@ export const StorySettings = reactive<{
 
     if (!existingStory) return;
 
-    this.stories = [
-      ...this.stories,
-      new Story({
-        ...existingStory,
-        drawingUtils: CanvasSettings.generalDrawingUtils,
-        title: `${existingStory.title}-${storyLength}`,
-      }),
-    ];
+    const duplicateStory = new Story({
+      layers: [...existingStory.layers],
+      drawingUtils: CanvasSettings.generalDrawingUtils,
+      title: `${existingStory.title}-${storyLength}`,
+    });
 
+    this.stories = [...this.stories, duplicateStory];
     await this.setCurrentStory(this.stories.length - 1);
+    this.saveStories();
   },
   async addNewStory(title: string) {
     if (!CanvasSettings.generalDrawingUtils) return;
@@ -107,6 +124,7 @@ export const StorySettings = reactive<{
 
     const newStoryIndex = newStories.length - 1;
     await this.setCurrentStory(newStoryIndex);
+    this.saveStories();
     return newStoryIndex;
   },
   async deleteStory(index: number) {
@@ -118,9 +136,14 @@ export const StorySettings = reactive<{
   },
 });
 
-watch(
-  () => StorySettings.stories,
-  () => {
-    StorySettings.saveStories();
+document.addEventListener("keydown", async (event) => {
+  if (event.key == LEFT) {
+    await StorySettings.loadPrevStory();
   }
-);
+});
+
+document.addEventListener("keydown", async (event) => {
+  if (event.code == RIGHT) {
+    await StorySettings.loadNextStory();
+  }
+});

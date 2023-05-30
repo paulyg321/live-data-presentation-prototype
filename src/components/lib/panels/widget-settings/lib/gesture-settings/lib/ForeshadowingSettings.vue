@@ -1,6 +1,16 @@
 <script setup lang="ts">
 import { ListenerMode, ForeshadowingStatesMode } from "@/utils";
-import { GestureSettingsState } from "@/state";
+import { GestureSettingsState, currentChart } from "@/state";
+import { ref, watchEffect } from "vue";
+
+const selectOptions = ref<string[]>();
+const colorScale = ref();
+
+watchEffect(() => {
+  selectOptions.value = currentChart.value?.state.selectOptions;
+  colorScale.value = currentChart.value?.getColorScale();
+});
+
 </script>
 <template>
   <v-row>
@@ -11,9 +21,8 @@ import { GestureSettingsState } from "@/state";
         :items="
           GestureSettingsState.listenerMode === ListenerMode.FORESHADOWING
             ? [
-                ForeshadowingStatesMode.NEXT,
-                ForeshadowingStatesMode.COUNT,
-                ForeshadowingStatesMode.ALL,
+                ForeshadowingStatesMode.TRAJECTORY,
+                ForeshadowingStatesMode.POINT,
               ]
             : []
         "
@@ -21,14 +30,7 @@ import { GestureSettingsState } from "@/state";
     </v-col>
   </v-row>
 
-  <v-row
-    v-if="
-      GestureSettingsState.foreshadowingStatesMode ===
-        ForeshadowingStatesMode.COUNT ||
-      GestureSettingsState.foreshadowingStatesMode ===
-        ForeshadowingStatesMode.NEXT
-    "
-  >
+  <v-row>
     <v-col>
       <v-text-field
         v-model="GestureSettingsState.foreshadowingStatesCount"
@@ -41,11 +43,23 @@ import { GestureSettingsState } from "@/state";
 
   <v-row>
     <v-col lg="12">
-      <v-text-field
+      <v-autocomplete
         v-model="GestureSettingsState.selectionKeys"
         label="Items to select"
+        :items="selectOptions"
+        multiple
+        chips
+        clearable
         hint="Enter the keys for the items you wish to select"
-      ></v-text-field>
+      >
+        <template v-slot:item="{ props, item }">
+          <v-list-item v-bind="props" :title="item.raw">
+            <template #prepend>
+              <v-badge :color="colorScale(item.raw)" inline></v-badge>
+            </template>
+          </v-list-item>
+        </template>
+      </v-autocomplete>
     </v-col>
     <v-col lg="12">
       <v-checkbox

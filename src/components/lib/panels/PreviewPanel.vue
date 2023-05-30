@@ -9,12 +9,11 @@ import {
   StateUpdateType,
   annotationSubject,
 } from "@/utils";
-import { onMounted, ref, watchEffect } from "vue";
+import { onMounted, ref, watch, watchEffect } from "vue";
 import {
   ChartSettings,
   CanvasSettings,
   StorySettings,
-  playbackSliderRange,
   currentChart,
   handlePlay,
 } from "@/state";
@@ -37,6 +36,13 @@ const playbackConfig = ref<PlaybackSettingsConfig>({
   playbackMode: StateUpdateType.GROUP_TIMELINE,
 });
 const keyframes = ref<string[]>();
+const currentIndex = ref<number>(0);
+
+watch(currentIndex, () => {
+  currentChart.value?.updateState({
+    currentKeyframeIndex: currentIndex.value,
+  });
+});
 
 watchEffect(() => {
   keyframes.value = currentChart.value?.state.keyframes;
@@ -57,7 +63,7 @@ selectionSubject.subscribe({
     if (!charts) return;
 
     charts.forEach((chart) => {
-      chart.state.chart?.setSelection(selectionSettings);
+      chart.state.controller?.setSelection(selectionSettings);
     });
   },
 });
@@ -76,17 +82,13 @@ annotationSubject.subscribe({
 // PLAYBACK CONTROLS
 playbackSubject.subscribe({
   next(config: any) {
-    if (config.type === "keyframe") {
-      endKeyframe.value = config.data;
+    if (config.type === "pause") {
+      console.log("pause");
+      currentChart.value?.state.controller?.pause();
     } else {
       playbackConfig.value = config.data;
 
-      handlePlay(
-        playbackConfig.value,
-        config.data.svg,
-        undefined,
-        endKeyframe.value
-      );
+      handlePlay(config.data, config.data.svg, undefined, undefined);
     }
   },
 });
@@ -98,7 +100,7 @@ foreshadowingAreaSubject.subscribe({
     if (!charts) return;
 
     charts.forEach((chart) => {
-      chart.state.chart?.setForeshadow(foreshadowingSettings);
+      chart.state.controller?.setForeshadow(foreshadowingSettings);
     });
   },
 });
@@ -189,8 +191,8 @@ onMounted(() => {
   <v-container>
     <v-row>
       <v-col>
-        <v-range-slider
-          v-model="playbackSliderRange"
+        <v-slider
+          v-model="currentIndex"
           :ticks="Object.assign({}, keyframes)"
           :show-ticks="false"
           thumb-label="always"
@@ -204,7 +206,7 @@ onMounted(() => {
               {{ keyframes[modelValue] }}
             </div>
           </template>
-        </v-range-slider>
+        </v-slider>
       </v-col>
     </v-row>
   </v-container>

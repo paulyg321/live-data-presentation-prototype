@@ -16,6 +16,8 @@
     "@mediapipe/control_utils": "^0.6.1629159505",
     "@mediapipe/drawing_utils": "^0.3.1620248257",
     "@mediapipe/hands": "^0.4.1646424915",
+    "@turf/helpers": "^6.5.0",
+    "@turf/line-intersect": "^6.5.0",
     "@types/d3": "^7.4.0",
     "@types/lodash": "^4.14.184",
     "@types/webfontloader": "^1.6.35",

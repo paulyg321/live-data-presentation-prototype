@@ -185,7 +185,7 @@ export abstract class AnimatedElement {
     this.controllerState = {
       ...args,
       currentKeyframeIndex: args.currentKeyframeIndex,
-      foreshadowingMode: ForeshadowingStatesMode.NEXT,
+      foreshadowingMode: ForeshadowingStatesMode.TRAJECTORY,
       foreshadowingStateCount: 1,
       playback: {
         playbackTimeline: gsap.timeline(),
@@ -197,10 +197,10 @@ export abstract class AnimatedElement {
     this.updateForeshadowingAnimationState();
   }
 
-  abstract handleForeshadowCount(
+  abstract handleForeshadowTrajectory(
     args: HandleForeshadowArgs
   ): HandleForeshadowReturnValue;
-  abstract handleForeshadowNext(
+  abstract handleForeshadowPoint(
     args: HandleForeshadowArgs
   ): HandleForeshadowReturnValue;
   abstract handleSelection(
@@ -214,6 +214,10 @@ export abstract class AnimatedElement {
 
   clearSvg() {
     d3.select("#drawing-board").selectAll("#remove").remove();
+  }
+
+  pause() {
+    this.controllerState.playback.playbackTimeline.pause();
   }
 
   play(args: AnimatedElementPlaybackArgs) {
@@ -231,6 +235,18 @@ export abstract class AnimatedElement {
     selectionAnimationState.positionTimeline?.clear();
     selectionAnimationState.sizeTimeline?.clear();
 
+    currentItemAnimationState.pathTimeline?.pause();
+    currentItemAnimationState.opacityTimeline?.pause();
+    currentItemAnimationState.positionTimeline?.pause();
+    currentItemAnimationState.sizeTimeline?.pause();
+    currentItemAnimationState.scaleTimeline?.pause();
+    selectionAnimationState.opacityTimeline?.pause();
+    selectionAnimationState.pathTimeline?.pause();
+    selectionAnimationState.positionTimeline?.pause();
+    selectionAnimationState.sizeTimeline?.pause();
+
+    this.controllerState.playback.playbackTimeline.clear();
+
     args.states.forEach(
       (state: AnimatedElementPlaybackState, index: number) => {
         const selector = canMorph ? state.selector : undefined;
@@ -239,117 +255,68 @@ export abstract class AnimatedElement {
           isLastTween = true;
         }
         this.controllerState.currentKeyframeIndex = state.index;
-        if (index === 0) {
-          this.updateCurrentAnimationState(
-            StateUpdateType.SET,
-            selector,
-            StateUpdateType.INDIVIDUAL_TWEENS === args.updateType
-              ? args.easeFn
-              : undefined,
-            args.duration,
-            isLastTween
-          );
-          this.updateSelectionState(
-            StateUpdateType.SET,
-            selector,
-            args.easeFn,
-            args.duration
-          );
-        } else {
-          this.updateCurrentAnimationState(
-            args.updateType,
-            selector,
-            StateUpdateType.INDIVIDUAL_TWEENS === args.updateType
-              ? args.easeFn
-              : undefined,
-            args.duration,
-            isLastTween
-          );
-          this.updateSelectionState(
-            args.updateType,
-            selector,
-            args.easeFn,
-            args.duration
-          );
-        }
+        this.updateCurrentAnimationState(
+          args.updateType,
+          selector,
+          undefined,
+          args.duration,
+          isLastTween
+        );
+        this.updateSelectionState(
+          args.updateType,
+          selector,
+          args.easeFn,
+          args.duration
+        );
       }
     );
 
-    if (args.updateType === StateUpdateType.GROUP_TIMELINE) {
-      // this.controllerState.playback.playbackTimeline.clear();
-      const tl1 = gsap.timeline();
-      const tl2 = gsap.timeline();
-
-      tl1.fromTo(
-        this.controllerState.playback,
-        { extent: 0 },
-        {
-          extent: 1,
-          onUpdate: () => {
-            currentItemAnimationState.pathTimeline?.totalProgress(
-              this.controllerState.playback.extent
-            );
-            currentItemAnimationState.sizeTimeline?.totalProgress(
-              this.controllerState.playback.extent
-            );
-            currentItemAnimationState.scaleTimeline?.totalProgress(
-              this.controllerState.playback.extent
-            );
-            selectionAnimationState.pathTimeline?.totalProgress(
-              this.controllerState.playback.extent
-            );
-            selectionAnimationState.sizeTimeline?.totalProgress(
-              this.controllerState.playback.extent
-            );
-          },
-          onComplete: () => {
-            this.updateForeshadowingAnimationState();
-          },
-          duration: args.duration,
-          ease: args.easeFn,
-        }
-      );
-
-      tl2.fromTo(
-        this.controllerState.playback,
-        { extent: 0 },
-        {
-          extent: 1,
-          onUpdate: () => {
-            currentItemAnimationState.positionTimeline?.totalProgress(
-              this.controllerState.playback.extent
-            );
-            currentItemAnimationState.opacityTimeline?.totalProgress(
-              this.controllerState.playback.extent
-            );
-            selectionAnimationState.opacityTimeline?.totalProgress(
-              this.controllerState.playback.extent
-            );
-            selectionAnimationState.positionTimeline?.totalProgress(
-              this.controllerState.playback.extent
-            );
-          },
-          onComplete: () => {
-            this.updateForeshadowingAnimationState();
-          },
-          duration: args.duration,
-          ease: args.easeFn,
-        }
-      );
-
-      tl1.play();
-      tl2.play();
-    } else if (args.updateType === StateUpdateType.INDIVIDUAL_TWEENS) {
-      currentItemAnimationState.sizeTimeline?.play();
-      currentItemAnimationState.scaleTimeline?.play();
-      currentItemAnimationState.pathTimeline?.play();
-      currentItemAnimationState.opacityTimeline?.play();
-      currentItemAnimationState.positionTimeline?.play();
-      selectionAnimationState.opacityTimeline?.play();
-      selectionAnimationState.pathTimeline?.play();
-      selectionAnimationState.positionTimeline?.play();
-      selectionAnimationState.sizeTimeline?.play();
-    }
+    this.controllerState.playback.playbackTimeline.clear();
+    this.controllerState.playback.playbackTimeline.pause(
+      this.controllerState.playback.extent
+    );
+    this.controllerState.playback.playbackTimeline.to(
+      this.controllerState.playback,
+      {
+        extent: 1,
+        onUpdate: () => {
+          currentItemAnimationState.pathTimeline?.totalProgress(
+            this.controllerState.playback.extent
+          );
+          currentItemAnimationState.sizeTimeline?.totalProgress(
+            this.controllerState.playback.extent
+          );
+          currentItemAnimationState.scaleTimeline?.totalProgress(
+            this.controllerState.playback.extent
+          );
+          currentItemAnimationState.positionTimeline?.totalProgress(
+            this.controllerState.playback.extent
+          );
+          currentItemAnimationState.opacityTimeline?.totalProgress(
+            this.controllerState.playback.extent
+          );
+          selectionAnimationState.pathTimeline?.totalProgress(
+            this.controllerState.playback.extent
+          );
+          selectionAnimationState.sizeTimeline?.totalProgress(
+            this.controllerState.playback.extent
+          );
+          selectionAnimationState.opacityTimeline?.totalProgress(
+            this.controllerState.playback.extent
+          );
+          selectionAnimationState.positionTimeline?.totalProgress(
+            this.controllerState.playback.extent
+          );
+        },
+        onComplete: () => {
+          this.updateForeshadowingAnimationState();
+          this.controllerState.playback.extent = 0;
+        },
+        duration: args.duration,
+        ease: args.easeFn,
+      }
+    );
+    this.controllerState.playback.playbackTimeline.play();
   }
 
   updateForeshadowingAnimationState(
@@ -389,20 +356,27 @@ export abstract class AnimatedElement {
                 this.controllerState.currentKeyframeIndex
               ],
           };
-  
+
           if (index > this.controllerState.currentKeyframeIndex) {
             switch (this.controllerState.foreshadowingMode) {
-              case ForeshadowingStatesMode.ALL:
-              case ForeshadowingStatesMode.COUNT: {
+              case ForeshadowingStatesMode.TRAJECTORY: {
                 // Check if its foreshadowed and whether should pulse - opacity = 0 and shouldPulse - false if not
                 ({ shouldPulse, opacity } =
-                  this.handleForeshadowCount(foreshadowFnArgs));
+                  this.handleForeshadowTrajectory(foreshadowFnArgs));
+                console.log({
+                  shouldPulse,
+                  opacity,
+                  index,
+                  finalForeshadowingIndex,
+                  curr: this.controllerState.currentKeyframeIndex,
+                  count: this.controllerState.foreshadowingStateCount,
+                });
                 break;
               }
-              case ForeshadowingStatesMode.NEXT: {
+              case ForeshadowingStatesMode.POINT: {
                 // Check if its foreshadowed and whether should pulse - opacity = 0 and shouldPulse - false if not
                 ({ shouldPulse, opacity } =
-                  this.handleForeshadowNext(foreshadowFnArgs));
+                  this.handleForeshadowPoint(foreshadowFnArgs));
                 break;
               }
               default:
@@ -413,7 +387,6 @@ export abstract class AnimatedElement {
           opacity = TRANSPARENT;
           shouldPulse = false;
         }
-
 
         if (updateType === StateUpdateType.SET) {
           currentItemAnimationState.opacity = opacity;
@@ -511,7 +484,6 @@ export abstract class AnimatedElement {
 
     this.updateSelectionState(StateUpdateType.ANIMATE);
   }
-
 
   updateSelectionState(
     updateType: StateUpdateType = StateUpdateType.SET,

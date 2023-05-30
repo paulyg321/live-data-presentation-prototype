@@ -11,14 +11,13 @@ import {
   GestureSettingsState,
   currentChart,
   handlePlay,
-  playbackSliderRange
 } from "@/state";
 import {
   ForeshadowingSettings,
   PlaybackSettings,
   SelectionSettings,
   KeyframeSettings,
-  AnnotationPoseSettings
+  AnnotationPoseSettings,
 } from "@/components";
 const currentWidget = ref<GestureListener>();
 const widgetType = ref<ListenerType>();
@@ -96,7 +95,7 @@ watch(currentWidget, () => {
       GestureSettingsState.triggerDuration = triggerDuration;
     }
     if (selectionKeys) {
-      GestureSettingsState.selectionKeys = selectionKeys.toString();
+      GestureSettingsState.selectionKeys = selectionKeys;
     }
     if (foreshadowingStatesCount) {
       GestureSettingsState.foreshadowingStatesCount = foreshadowingStatesCount;
@@ -138,7 +137,7 @@ watch(
       resetPauseDuration: GestureSettingsState.resetPauseDuration,
       triggerDuration: GestureSettingsState.triggerDuration,
       resetKeys: new Set(GestureSettingsState.resetKey),
-      selectionKeys: GestureSettingsState.selectionKeys.split(","),
+      selectionKeys: GestureSettingsState.selectionKeys,
       foreshadowingStatesMode: GestureSettingsState.foreshadowingStatesMode,
       foreshadowingStatesCount: GestureSettingsState.foreshadowingStatesCount,
       useBounds: GestureSettingsState.useBounds,
@@ -150,6 +149,24 @@ watch(
   (state) => {
     currentWidget.value?.updateState(state);
     StorySettings.saveStories();
+  }
+);
+
+watch(
+  () => GestureSettingsState.selectionKeys,
+  () => {
+    if (GestureSettingsState.selectionKeys.length > 0) {
+      const bounds = currentChart.value?.state.controller?.getSelectionBounds(
+        GestureSettingsState.selectionKeys
+      );
+
+      if (bounds) {
+        currentWidget.value?.updateState({
+          position: bounds.position,
+          dimensions: bounds.dimensions,
+        })
+      }
+    }
   }
 );
 
@@ -204,7 +221,7 @@ onMounted(() => {
       GestureSettingsState.triggerDuration = triggerDuration;
     }
     if (selectionKeys) {
-      GestureSettingsState.selectionKeys = selectionKeys.toString();
+      GestureSettingsState.selectionKeys = selectionKeys;
     }
     if (foreshadowingStatesCount) {
       GestureSettingsState.foreshadowingStatesCount = foreshadowingStatesCount;
@@ -277,6 +294,24 @@ function getGestures() {
     <v-row class="mb-5">
       <v-col lg="12">
         <div class="text-h5">Gesture Settings</div>
+      </v-col>
+    </v-row>
+    <v-row
+      v-if="
+        GestureSettingsState.listenerMode &&
+        [ListenerMode.FORESHADOWING, ListenerMode.SELECTION].includes(
+          GestureSettingsState.listenerMode
+        )
+      "
+    >
+      <v-col>
+        <v-btn
+          class="mb-4"
+          block
+          size="large"
+          @click="() => currentWidget?.triggerListener()"
+          >Preview</v-btn
+        >
       </v-col>
     </v-row>
 
@@ -380,8 +415,8 @@ function getGestures() {
           handlePlay(
             args,
             args.svg,
-            playbackSliderRange[1],
-            playbackSliderRange[0]
+            currentChart?.state.startKeyframeIndex,
+            currentChart?.state.endKeyframeIndex
           );
         }
       "
@@ -390,8 +425,8 @@ function getGestures() {
           handlePlay(
             args,
             args.svg,
-            playbackSliderRange[0],
-            playbackSliderRange[1]
+            currentChart?.state.startKeyframeIndex,
+            currentChart?.state.endKeyframeIndex
           );
         }
       "

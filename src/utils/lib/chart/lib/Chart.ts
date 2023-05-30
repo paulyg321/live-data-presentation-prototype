@@ -9,6 +9,7 @@ import {
   getStoredData,
   storeData,
 } from "@/utils";
+import _ from "lodash";
 
 export enum ScaleTypes {
   LINEAR = "scaleLinear",
@@ -62,17 +63,18 @@ export interface NewChartArgs {
   canvasDimensions: Dimensions;
   // Utils
   drawingUtils: DrawingUtils;
-  beginningKeyframeIndex?: number;
+  currentKeyframeIndex?: number;
+  startKeyframeIndex?: number;
+  endKeyframeIndex?: number;
   dataId?: string;
+  dataFieldNames: string[];
 }
 
 export type ChartState = NewChartArgs & {
-  canvasListener?: CanvasElementListener;
   data: any;
-  /**
-   * TODO: Create form fields for these
-   */
+  canvasListener?: CanvasElementListener;
   selectionField?: string;
+  selectOptions: string[];
   xScaleType: ScaleTypes;
   yScaleType: ScaleTypes;
   xDomain?: any[];
@@ -80,9 +82,11 @@ export type ChartState = NewChartArgs & {
   zDomain?: any[];
   colorDomain?: any[];
   keyframes?: any[];
-  chart?: ChartController;
+  controller?: ChartController;
   drawingUtils: DrawingUtils;
-  beginningKeyframeIndex: number;
+  currentKeyframeIndex: number;
+  startKeyframeIndex: number;
+  endKeyframeIndex: number;
 };
 
 export class Chart {
@@ -115,7 +119,10 @@ export class Chart {
     drawingUtils,
     selectionField,
     groupBy,
-    beginningKeyframeIndex = 0,
+    currentKeyframeIndex = 0,
+    startKeyframeIndex = 0,
+    endKeyframeIndex = 0,
+    dataFieldNames,
   }: NewChartArgs) {
     this.state = {
       title,
@@ -145,7 +152,11 @@ export class Chart {
       xScaleType: ScaleTypes.LINEAR,
       yScaleType: ScaleTypes.LINEAR,
       keyframes: [],
-      beginningKeyframeIndex,
+      currentKeyframeIndex,
+      startKeyframeIndex,
+      endKeyframeIndex,
+      selectOptions: [],
+      dataFieldNames,
     };
   }
 
@@ -170,7 +181,9 @@ export class Chart {
   updateState(args: {
     position?: Coordinate2D;
     dimensions?: Dimensions;
-    beginningKeyframeIndex?: number;
+    currentKeyframeIndex?: number;
+    startKeyframeIndex?: number;
+    endKeyframeIndex?: number;
   }) {
     if (args.position) {
       this.state.position = args.position;
@@ -181,13 +194,20 @@ export class Chart {
         ...args.dimensions,
       };
     }
-    if (args.beginningKeyframeIndex) {
-      this.state.beginningKeyframeIndex = args.beginningKeyframeIndex;
+
+    if (args.startKeyframeIndex) {
+      this.state.startKeyframeIndex = args.startKeyframeIndex;
     }
-    this.state.chart?.updateState({
-      ...args,
-      currentKeyframeIndex: args.beginningKeyframeIndex,
-    });
+
+    if (args.currentKeyframeIndex) {
+      this.state.currentKeyframeIndex = args.currentKeyframeIndex;
+    }
+
+    if (args.endKeyframeIndex) {
+      this.state.endKeyframeIndex = args.endKeyframeIndex;
+    }
+
+    this.state.controller?.updateState(args);
   }
 
   getColorScale() {
@@ -251,6 +271,9 @@ export class Chart {
       ([key]: any) => key
     ).sort((a, b) => d3.ascending(a, b));
 
+    this.state.endKeyframeIndex =
+      this.state.endKeyframeIndex ?? this.state.keyframes.length;
+
     const resultMap = d3.rollup(
       this.state.data,
       (groupedData) => {
@@ -283,6 +306,11 @@ export class Chart {
             });
           }
         });
+
+        this.state.selectOptions = _.union(this.state.selectOptions, [
+          selectionKey,
+        ]);
+
         return {
           unscaledData,
           colorKey,
@@ -305,6 +333,8 @@ export class Chart {
       (d: any) => d[this.state.field]
     );
     const rankedData: any[] = [];
+    this.state.keyframes = [];
+
     groupedByKeyFrame.forEach((frame: any, keyframe: string) => {
       this.state.keyframes?.push(keyframe);
       const currentFrame = [...frame];
@@ -319,9 +349,12 @@ export class Chart {
       });
     });
 
-    this.state.keyframes = this.state.keyframes?.sort((a, b) =>
+    this.state.keyframes = this.state.keyframes.sort((a, b) =>
       d3.ascending(a, b)
     );
+
+    this.state.endKeyframeIndex =
+      this.state.endKeyframeIndex ?? this.state.keyframes.length;
 
     const resultMap = d3.rollup(
       rankedData,
@@ -355,6 +388,9 @@ export class Chart {
             });
           }
         });
+
+        _.union(this.state.selectOptions, [selectionKey]);
+
         return {
           unscaledData,
           colorKey,
@@ -406,7 +442,9 @@ export class Chart {
       drawingUtils: this.state.drawingUtils,
       xScaleType: this.state.xScaleType,
       yScaleType: this.state.yScaleType,
-      currentKeyframeIndex: this.state.beginningKeyframeIndex,
+      currentKeyframeIndex: this.state.currentKeyframeIndex,
+      startKeyframeIndex: this.state.startKeyframeIndex,
+      endKeyframeIndex: this.state.endKeyframeIndex,
       playbackExtent: 0,
       chartType: this.state.type,
     } as ChartsControllerState;
@@ -415,12 +453,12 @@ export class Chart {
       case ChartType.LINE:
       case ChartType.SCATTER:
       case ChartType.BAR:
-        this.state.chart = new ChartController(initializeChartArgs);
+        this.state.controller = new ChartController(initializeChartArgs);
         break;
     }
   }
 
   draw() {
-    this.state.chart?.draw();
+    this.state.controller?.draw();
   }
 }

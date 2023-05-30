@@ -112,12 +112,12 @@ onMounted(() => {
           ></v-select>
         </v-col>
         <v-col lg="12">
-          <v-select
+          <v-autocomplete
             v-model="playbackSettings[affectKey].easeFn"
             label="Ease Fn"
             :items="easeOptions"
             hint="Applies ease functions and playback duration to each Individual tween or to the group"
-          ></v-select>
+          ></v-autocomplete>
         </v-col>
         <v-col lg="12">
           <v-textarea

@@ -106,12 +106,12 @@ function handleSavePath() {
       ></v-text-field>
     </v-col>
     <v-col lg="12">
-      <v-select
+      <v-autocomplete
         v-model="svgSettings.state.animationEase"
         label="Ease Fn"
         :items="easeOptions"
         hint="Applies ease functions and playback duration to each Individual tween or to the group"
-      ></v-select>
+      ></v-autocomplete>
     </v-col>
     <v-col>
       <v-text-field

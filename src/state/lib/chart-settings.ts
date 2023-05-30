@@ -75,7 +75,7 @@ export const ChartSettings = reactive<{
     if (!charts) return;
 
     charts.forEach((chart) => {
-      chart.state.chart?.play({
+      chart.state.controller?.play({
         states: [
           {
             index: 1,
@@ -131,7 +131,6 @@ export const ChartSettings = reactive<{
   playbackType: PlaybackType.NEXT,
 });
 
-export const playbackSliderRange = ref<number[]>([0, 1]);
 export const currentChart = computed(() => {
   return StorySettings.currentStory?.getCharts()[0];
 });
@@ -148,13 +147,16 @@ export function handlePlay(
     d3.select("#st0").attr("d", svg);
   }
 
-  const args = currentChart.value?.state.chart?.processPlaybackSubscriptionData(
-    config,
-    endKeyframe,
-    startKeyframe,
-    selector
-  );
+  const args =
+    currentChart.value?.state.controller?.processPlaybackSubscriptionData(
+      config,
+      endKeyframe,
+      startKeyframe,
+      selector
+    );
   if (args) {
-    currentChart.value?.state.chart?.play(args as AnimatedElementPlaybackArgs);
+    currentChart.value?.state.controller?.play(
+      args as AnimatedElementPlaybackArgs
+    );
   }
 }

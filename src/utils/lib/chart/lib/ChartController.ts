@@ -107,6 +107,7 @@ export interface ChartsControllerState {
   playbackTimeline?: ReturnType<typeof gsap.timeline>;
   playbackExtent: number;
   currentKeyframeIndex: number;
+  startKeyframeIndex: number;
   endKeyframeIndex: number;
   playbackArgs?: AnimatedElementPlaybackArgs;
 }
@@ -166,10 +167,13 @@ export class ChartController {
           this.state.currentForeshadow[key]);
       } else {
         isForeshadowed = false;
-        foreshadowingMode = ForeshadowingStatesMode.NEXT;
+        foreshadowingMode = ForeshadowingStatesMode.TRAJECTORY;
         foreshadowingStateCount = 1;
       }
 
+      if (isForeshadowed) {
+        console.log(foreshadowingStateCount);
+      }
       return {
         isForeshadowed,
         foreshadowingMode,
@@ -200,9 +204,7 @@ export class ChartController {
             });
           } else if (type === "foreshadow") {
             animatedElement.updateState({
-              ...getForeshadowingInfo(
-                animatedElement.controllerState.selectionKey
-              ),
+              ...getForeshadowingInfo(animatedElement.controllerState.label),
             });
           } else if (type === "select") {
             animatedElement.updateState({
@@ -285,6 +287,8 @@ export class ChartController {
       drawingUtils,
       colorScale,
       currentKeyframeIndex,
+      endKeyframeIndex,
+      startKeyframeIndex,
     } = args;
 
     if (position || dimensions || xDomain || yDomain) {
@@ -305,8 +309,45 @@ export class ChartController {
       if (currentKeyframeIndex) {
         this.state.currentKeyframeIndex = currentKeyframeIndex;
       }
+      if (endKeyframeIndex) {
+        this.state.endKeyframeIndex = endKeyframeIndex;
+      }
+      if (startKeyframeIndex) {
+        this.state.startKeyframeIndex = startKeyframeIndex;
+      }
       this.upsertAnimatedItems();
     }
+  }
+
+  getSelectionBounds(keys: string[]) {
+    const positions: Coordinate2D[] = [];
+    this.state.animatedElements?.forEach((animatedElement: AnimatedElement) => {
+      const isSelected = keys.includes(
+        animatedElement.controllerState.selectionKey
+      );
+
+      if (isSelected) {
+        positions.push(animatedElement.animationState.current.position);
+      }
+    });
+
+    const xExtent = d3.extent(positions, (d) => d.x) as number[];
+    const yExtent = d3.extent(positions, (d) => d.y) as number[];
+
+    if (!xExtent || !yExtent) {
+      return undefined;
+    }
+
+    return {
+      position: {
+        x: (xExtent[0] ?? 25) - 25,
+        y: (yExtent[0] ?? 25) - 25,
+      },
+      dimensions: {
+        width: xExtent[1] - xExtent[0] + 50,
+        height: yExtent[1] - yExtent[0] + 50,
+      },
+    };
   }
 
   processPlaybackSubscriptionData(
@@ -315,8 +356,8 @@ export class ChartController {
     startKeyframe?: number,
     selector?: string
   ) {
-    const _startKeyframe = startKeyframe ?? this.state.currentKeyframeIndex;
-    const _endKeyframe = endKeyframe ?? this.state.currentKeyframeIndex;
+    const _startKeyframe = startKeyframe ?? this.state.startKeyframeIndex;
+    const _endKeyframe = endKeyframe ?? this.state.endKeyframeIndex;
     const states = [..._.range(_startKeyframe, _endKeyframe), _endKeyframe];
     return {
       states: states.map((value: number, index: number) => {
@@ -331,6 +372,13 @@ export class ChartController {
       updateType:
         playbackConfig?.playbackMode ?? StateUpdateType.GROUP_TIMELINE,
     };
+  }
+
+  pause() {
+    this.state.playbackTimeline?.pause();
+    this.state.animatedElements?.forEach((element) => {
+      element.pause();
+    });
   }
 
   play(
@@ -348,47 +396,29 @@ export class ChartController {
       });
 
     this.state.keyframeTimeline?.clear();
+    this.state.keyframeTimeline?.pause();
     args.states.forEach(
       (state: AnimatedElementPlaybackState, index: number) => {
-        if (index === 0) {
-          this.state.keyframeTimeline?.set(this.state, {
-            currentKeyframeIndex: state.index,
-          });
-        } else {
-          this.state.keyframeTimeline?.to(this.state, {
-            currentKeyframeIndex: state.index,
-            duration: args.duration,
-            ...(StateUpdateType.INDIVIDUAL_TWEENS === args.updateType
-              ? { ease: args.easeFn }
-              : {}),
-          });
-        }
+        this.state.keyframeTimeline?.to(this.state, {
+          currentKeyframeIndex: state.index,
+        });
       }
     );
 
-    if (args.updateType === StateUpdateType.GROUP_TIMELINE) {
-      this.state.playbackTimeline?.clear();
-      this.state.playbackTimeline?.fromTo(
-        this.state,
-        {
-          playbackExtent: 0,
-        },
-        {
-          playbackExtent: 1,
-          onUpdate: () => {
-            this.state.keyframeTimeline?.totalProgress(
-              this.state.playbackExtent
-            );
-          },
-          duration: args.duration,
-          ease: args.easeFn,
-        }
-      );
-
-      this.state.playbackTimeline?.play();
-    } else if (args.updateType === StateUpdateType.INDIVIDUAL_TWEENS) {
-      this.state.keyframeTimeline?.play();
-    }
+    this.state.playbackTimeline?.clear();
+    this.state.playbackTimeline?.pause(this.state.playbackExtent);
+    this.state.playbackTimeline?.to(this.state, {
+      playbackExtent: 1,
+      onUpdate: () => {
+        this.state.keyframeTimeline?.totalProgress(this.state.playbackExtent);
+      },
+      onComplete: () => {
+        this.state.playbackExtent = 0;
+      },
+      duration: args.duration,
+      ease: args.easeFn,
+    });
+    this.state.playbackTimeline?.play();
   }
 
   setForeshadow(args?: {
@@ -399,7 +429,7 @@ export class ChartController {
     };
     keys?: string[];
     mode: ForeshadowingStatesMode;
-    stateCount?: number;
+    count?: number;
     requireKeyInBounds?: boolean;
   }) {
     const foreshadowingMap: Record<
@@ -408,7 +438,7 @@ export class ChartController {
     > = {};
     this.state.animatedElements?.forEach((element) => {
       if (!args) {
-        foreshadowingMap[element.controllerState.selectionKey] = {
+        foreshadowingMap[element.controllerState.label] = {
           isForeshadowed: false,
           foreshadowingMode: element.controllerState.foreshadowingMode,
           foreshadowingStateCount:
@@ -445,13 +475,13 @@ export class ChartController {
           : Boolean(keyIncluded || bounded);
 
         if (isForeshadowed) {
-          foreshadowingMap[element.controllerState.selectionKey] = {
+          foreshadowingMap[element.controllerState.label] = {
             isForeshadowed,
             foreshadowingMode: args.mode,
-            foreshadowingStateCount: args.stateCount ?? 1,
+            foreshadowingStateCount: args.count ?? 1,
           };
         } else {
-          foreshadowingMap[element.controllerState.selectionKey] = {
+          foreshadowingMap[element.controllerState.label] = {
             isForeshadowed,
             foreshadowingMode: element.controllerState.foreshadowingMode,
             foreshadowingStateCount:
@@ -585,7 +615,7 @@ export class ChartController {
     zDomain?: any[];
     xScaleType: ScaleTypes;
     yScaleType: ScaleTypes;
-  }): { xScale: D3ScaleTypes; yScale: D3ScaleTypes, zScale?: D3ScaleTypes } {
+  }): { xScale: D3ScaleTypes; yScale: D3ScaleTypes; zScale?: D3ScaleTypes } {
     const xScaleType = args.xScaleType;
     const xDomain = args.xDomain;
     const xRange = args.xRange;

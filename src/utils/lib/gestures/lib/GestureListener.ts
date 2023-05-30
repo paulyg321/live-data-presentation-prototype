@@ -172,6 +172,9 @@ export interface GestureListenerState {
 
   animationState: Record<string, any>;
   gestureSubscription?: Subscription;
+
+  numRevolutions: number;
+  gestureStartTime?: number;
 }
 
 export type GestureListenerSubjectMap = { [key: string]: Subject<any> };
@@ -284,6 +287,7 @@ export abstract class GestureListener {
       playbackSettings,
       endKeyframe,
       selectionLabelKey,
+      numRevolutions: 0,
     };
 
     this.setResetHandler();
@@ -313,9 +317,11 @@ export abstract class GestureListener {
   }: Partial<GestureListenerConstructorArgs>) {
     if (position) {
       this.state.position = position;
+      this.state.canvasListener?.updateState({ position });
     }
     if (dimensions) {
       this.state.dimensions = dimensions;
+      this.state.canvasListener?.updateState({ dimensions });
     }
     if (canvasDimensions) {
       this.state.canvasDimensions = canvasDimensions;
@@ -381,6 +387,16 @@ export abstract class GestureListener {
     });
   }
 
+  triggerListener() {
+    this.publishToSubject();
+  }
+
+  pausePlayback() {
+    this.publishToSubjectIfExists(GestureListener.playbackSubjectKey, {
+      type: "pause",
+    });
+  }
+
   publishToSubject(
     bounds?: {
       coordinates: Coordinate2D;
@@ -412,14 +428,8 @@ export abstract class GestureListener {
       case ListenerMode.PLAYBACK:
         if (!affectKey) return;
         this.publishToSubjectIfExists(GestureListener.playbackSubjectKey, {
-          type: "config",
+          type: "play",
           data: this.state.playbackSettings[affectKey],
-        });
-        break;
-      case ListenerMode.KEYFRAME:
-        this.publishToSubjectIfExists(GestureListener.playbackSubjectKey, {
-          type: "keyframe",
-          data: this.state.endKeyframe?.index,
         });
         break;
       case ListenerMode.ANNOTATE:
@@ -557,7 +567,7 @@ export abstract class GestureListener {
   }
 
   renderStrokePath() {
-    if (!this.state.startDetecting) return;
+    // if (!this.state.startDetecting) return;
     this.state.stroke.forEach((stroke) => {
       this.state.drawingUtils.modifyContextStyleAndDraw(
         {
