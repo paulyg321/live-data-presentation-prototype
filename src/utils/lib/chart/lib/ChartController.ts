@@ -464,6 +464,27 @@ export class ChartController {
     this.state.playbackTimeline?.play();
   }
 
+  tempPlay(
+    args: {
+      keys?: string[];
+    } & AnimatedElementPlaybackArgs
+  ) {
+    const incrementBy = (1 / args.states.length) * 0.2;
+    if (this.state.playbackExtent !== 0) {
+      this.state.playbackExtent += incrementBy;
+      this.state.keyframeTimeline?.totalProgress(this.state.playbackExtent);
+      return;
+    }
+    this.state.keyframeTimeline?.clear();
+    this.state.keyframeTimeline?.pause();
+    args.states.forEach((state: AnimatedElementPlaybackState) => {
+      this.state.keyframeTimeline?.to(this.state, {
+        currentKeyframeIndex: state.index,
+      });
+    });
+    this.state.playbackExtent = incrementBy;
+  }
+
   setForeshadow(args?: {
     bounds?: {
       coordinates: Coordinate2D;

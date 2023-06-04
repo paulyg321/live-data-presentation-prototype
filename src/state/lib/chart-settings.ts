@@ -154,7 +154,7 @@ export function handlePlay(
     );
 
   if (args) {
-    currentChart.value?.state.controller?.play(
+    currentChart.value?.state.controller?.tempPlay(
       args as AnimatedElementPlaybackArgs
     );
   }

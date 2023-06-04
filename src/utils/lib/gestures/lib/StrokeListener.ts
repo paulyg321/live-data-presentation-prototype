@@ -238,18 +238,17 @@ export class StrokeListener extends GestureListener {
         return [coord.x, coord.y];
       });
 
-      const result = doesNewCoordClosePath(newCoords, allCoords);
+      const closedPath = doesNewCoordClosePath(newCoords, allCoords);
 
-      if (result) {
+      if (closedPath) {
         this.state.stroke = [];
         this.state.numRevolutions = this.state.numRevolutions + 1;
-        if (this.state.gestureStartTime && isFirstDial) {
-          const timeTaken =
-            (new Date().getTime() - this.state.gestureStartTime) / 1000;
-          // TODO: Map time taken to an affect
-          // console.log(timeTaken);
-          this.publishToSubject(undefined, AffectOptions.NEUTRAL);
-        }
+
+        // const timeTaken =
+        //   (new Date().getTime() - this.state.gestureStartTime) / 1000;
+        // TODO: Map time taken to an affect
+        // console.log(timeTaken);
+        this.publishToSubject(undefined, AffectOptions.NEUTRAL);
       } else {
         this.state.stroke.push(indexFingerPosition);
       }
