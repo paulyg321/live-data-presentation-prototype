@@ -10,3 +10,5 @@ export const snackbarSubject = new Subject();
 export const highlightSubject = new Subject();
 export const selectionSubject = new Subject();
 export const annotationSubject = new Subject();
+
+export const controllerPlaySubject = new Subject();

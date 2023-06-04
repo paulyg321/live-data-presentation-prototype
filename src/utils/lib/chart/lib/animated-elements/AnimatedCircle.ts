@@ -10,7 +10,6 @@ import {
   type HandleSelectionArgs,
   type HandleSelectionReturnValue,
   type VisualState,
-  type SVGPrimitive,
   TRANSPARENT,
   SELECTED_OPACITY,
 } from "@/utils";
@@ -155,18 +154,9 @@ export class AnimatedCircle extends AnimatedElement {
       height: radius * 2 + padding,
     };
 
-    const element = d3
-      .select(args.selector ?? "#circle")
-      .clone()
-      .attr("id", "remove")
-      .node() as SVGPrimitive;
-
     return {
-      element,
       position,
       dimensions,
-      xSize: element.getBoundingClientRect().width,
-      ySize: element.getBoundingClientRect().height,
     };
   }
 
@@ -193,18 +183,9 @@ export class AnimatedCircle extends AnimatedElement {
       height: radius * 2,
     };
 
-    const element = d3
-      .select(args.selector ?? "#circle")
-      .clone()
-      .attr("id", "remove")
-      .node() as SVGPrimitive;
-
     return {
-      element,
       position,
       dimensions,
-      xSize: element.getBoundingClientRect().width,
-      ySize: element.getBoundingClientRect().height,
     };
   }
 

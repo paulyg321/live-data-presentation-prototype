@@ -272,7 +272,7 @@ export class StrokeListener extends GestureListener {
   draw() {
     this.renderBorder();
     this.renderStrokePath();
-    this.renderReferenceCircles();
+    // this.renderReferenceCircles();
     this.renderDetectionState();
     if (this.state.listenerMode === ListenerMode.KEYFRAME) {
       this.renderKeyframe();

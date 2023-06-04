@@ -304,7 +304,7 @@ function getGestures() {
         )
       "
     >
-      <v-col>
+      <v-col lg="6">
         <v-btn
           class="mb-4"
           block
@@ -415,8 +415,8 @@ function getGestures() {
           handlePlay(
             args,
             args.svg,
-            currentChart?.state.startKeyframeIndex,
-            currentChart?.state.endKeyframeIndex
+            currentChart?.state.endKeyframeIndex,
+            currentChart?.state.startKeyframeIndex
           );
         }
       "

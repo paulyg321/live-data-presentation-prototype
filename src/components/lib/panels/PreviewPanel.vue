@@ -29,7 +29,6 @@ gsap.registerPlugin(CustomEase);
 const snackbar = ref<boolean>(false);
 const snackbarText = ref<string>("");
 const snackbarVariant = ref<string>("");
-const endKeyframe = ref<number>();
 const playbackConfig = ref<PlaybackSettingsConfig>({
   duration: 5,
   easeFn: "none",
@@ -46,6 +45,13 @@ watch(currentIndex, () => {
 
 watchEffect(() => {
   keyframes.value = currentChart.value?.state.keyframes;
+});
+
+watch(currentChart, () => {
+  currentIndex.value = currentChart.value?.state.startKeyframeIndex ?? 0;
+  currentChart.value?.updateState({
+    currentKeyframeIndex: currentIndex.value,
+  });
 });
 
 snackbarSubject.subscribe({

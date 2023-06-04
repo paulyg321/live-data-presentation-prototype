@@ -82,7 +82,6 @@ export const ChartSettings = reactive<{
           },
           {
             index: 6,
-            selector: "#st0",
           },
           {
             index: 3,
@@ -99,7 +98,6 @@ export const ChartSettings = reactive<{
           // },
         ],
         duration: 5,
-        updateType: StateUpdateType.INDIVIDUAL_TWEENS,
         // easeFn: "circ.out",
       });
     });
@@ -154,6 +152,7 @@ export function handlePlay(
       startKeyframe,
       selector
     );
+
   if (args) {
     currentChart.value?.state.controller?.play(
       args as AnimatedElementPlaybackArgs

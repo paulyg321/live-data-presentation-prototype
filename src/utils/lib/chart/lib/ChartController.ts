@@ -14,14 +14,24 @@ import {
   isInBound,
   drawXAxis,
   drawYAxis,
-  StateUpdateType,
   AnimatedCircle,
   type PlaybackSettingsConfig,
+  controllerPlaySubject,
+  type SVGPrimitive,
+  type AnimatedElementForeshadowingSettings,
 } from "@/utils";
 import { markRaw } from "vue";
 import _ from "lodash";
+import { MorphSVGPlugin } from "gsap/MorphSVGPlugin";
 
 const RADIUS_RANGE = [7, 30];
+
+export interface ElementDetails {
+  element: SVGPrimitive;
+  path: any;
+  xSize: number;
+  ySize: number;
+}
 
 export type AnimationChartElementData = {
   x: number;
@@ -32,41 +42,14 @@ export type AnimationChartElementData = {
 
 export interface AnimatedElementPlaybackState {
   index: number;
-  selector?: string;
-  easeFn?: any;
 }
 
 export interface AnimatedElementPlaybackArgs {
   states: AnimatedElementPlaybackState[];
   duration: number;
   easeFn?: any;
-  updateType:
-    | StateUpdateType.GROUP_TIMELINE
-    | StateUpdateType.INDIVIDUAL_TWEENS;
+  selector?: string;
 }
-
-export interface AnimatedElementForeshadowingSettings {
-  isForeshadowed: boolean;
-  foreshadowingMode: ForeshadowingStatesMode;
-  foreshadowingStateCount: number;
-}
-
-export type AnimatedChartElementArgs = {
-  unscaledData: AnimationChartElementData[];
-  colorKey: string;
-  color: string;
-  selectionKey: string;
-  label: string;
-  drawingUtils: DrawingUtils;
-  xScale: D3ScaleTypes;
-  yScale: D3ScaleTypes;
-  zScale?: D3ScaleTypes;
-  isSelected: boolean;
-  activeSelection: boolean;
-  currentKeyframeIndex: number;
-  clipBoundaries: (context: CanvasRenderingContext2D) => void;
-  selectionLabelKey?: string;
-} & AnimatedElementForeshadowingSettings;
 
 export interface ChartsControllerState {
   chartType: ChartType;
@@ -148,6 +131,33 @@ export class ChartController {
     this.upsertAnimatedItems();
   }
 
+  getSampleElement(selector: string): ElementDetails {
+    let element;
+
+    if (selector.includes("rect")) {
+      element = d3
+        .select(selector)
+        .clone()
+        .attr("id", "remove")
+        .attr("width", 1)
+        .attr("height", 1)
+        .node() as SVGPrimitive;
+    } else {
+      element = d3
+        .select(selector)
+        .clone(false)
+        .attr("id", "remove")
+        .node() as SVGPrimitive;
+    }
+
+    return {
+      element,
+      path: MorphSVGPlugin.convertToPath(element)[0],
+      xSize: element.getBoundingClientRect().width,
+      ySize: element.getBoundingClientRect().height,
+    };
+  }
+
   upsertAnimatedItems(
     type?: "scale" | "foreshadow" | "select",
     selectionLabelKey?: string
@@ -155,6 +165,12 @@ export class ChartController {
     if (!this.state.xScale || !this.state.yScale) {
       return;
     }
+
+    const defaultElementDetails = this.getSampleElement(
+      this.state.chartType === ChartType.BAR ? "#rect" : "#circle"
+    );
+
+    d3.select("#drawing-board").selectAll("#remove").remove();
 
     // UTILITY FUNCTIONS FOR "upsertAnimatedItems"
     const getForeshadowingInfo = (key: string) => {
@@ -186,7 +202,7 @@ export class ChartController {
     );
     const getSelectionInfo = (key: string) => {
       return {
-        isSelected: this.state.currentSelection?.includes(key) ?? false,
+        isSelected: Boolean(this.state.currentSelection?.includes(key)),
         activeSelection,
         selectionLabelKey,
       };
@@ -223,7 +239,7 @@ export class ChartController {
       );
     } else {
       this.state.animatedElements = this.state.items
-        // .filter((_, index) => index < 10)
+        // .filter((item, index) => index < 5)
         .map(
           (item: {
             unscaledData: AnimationChartElementData[];
@@ -243,6 +259,7 @@ export class ChartController {
                 ...getSelectionInfo(item.selectionKey),
                 clipBoundaries: generateClipRect,
                 activeSelection,
+                defaultElementDetails: { ...defaultElementDetails },
               });
             } else if (this.state.chartType === ChartType.SCATTER) {
               return new AnimatedCircle({
@@ -257,6 +274,7 @@ export class ChartController {
                 ...getSelectionInfo(item.selectionKey),
                 clipBoundaries: generateClipRect,
                 activeSelection,
+                defaultElementDetails: { ...defaultElementDetails },
               });
             } else {
               return new AnimatedCircle({
@@ -271,6 +289,7 @@ export class ChartController {
                 ...getSelectionInfo(item.selectionKey),
                 clipBoundaries: generateClipRect,
                 activeSelection,
+                defaultElementDetails: { ...defaultElementDetails },
               });
             }
           }
@@ -360,17 +379,14 @@ export class ChartController {
     const _endKeyframe = endKeyframe ?? this.state.endKeyframeIndex;
     const states = [..._.range(_startKeyframe, _endKeyframe), _endKeyframe];
     return {
-      states: states.map((value: number, index: number) => {
+      states: states.map((value: number) => {
         return {
           index: value,
-          selector:
-            index < states.length - 1 && index !== 0 ? selector : undefined,
         };
       }),
+      selector,
       duration: playbackConfig?.duration ?? 5,
       easeFn: playbackConfig?.easeFn,
-      updateType:
-        playbackConfig?.playbackMode ?? StateUpdateType.GROUP_TIMELINE,
     };
   }
 
@@ -386,24 +402,51 @@ export class ChartController {
       keys?: string[];
     } & AnimatedElementPlaybackArgs
   ) {
-    this.state.animatedElements
-      ?.filter((element) => {
-        if (!args.keys) return true;
-        return args.keys.includes(element.controllerState.selectionKey);
-      })
-      .forEach((element) => {
-        element.play(args);
-      });
+    // if (this.state.playbackExtent !== 0) {
+    //   this.state.playbackTimeline?.play();
+    //   this.state.animatedElements?.forEach((element) => {
+    //     element.resume();
+    //   });
+    //   return;
+    // }
+
+    const defaultSelector =
+      this.state.chartType === ChartType.BAR ? "#rect" : "#circle";
+
+    const morphDetails = this.getSampleElement(
+      args.selector ?? defaultSelector
+    );
+
+    const defaultDetails = this.getSampleElement(defaultSelector);
+
+    d3.select("#drawing-board").selectAll("#remove").remove();
+
+    this.state.animatedElements?.forEach((element: AnimatedElement) => {
+      const currentSelection = this.state.currentSelection;
+      if (
+        currentSelection &&
+        currentSelection.length > 0 &&
+        currentSelection.includes(element.controllerState.selectionKey)
+      ) {
+        element.updateState({
+          defaultElementDetails: { ...morphDetails },
+        });
+      } else {
+        element.updateState({
+          defaultElementDetails: { ...defaultDetails },
+        });
+      }
+    });
+
+    controllerPlaySubject.next(args);
 
     this.state.keyframeTimeline?.clear();
     this.state.keyframeTimeline?.pause();
-    args.states.forEach(
-      (state: AnimatedElementPlaybackState, index: number) => {
-        this.state.keyframeTimeline?.to(this.state, {
-          currentKeyframeIndex: state.index,
-        });
-      }
-    );
+    args.states.forEach((state: AnimatedElementPlaybackState) => {
+      this.state.keyframeTimeline?.to(this.state, {
+        currentKeyframeIndex: state.index,
+      });
+    });
 
     this.state.playbackTimeline?.clear();
     this.state.playbackTimeline?.pause(this.state.playbackExtent);

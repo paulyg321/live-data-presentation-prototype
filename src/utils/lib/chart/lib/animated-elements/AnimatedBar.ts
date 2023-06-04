@@ -258,20 +258,9 @@ export class AnimatedBar extends AnimatedElement {
       y: position.y - padding / 2,
     };
 
-    const element = d3
-      .select(args.selector ?? "#rect")
-      .clone()
-      .attr("id", "remove")
-      .attr("width", 1)
-      .attr("height", 1)
-      .node() as SVGPrimitive;
-
     return {
-      element,
       position: modifiedPosition,
       dimensions: modifiedDimensions,
-      xSize: element.getBoundingClientRect().width,
-      ySize: element.getBoundingClientRect().height,
     };
   }
 
@@ -283,22 +272,9 @@ export class AnimatedBar extends AnimatedElement {
         yScale: this.controllerState.yScale,
       });
 
-    const element = d3
-      .select(args.selector ?? "#rect")
-      .clone()
-      .attr("id", "remove")
-      .attr("width", 1)
-      .attr("height", 1)
-      .node() as SVGPrimitive;
-
-    const elementSize = element?.getBoundingClientRect();
-
     return {
-      element,
       position,
       dimensions: rectDimensions,
-      xSize: elementSize.width,
-      ySize: elementSize.height,
     };
   }
 
