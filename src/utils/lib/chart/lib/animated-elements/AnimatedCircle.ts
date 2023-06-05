@@ -12,6 +12,8 @@ import {
   type VisualState,
   TRANSPARENT,
   SELECTED_OPACITY,
+  isInBound,
+  type Dimensions,
 } from "@/utils";
 
 const RADIUS = 10;
@@ -347,5 +349,27 @@ export class AnimatedCircle extends AnimatedElement {
         }
       );
     }
+  }
+
+  isInBound(boundaries: {
+    position: Coordinate2D;
+    dimensions?: Dimensions;
+    radius?: number;
+  }): boolean {
+    return isInBound(
+      {
+        x: this.controllerState.xScale(
+          this.controllerState.unscaledData[
+            this.controllerState.currentKeyframeIndex
+          ].x
+        ) as number,
+        y: this.controllerState.yScale(
+          this.controllerState.unscaledData[
+            this.controllerState.currentKeyframeIndex
+          ].y
+        ) as number,
+      },
+      boundaries
+    );
   }
 }

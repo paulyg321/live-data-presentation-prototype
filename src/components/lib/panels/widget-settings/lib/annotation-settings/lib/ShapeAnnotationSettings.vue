@@ -91,12 +91,6 @@ watch(
         hint="Applies ease functions and playback duration to each Individual tween or to the group"
       ></v-autocomplete>
     </v-col>
-    <v-col>
-      <v-text-field
-        label="Color"
-        v-model="shapeSettings.state.color"
-      ></v-text-field>
-    </v-col>
     <v-col lg="12">
       <v-slider
         max="1"
@@ -112,6 +106,13 @@ watch(
         label="Line Width"
         v-model="shapeSettings.state.lineWidth"
       ></v-slider>
+    </v-col>
+    <v-col lg="12" class="d-flex justify-center">
+      <v-color-picker
+        v-model="shapeSettings.state.color"
+        label="Color"
+        mode="hex"
+      ></v-color-picker>
     </v-col>
   </v-row>
 </template>

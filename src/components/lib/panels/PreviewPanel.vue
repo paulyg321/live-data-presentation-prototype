@@ -8,8 +8,10 @@ import {
   type PlaybackSettingsConfig,
   StateUpdateType,
   annotationSubject,
+  highlightSubject,
+  HighlightListener,
 } from "@/utils";
-import { onMounted, ref, watch, watchEffect } from "vue";
+import { computed, onMounted, ref, watch, watchEffect } from "vue";
 import {
   ChartSettings,
   CanvasSettings,
@@ -27,6 +29,13 @@ gsap.registerPlugin(MorphSVGPlugin);
 gsap.registerPlugin(CustomEase);
 
 const snackbar = ref<boolean>(false);
+const highlightModeActive = ref<boolean>(false);
+const _highlightListener = ref<HighlightListener | undefined>();
+watch(highlightModeActive, () => {
+  _highlightListener.value?.updateState({
+    isActive: highlightModeActive.value,
+  });
+});
 const snackbarText = ref<string>("");
 const snackbarVariant = ref<string>("");
 const playbackConfig = ref<PlaybackSettingsConfig>({
@@ -52,6 +61,23 @@ watch(currentChart, () => {
   currentChart.value?.updateState({
     currentKeyframeIndex: currentIndex.value,
   });
+});
+
+highlightSubject.subscribe({
+  next(value: any) {
+    const charts = StorySettings.currentStory?.getCharts();
+    if (!charts) return;
+
+    console.log(value);
+    charts.forEach((chart) => {
+      chart.state.controller?.setSelection({
+        bounds: {
+          coordinates: value,
+          radius: 10,
+        },
+      });
+    });
+  },
 });
 
 snackbarSubject.subscribe({
@@ -89,7 +115,6 @@ annotationSubject.subscribe({
 playbackSubject.subscribe({
   next(config: any) {
     if (config.type === "pause") {
-      console.log("pause");
       currentChart.value?.state.controller?.pause();
     } else {
       playbackConfig.value = config.data;
@@ -152,10 +177,39 @@ function initializeCanvasListeners() {
   }
 }
 
+function handleReset(type: string) {
+  switch (type) {
+    case "selection":
+      selectionSubject.next(undefined);
+      break;
+    case "foreshadowing":
+      foreshadowingAreaSubject.next(undefined);
+      break;
+    case "annotation":
+      annotationSubject.next(undefined);
+      break;
+    default:
+      break;
+  }
+}
+
 onMounted(() => {
   initializeCanvasListeners();
   draw();
   ChartSettings.setExtentVisualizer();
+  const drawingUtils = CanvasSettings.generalDrawingUtils;
+  if (!drawingUtils) return;
+  console.log("HERE");
+  _highlightListener.value = new HighlightListener({
+    position: {
+      x: CanvasSettings.dimensions.width / 2 - 25,
+      y: CanvasSettings.dimensions.height / 2 - 25,
+    },
+    dimensions: { width: 50, height: 50 },
+    canvasDimensions: CanvasSettings.dimensions,
+    drawingUtils,
+    isActive: false,
+  });
 });
 </script>
 <!---------------------------------------------------------------------------------------------------------->
@@ -172,8 +226,9 @@ onMounted(() => {
       :height="CanvasSettings.dimensions.height"
       :className="className"
       ref="svg"
+      :view-box="`0 0 ${CanvasSettings.dimensions.width} ${CanvasSettings.dimensions.height}`"
     >
-      <rect id="rect" />
+      <path id="rect" d="M0 1750.176h1920V169H0z"></path>
       <path
         id="circle"
         d="M256,0C114.837,0,0,114.837,0,256s114.837,256,256,256s256-114.837,256-256S397.163,0,256,0z"
@@ -196,7 +251,7 @@ onMounted(() => {
   </CanvasWrapper>
   <v-container>
     <v-row>
-      <v-col>
+      <v-col lg="12">
         <v-slider
           v-model="currentIndex"
           :ticks="Object.assign({}, keyframes)"
@@ -213,6 +268,29 @@ onMounted(() => {
             </div>
           </template>
         </v-slider>
+      </v-col>
+    </v-row>
+    <v-row>
+      <v-col lg="3">
+        <v-btn block @click="() => handleReset('selection')"
+          >Reset Selection</v-btn
+        >
+      </v-col>
+      <v-col lg="3">
+        <v-btn block @click="() => handleReset('foreshadowing')"
+          >Reset Foreshadowing</v-btn
+        >
+      </v-col>
+      <v-col lg="3">
+        <v-btn block @click="() => handleReset('annotation')"
+          >Reset Annotation</v-btn
+        >
+      </v-col>
+      <v-col lg="3">
+        <v-checkbox
+          label="Highlight Mode"
+          v-model="highlightModeActive"
+        ></v-checkbox>
       </v-col>
     </v-row>
   </v-container>

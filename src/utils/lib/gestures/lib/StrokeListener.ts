@@ -244,10 +244,8 @@ export class StrokeListener extends GestureListener {
         this.state.stroke = [];
         this.state.numRevolutions = this.state.numRevolutions + 1;
         if (this.state.gestureStartTime && isFirstDial) {
-          const timeTaken =
-            (new Date().getTime() - this.state.gestureStartTime) / 1000;
-          // TODO: Map time taken to an affect
-          // console.log(timeTaken);
+          // const timeTaken =
+          //   (new Date().getTime() - this.state.gestureStartTime) / 1000;
           this.publishToSubject(undefined, AffectOptions.NEUTRAL);
         }
       } else {
@@ -274,9 +272,6 @@ export class StrokeListener extends GestureListener {
     this.renderStrokePath();
     // this.renderReferenceCircles();
     this.renderDetectionState();
-    if (this.state.listenerMode === ListenerMode.KEYFRAME) {
-      this.renderKeyframe();
-    }
   }
 }
 

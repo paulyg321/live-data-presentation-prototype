@@ -8,6 +8,6 @@ export * from "./lib/RectPoseListener";
 export * from "./lib/RangePoseListener";
 export * from "./lib/PointPoseListener";
 export * from "./lib/OpenHandPoseListener";
-export * from "./lib/ThumbPoseListener";
+export * from "./lib/HighlightListener";
 export * from "./lib/StrokeListener";
 export * from "./lib/handGestures";

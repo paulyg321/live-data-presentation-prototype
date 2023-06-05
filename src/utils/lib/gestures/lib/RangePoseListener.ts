@@ -263,8 +263,5 @@ export class RangePoseListener extends GestureListener {
     if (this.state.timer) {
       this.drawPoseState();
     }
-    if (this.state.listenerMode === ListenerMode.KEYFRAME) {
-      this.renderKeyframe();
-    }
   }
 }

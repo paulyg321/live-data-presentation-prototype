@@ -61,7 +61,7 @@ watchEffect(() => {
         </template>
       </v-autocomplete>
     </v-col>
-    <v-col lg="12">
+    <!-- <v-col lg="12">
       <v-checkbox
         label="Emit to items within bounds"
         v-model="GestureSettingsState.useBounds"
@@ -72,7 +72,7 @@ watchEffect(() => {
         label="Only emit to items within bounds"
         v-model="GestureSettingsState.restrictToBounds"
       ></v-checkbox>
-    </v-col>
+    </v-col> -->
   </v-row>
 </template>
 <style></style>

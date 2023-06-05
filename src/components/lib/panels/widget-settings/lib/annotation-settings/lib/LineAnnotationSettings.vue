@@ -63,10 +63,10 @@ watch(
 <template>
   <v-row>
     <v-col lg="6">
-      <v-btn @click="() => currentWidget?.handleUnveil()">Unveil</v-btn>
+      <v-btn block @click="() => currentWidget?.handleUnveil()">Unveil</v-btn>
     </v-col>
     <v-col lg="6">
-      <v-btn @click="() => currentWidget?.handleHide()">Hide</v-btn>
+      <v-btn block @click="() => currentWidget?.handleHide()">Hide</v-btn>
     </v-col>
     <v-col lg="12">
       <v-text-field
@@ -90,12 +90,6 @@ watch(
         hint="Applies ease functions and playback duration to each Individual tween or to the group"
       ></v-autocomplete>
     </v-col>
-    <v-col>
-      <v-text-field
-        label="Color"
-        v-model="lineSettings.state.color"
-      ></v-text-field>
-    </v-col>
     <v-col lg="12">
       <v-slider
         max="1"
@@ -111,6 +105,13 @@ watch(
         label="Line Width"
         v-model="lineSettings.state.lineWidth"
       ></v-slider>
+    </v-col>
+    <v-col lg="12" class="d-flex justify-center">
+      <v-color-picker
+        v-model="lineSettings.state.color"
+        label="Color"
+        mode="hex"
+      ></v-color-picker>
     </v-col>
   </v-row>
 </template>

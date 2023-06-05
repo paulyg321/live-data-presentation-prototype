@@ -42,6 +42,7 @@ export type AnimatedChartElementArgs = {
   clipBoundaries: (context: CanvasRenderingContext2D) => void;
   selectionLabelKey?: string;
   defaultElementDetails: ElementDetails;
+  domainPerKeyframe?: number[][];
 } & AnimatedElementForeshadowingSettings;
 
 export type AnimatedElementState = AnimatedChartElementArgs & {
@@ -200,6 +201,7 @@ export abstract class AnimatedElement {
     this.controllerState = {
       ...args,
       currentKeyframeIndex: args.currentKeyframeIndex,
+      domainPerKeyframe: args.domainPerKeyframe,
       foreshadowingMode: ForeshadowingStatesMode.TRAJECTORY,
       foreshadowingStateCount: 1,
       playback: {
@@ -232,6 +234,11 @@ export abstract class AnimatedElement {
   ): HandleSelectionReturnValue;
   abstract drawCurrentState(): void;
   abstract drawForeshadowingState(): void;
+  abstract isInBound(boundaries: {
+    position: Coordinate2D;
+    dimensions?: Dimensions;
+    radius?: number;
+  }): boolean;
 
   clearSvg() {
     d3.select("#drawing-board").selectAll("#remove").remove();
@@ -402,7 +409,6 @@ export abstract class AnimatedElement {
           currentItemAnimationState.opacity = opacity;
         } else if (updateType === StateUpdateType.ANIMATE) {
           currentItemAnimationState.opacityTimeline?.clear();
-
           currentItemAnimationState.opacityTimeline?.fromTo(
             currentItemAnimationState,
             {

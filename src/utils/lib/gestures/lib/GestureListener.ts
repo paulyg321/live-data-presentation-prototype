@@ -113,6 +113,7 @@ export interface GestureListenerConstructorArgs {
   endKeyframe?: { value: string; index: number };
   strokeRecognizer?: DollarRecognizer;
   selectionLabelKey?: string;
+  isActive?: boolean;
 }
 
 export interface GestureListenerState {
@@ -175,6 +176,7 @@ export interface GestureListenerState {
 
   numRevolutions: number;
   gestureStartTime?: number;
+  isActive?: boolean;
 }
 
 export type GestureListenerSubjectMap = { [key: string]: Subject<any> };
@@ -190,7 +192,7 @@ export enum ListenerMode {
   FORESHADOWING = "foreshadowing",
   SELECTION = "selection",
   PLAYBACK = "playback",
-  KEYFRAME = "keyframe",
+  HIGHLIGHT = "highlight",
   ANNOTATE = "annotate",
 }
 
@@ -236,6 +238,7 @@ export abstract class GestureListener {
     strokeRecognizer = new DollarRecognizer(),
     playbackSettings = DEFAULT_PLAYBACK_SETTINGS,
     selectionLabelKey,
+    isActive,
   }: GestureListenerConstructorArgs) {
     this.state = {
       position,
@@ -288,6 +291,7 @@ export abstract class GestureListener {
       endKeyframe,
       selectionLabelKey,
       numRevolutions: 0,
+      isActive,
     };
 
     this.setResetHandler();
@@ -314,6 +318,7 @@ export abstract class GestureListener {
     playbackConfig,
     endKeyframe,
     selectionLabelKey,
+    isActive,
   }: Partial<GestureListenerConstructorArgs>) {
     if (position) {
       this.state.position = position;
@@ -374,6 +379,9 @@ export abstract class GestureListener {
     if (endKeyframe) {
       this.state.endKeyframe = endKeyframe;
     }
+    if (isActive !== undefined) {
+      this.state.isActive = isActive;
+    }
     this.state.selectionLabelKey = selectionLabelKey;
   }
 
@@ -433,6 +441,11 @@ export abstract class GestureListener {
         });
         break;
       case ListenerMode.ANNOTATE:
+        this.publishToSubjectIfExists(GestureListener.annotationSubjectKey, {
+          keys: this.state.selectionKeys,
+        });
+        break;
+      case ListenerMode.HIGHLIGHT:
         this.publishToSubjectIfExists(GestureListener.annotationSubjectKey, {
           keys: this.state.selectionKeys,
         });

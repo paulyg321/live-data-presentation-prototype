@@ -1,4 +1,3 @@
-import * as d3 from "d3";
 import {
   type AnimatedChartElementArgs,
   type D3ScaleTypes,
@@ -11,8 +10,9 @@ import {
   type HandleSelectionArgs,
   type HandleSelectionReturnValue,
   type VisualState,
-  type SVGPrimitive,
   FORESHADOW_OPACITY,
+  type Dimensions,
+  isInBound,
 } from "@/utils";
 
 const padding = 5;
@@ -324,11 +324,14 @@ export class AnimatedBar extends AnimatedElement {
     };
 
     const rectDimensions = {
-      height:
+      height: Math.floor(
         (yScale(nextRectHorizontalPosition) as number) -
-        (yScale(coordinate.y) as number) -
-        margin,
-      width: (xScale(coordinate.x) as number) - (xScale(0) as number),
+          (yScale(coordinate.y) as number) -
+          margin
+      ),
+      width: Math.floor(
+        (xScale(coordinate.x) as number) - (xScale(0) as number)
+      ),
     };
 
     return {
@@ -525,6 +528,32 @@ export class AnimatedBar extends AnimatedElement {
           });
         }
       );
+    });
+  }
+
+  isInBound(boundaries: {
+    position: Coordinate2D;
+    dimensions?: Dimensions;
+    radius?: number;
+  }): boolean {
+    const { rectDimensions, topLeft: position } =
+      AnimatedBar.createRectDataFromCoordinate({
+        coordinate:
+          this.controllerState.unscaledData[
+            this.controllerState.currentKeyframeIndex
+          ],
+        xScale: this.controllerState.xScale,
+        yScale: this.controllerState.yScale,
+      });
+
+    console.log({
+      rectDimensions,
+      position,
+      hand: boundaries.position,
+    });
+    return isInBound(boundaries.position, {
+      position,
+      dimensions: rectDimensions,
     });
   }
 }

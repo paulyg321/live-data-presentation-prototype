@@ -78,9 +78,9 @@ onMounted(() => {
         </v-col>
       </v-row>
       <v-row>
-        <v-col lg="12">
+        <!-- <v-col lg="12"> -->
           <!-- change this v-model -->
-          <v-select
+          <!-- <v-select
             v-model="affectKey"
             label="Affect"
             :items="[
@@ -89,8 +89,8 @@ onMounted(() => {
               AffectOptions.NEGATIVE,
             ]"
             hint="Select which one of the following affect configs you'd like to modify"
-          ></v-select>
-        </v-col>
+          ></v-select> -->
+        <!-- </v-col> -->
         <v-col lg="12">
           <!-- change this v-model -->
           <v-text-field
@@ -99,17 +99,6 @@ onMounted(() => {
             type="number"
             hint="How long should the full animation or each animation take"
           ></v-text-field>
-        </v-col>
-        <v-col lg="12">
-          <v-select
-            v-model="playbackSettings[affectKey].playbackMode"
-            label="Playback Mode"
-            :items="[
-              StateUpdateType.GROUP_TIMELINE,
-              StateUpdateType.INDIVIDUAL_TWEENS,
-            ]"
-            hint="Applies ease functions and playback duration to each Individual tween or to the group"
-          ></v-select>
         </v-col>
         <v-col lg="12">
           <v-autocomplete

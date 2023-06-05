@@ -1,7 +1,7 @@
 export enum AnnotationType {
-  RECT = "annotation-rect",
-  CIRCLE = "annotation-circle",
-  LINE = "annotation-line",
-  TEXT = "annotation-text",
-  SVG = "annotation-svg",
+  RECT = "rect-annotation",
+  CIRCLE = "circle-annotation",
+  LINE = "line-annotation",
+  TEXT = "text-annotation",
+  SVG = "svg-annotation",
 }

@@ -119,12 +119,6 @@ function handleSavePath() {
         v-model="svgSettings.state.color"
       ></v-text-field>
     </v-col>
-    <v-col>
-      <v-text-field
-        label="Alternate Color"
-        v-model="svgSettings.state.alternateColor"
-      ></v-text-field>
-    </v-col>
     <v-col lg="12">
       <v-slider
         max="1"
@@ -149,6 +143,20 @@ function handleSavePath() {
       <v-btn :disabled="!svgSettings.state.path" @click="handleSavePath"
         >Save Path</v-btn
       >
+    </v-col>
+    <v-col lg="12" class="d-flex justify-center">
+      <v-color-picker
+        v-model="svgSettings.state.color"
+        label="Color"
+        mode="hex"
+      ></v-color-picker>
+    </v-col>
+    <v-col lg="12" class="d-flex justify-center">
+      <v-color-picker
+        v-model="svgSettings.state.alternateColor"
+        label="Color"
+        mode="hex"
+      ></v-color-picker>
     </v-col>
   </v-row>
 </template>

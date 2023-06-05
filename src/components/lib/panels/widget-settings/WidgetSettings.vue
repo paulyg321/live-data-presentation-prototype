@@ -1,7 +1,11 @@
 <script lang="ts" setup>
-import { AnnotationType, ChartType, ListenerType } from "@/utils";
+import {
+  AnnotationType,
+  ChartType,
+  ListenerType,
+} from "@/utils";
 import { onMounted, watch } from "vue";
-import { StorySettings } from "@/state";
+import { StorySettings, widgetIconMap } from "@/state";
 import {
   AnnotationSettings,
   ChartSettings,
@@ -34,23 +38,24 @@ onMounted(() => {
             <template #item="{ element, index }">
               <v-list-item
                 :key="index"
-                :title="`${index}-${element.type}`"
+                :title="`${element.type}`"
                 :active="
                   element.id === StorySettings.currentStory?.currentWidget?.id
                 "
+                :prepend-icon="widgetIconMap[element.type]"
                 @click="
                   () => StorySettings.currentStory?.setCurrentWidget(element.id)
                 "
               >
                 <template v-slot:append>
-                  <v-btn
+                  <!-- <v-btn
                     color="deep-purple-lighten-2"
                     icon="mdi-select"
                     variant="elevated"
                     density="compact"
                     v-clipboard="() => element.id"
                     class="mr-2"
-                  ></v-btn>
+                  ></v-btn> -->
                   <v-btn
                     color="deep-purple-lighten-2"
                     icon="mdi-delete-empty"

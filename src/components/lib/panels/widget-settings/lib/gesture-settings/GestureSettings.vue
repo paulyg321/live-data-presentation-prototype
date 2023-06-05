@@ -155,7 +155,8 @@ watch(
 watch(
   () => GestureSettingsState.selectionKeys,
   () => {
-    if (GestureSettingsState.selectionKeys.length > 0) {
+    const isAnnotation = GestureSettingsState.listenerMode === ListenerMode.ANNOTATE;
+    if (!isAnnotation && GestureSettingsState.selectionKeys.length > 0) {
       const bounds = currentChart.value?.state.controller?.getSelectionBounds(
         GestureSettingsState.selectionKeys
       );
@@ -373,7 +374,6 @@ function getGestures() {
             ListenerMode.FORESHADOWING,
             ListenerMode.SELECTION,
             ListenerMode.PLAYBACK,
-            ListenerMode.KEYFRAME,
             ListenerMode.ANNOTATE,
           ]"
         ></v-select>

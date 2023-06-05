@@ -7,16 +7,14 @@ import {
   type ListenerProcessedFingerData,
   SupportedGestures,
   DEFAULT_TRIGGER_DURATION,
-  ListenerMode,
   startTimeoutInstance,
 } from "@/utils";
 
-export type ThumbPoseListenerConstructorArgs = GestureListenerConstructorArgs;
+export type HighlightListenerConstructorArgs = GestureListenerConstructorArgs;
 
-export class ThumbPoseListener extends GestureListener {
+export class HighlightListener extends GestureListener {
   constructor({
     position,
-    dimensions,
     handsToTrack = {
       dominant: HANDS.RIGHT,
       nonDominant: HANDS.LEFT,
@@ -35,11 +33,11 @@ export class ThumbPoseListener extends GestureListener {
     triggerDuration = DEFAULT_TRIGGER_DURATION,
     numHands = 1,
     ...rest
-  }: ThumbPoseListenerConstructorArgs) {
+  }: HighlightListenerConstructorArgs) {
     super({
       ...rest,
       position,
-      dimensions,
+      dimensions: canvasDimensions,
       handsToTrack,
       gestureTypes,
       canvasDimensions,
@@ -75,24 +73,21 @@ export class ThumbPoseListener extends GestureListener {
   // Implemented to only track one finger and one hand
   protected handleNewData(fingerData: ListenerProcessedFingerData): void {
     const dominantHand = fingerData[this.state.handsToTrack.dominant];
-    const nonDominantHand = fingerData[this.state.handsToTrack.nonDominant];
-
-    if (!dominantHand || !nonDominantHand) {
+    if (!dominantHand || !this.state.isActive) {
       return;
     }
 
-    const trigger = this.thumbsTouch(fingerData);
+    const indexPosition = dominantHand.fingerPositions[
+      HAND_LANDMARK_IDS.index_finger_tip
+    ] as Coordinate2D;
 
-    if (trigger) {
-      this.handleTrigger(fingerData);
-      return;
-    }
+    this.publishToSubjectIfExists(
+      GestureListener.highlighSubjectKey,
+      indexPosition
+    );
   }
 
   draw() {
     this.renderBorder();
-    if (this.state.listenerMode === ListenerMode.KEYFRAME) {
-      this.renderKeyframe();
-    }
   }
 }

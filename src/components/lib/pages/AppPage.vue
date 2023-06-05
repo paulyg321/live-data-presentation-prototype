@@ -35,7 +35,6 @@ import {
   RangePoseListener,
   OpenHandPoseListener,
   PointPoseListener,
-  ThumbPoseListener,
   AnnotationType,
   Line,
   Circle,
@@ -58,7 +57,6 @@ enum AvailableWidgets {
   RANGE_POSE = "range-pose",
   POINT_POSE = "point-pose",
   OPEN_HAND_POSE = "open-hand-pose",
-  THUMB_POSE = "thumb-touch",
   STROKE_LISTENER = "stroke-listener",
   // annotation widgets
   LINE_ANNOTATION = "line-annotation",
@@ -182,12 +180,6 @@ function handleAddWidget(value: {
           ListenerType.OPEN_HAND_POSE
         );
         break;
-      case AvailableWidgets.THUMB_POSE:
-        handleGestureWidget(
-          SettingsTab.WIDGET_SETTINGS,
-          ListenerType.THUMB_POSE
-        );
-        break;
       case AvailableWidgets.STROKE_LISTENER:
         handleGestureWidget(
           SettingsTab.WIDGET_SETTINGS,
@@ -258,21 +250,6 @@ function addWidget(type: string) {
     }
     case ListenerType.OPEN_HAND_POSE: {
       const newListener = new OpenHandPoseListener({
-        position: {
-          x: CanvasSettings.dimensions.width / 2 - 25,
-          y: CanvasSettings.dimensions.height / 2 - 25,
-        },
-        dimensions: { width: 50, height: 50 },
-        canvasDimensions: CanvasSettings.dimensions,
-        resetKeys: getGestureListenerResetKeys(),
-        drawingUtils,
-      });
-
-      StorySettings.currentStory?.addLayer(type, newListener);
-      break;
-    }
-    case ListenerType.THUMB_POSE: {
-      const newListener = new ThumbPoseListener({
         position: {
           x: CanvasSettings.dimensions.width / 2 - 25,
           y: CanvasSettings.dimensions.height / 2 - 25,
@@ -428,7 +405,7 @@ onMounted(() => {
           <v-tooltip text="Scatter Plot">
             <template v-slot:activator="{ props }">
               <v-list-item
-                :prepend-icon="widgetIconMap.scatter"
+                :prepend-icon="widgetIconMap[ChartType.SCATTER]"
                 :value="AvailableWidgets.SCATTER_PLOT"
                 v-bind="props"
                 :disabled="disableChartType"
@@ -440,7 +417,7 @@ onMounted(() => {
           <v-tooltip text="Bar Chart">
             <template v-slot:activator="{ props }">
               <v-list-item
-                :prepend-icon="widgetIconMap.bar"
+                :prepend-icon="widgetIconMap[ChartType.BAR]"
                 :value="AvailableWidgets.BAR_CHART"
                 v-bind="props"
                 :disabled="disableChartType"
@@ -452,7 +429,7 @@ onMounted(() => {
           <v-tooltip text="Line Annotation">
             <template v-slot:activator="{ props }">
               <v-list-item
-                :prepend-icon="widgetIconMap['annotation-line']"
+                :prepend-icon="widgetIconMap[AnnotationType.LINE]"
                 :value="AvailableWidgets.LINE_ANNOTATION"
                 v-bind="props"
                 :disabled="disableChartType"
@@ -464,7 +441,7 @@ onMounted(() => {
           <v-tooltip text="Text Annotation">
             <template v-slot:activator="{ props }">
               <v-list-item
-                :prepend-icon="widgetIconMap['annotation-text']"
+                :prepend-icon="widgetIconMap[AnnotationType.TEXT]"
                 :value="AvailableWidgets.TEXT_ANNOTATION"
                 v-bind="props"
                 :disabled="disableChartType"
@@ -476,7 +453,7 @@ onMounted(() => {
           <v-tooltip text="SVG Annotation">
             <template v-slot:activator="{ props }">
               <v-list-item
-                :prepend-icon="widgetIconMap['annotation-svg']"
+                :prepend-icon="widgetIconMap[AnnotationType.SVG]"
                 :value="AvailableWidgets.SVG_ANNOTATION"
                 v-bind="props"
                 :disabled="disableChartType"
@@ -488,7 +465,7 @@ onMounted(() => {
           <v-tooltip text="Rect Annotation">
             <template v-slot:activator="{ props }">
               <v-list-item
-                :prepend-icon="widgetIconMap['annotation-rect']"
+                :prepend-icon="widgetIconMap[AnnotationType.RECT]"
                 :value="AvailableWidgets.RECT_ANNOTATION"
                 v-bind="props"
                 :disabled="disableChartType"
@@ -500,7 +477,7 @@ onMounted(() => {
           <v-tooltip text="Circle Annotation">
             <template v-slot:activator="{ props }">
               <v-list-item
-                :prepend-icon="widgetIconMap['annotation-circle']"
+                :prepend-icon="widgetIconMap[AnnotationType.CIRCLE]"
                 :value="AvailableWidgets.CIRCLE_ANNOTATION"
                 v-bind="props"
                 :disabled="disableChartType"
@@ -512,7 +489,7 @@ onMounted(() => {
           <v-tooltip text="Rect Pose Widget">
             <template v-slot:activator="{ props }">
               <v-list-item
-                :prepend-icon="widgetIconMap['rect-pose']"
+                :prepend-icon="widgetIconMap[ListenerType.RECT_POSE]"
                 :value="AvailableWidgets.RECT_POSE"
                 v-bind="props"
                 :disabled="disablePoses"
@@ -524,7 +501,7 @@ onMounted(() => {
           <v-tooltip text="Range Pose Widget">
             <template v-slot:activator="{ props }">
               <v-list-item
-                :prepend-icon="widgetIconMap['range-pose']"
+                :prepend-icon="widgetIconMap[ListenerType.RANGE_POSE]"
                 :value="AvailableWidgets.RANGE_POSE"
                 v-bind="props"
                 :disabled="disablePoses"
@@ -536,7 +513,7 @@ onMounted(() => {
           <v-tooltip text="Point Pose Widget">
             <template v-slot:activator="{ props }">
               <v-list-item
-                :prepend-icon="widgetIconMap['point-pose']"
+                :prepend-icon="widgetIconMap[ListenerType.POINT_POSE]"
                 :value="AvailableWidgets.POINT_POSE"
                 v-bind="props"
                 :disabled="disablePoses"
@@ -548,20 +525,8 @@ onMounted(() => {
           <v-tooltip text="Open Hand Pose Widget">
             <template v-slot:activator="{ props }">
               <v-list-item
-                :prepend-icon="widgetIconMap['open-hand-pose']"
+                :prepend-icon="widgetIconMap[ListenerType.OPEN_HAND_POSE]"
                 :value="AvailableWidgets.OPEN_HAND_POSE"
-                v-bind="props"
-                :disabled="disablePoses"
-              >
-              </v-list-item>
-            </template>
-          </v-tooltip>
-
-          <v-tooltip text="Thumb Pose Widget">
-            <template v-slot:activator="{ props }">
-              <v-list-item
-                :prepend-icon="widgetIconMap['thumb-pose']"
-                :value="AvailableWidgets.THUMB_POSE"
                 v-bind="props"
                 :disabled="disablePoses"
               >
@@ -572,7 +537,7 @@ onMounted(() => {
           <v-tooltip text="Stroke Listener Widget">
             <template v-slot:activator="{ props }">
               <v-list-item
-                :prepend-icon="widgetIconMap['stroke-listener']"
+                :prepend-icon="widgetIconMap[ListenerType.STROKE_LISTENER]"
                 :value="AvailableWidgets.STROKE_LISTENER"
                 v-bind="props"
                 :disabled="disablePoses"

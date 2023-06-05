@@ -36,9 +36,9 @@ export const MIN_DOMAIN_Y = 1;
 const colorArray = d3["schemeTableau10"];
 
 export enum ChartType {
-  LINE = "line",
-  SCATTER = "scatter",
-  BAR = "bar",
+  LINE = "line-chart",
+  SCATTER = "scatter-plot",
+  BAR = "bar-chart",
 }
 
 export type ScaleOrdinal = d3.ScaleOrdinal<string, string, never>;
@@ -82,6 +82,7 @@ export type ChartState = NewChartArgs & {
   zDomain?: any[];
   colorDomain?: any[];
   keyframes?: any[];
+  domainPerKeyframe?: any[];
   controller?: ChartController;
   drawingUtils: DrawingUtils;
   currentKeyframeIndex: number;
@@ -255,6 +256,21 @@ export class Chart {
 
       this.state.xDomain = [0, dataDomain[1]];
       this.state.yDomain = [MIN_DOMAIN_Y, MAX_DOMAIN_Y];
+
+      // Group each keyframe so we can get the extent for each keyframe
+      const groupedByKeyFrame = d3.group(
+        this.state.data,
+        (d: any) => d[this.state.field]
+      );
+
+      this.state.domainPerKeyframe = [];
+
+      groupedByKeyFrame.forEach((frame: any) => {
+        const currentFrame = [...frame];
+        this.state.domainPerKeyframe?.push(
+          d3.extent(currentFrame, (d) => d[this.state.xField])
+        );
+      });
     }
   }
 
@@ -389,7 +405,9 @@ export class Chart {
           }
         });
 
-        _.union(this.state.selectOptions, [selectionKey]);
+        this.state.selectOptions = _.union(this.state.selectOptions, [
+          selectionKey,
+        ]);
 
         return {
           unscaledData,
@@ -428,7 +446,6 @@ export class Chart {
     if (!this.state.xDomain || !this.state.yDomain || !this.state.keyframes) {
       return;
     }
-
     initializeChartArgs = {
       ...initializeChartArgs,
       colorScale,
@@ -439,6 +456,7 @@ export class Chart {
       position: this.state.position,
       canvasDimensions: this.state.canvasDimensions,
       keyframes: this.state.keyframes,
+      domainPerKeyframe: this.state.domainPerKeyframe,
       drawingUtils: this.state.drawingUtils,
       xScaleType: this.state.xScaleType,
       yScaleType: this.state.yScaleType,

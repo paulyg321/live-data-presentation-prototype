@@ -10,7 +10,6 @@ import {
   ChartType,
   Chart,
   type Coordinate2D,
-  ThumbPoseListener,
   AnnotationType,
   Line,
   Circle,
@@ -27,7 +26,6 @@ export type StoryLayer =
   | PointPoseListener
   | OpenHandPoseListener
   | StrokeListener
-  | ThumbPoseListener
   | AnnotationLayers
   | Chart;
 
@@ -124,13 +122,6 @@ export class Story {
                 type,
                 id,
                 layer: new RangePoseListener(arg),
-              };
-            }
-            case ListenerType.THUMB_POSE: {
-              return {
-                type,
-                id,
-                layer: new ThumbPoseListener(arg),
               };
             }
             case ListenerType.STROKE_LISTENER: {

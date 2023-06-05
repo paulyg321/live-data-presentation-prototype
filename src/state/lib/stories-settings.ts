@@ -11,7 +11,7 @@ import { markRaw, reactive, watch } from "vue";
 import { CanvasSettings } from "./canvas-settings";
 import { parse, stringify } from "flatted";
 
-export const widgetIconMap = {
+export const widgetIconMap: Record<string, string> = {
   [ChartType.BAR]: "mdi-chart-bar",
   [ChartType.LINE]: "mdi-chart-line",
   [ChartType.SCATTER]: "mdi-chart-scatter-plot",
