@@ -6,6 +6,8 @@ import {
   Story,
   getStories,
   storeStories,
+  type StoryLayer,
+  GestureListener,
 } from "@/utils";
 import { markRaw, reactive, watch } from "vue";
 import { CanvasSettings } from "./canvas-settings";
@@ -31,33 +33,17 @@ export const widgetIconMap: Record<string, string> = {
   [AnnotationType.RECT]: "mdi-vector-rectangle",
 };
 
-watch(() => CanvasSettings.generalDrawingUtils, initializeStories);
-
 const LEFT = "ArrowLeft";
 const RIGHT = "ArrowRight";
 
-export async function initializeStories() {
-  const stories = (await getStories()) ?? "[[]]";
-  if (stories && CanvasSettings.generalDrawingUtils) {
-    StorySettings.stories = (parse(stories) as any[]).map((story) => {
-      const newStory = new Story({
-        ...story,
-        drawingUtils: CanvasSettings.generalDrawingUtils as DrawingUtils,
-      });
-
-      return newStory;
-    });
-  }
-}
-
 export const StorySettings = reactive<{
-  stories: Story[];
+  stories: string[];
   currentStory?: Story;
   currentStoryIndex?: number;
-  saveStories: () => void;
+  saveCurrentStory: () => void;
   loadNextStory: () => Promise<void>;
   loadPrevStory: () => Promise<void>;
-  addNewStory: (title: string) => Promise<number | undefined>;
+  addNewStory: (title: string) => Promise<void>;
   setCurrentStory: (index: number) => Promise<void>;
   deleteStory: (index: number) => Promise<void>;
   duplicateStory: (index: number) => Promise<void>;
@@ -66,12 +52,24 @@ export const StorySettings = reactive<{
   currentStory: undefined,
   currentStoryIndex: undefined,
   async setCurrentStory(index: number) {
-    const storedStories = this.stories;
-    if (storedStories.length > 0) {
-      this.currentStory = storedStories[index];
-      await this.currentStory?.loadStoredLayers();
-      this.currentStoryIndex = index;
+    // Check local storage for using the name stored in this.stories[]
+    const key = this.stories[index];
+    const storedStory = localStorage.getItem(key);
+    if (!storedStory) return;
+
+    if (this.currentStory) {
+      this.currentStory.getListeners().forEach((listener) => {
+        (listener.layer as GestureListener).unsubscribe();
+      });
     }
+
+    this.currentStory = new Story({
+      ...parse(storedStory),
+      drawingUtils: CanvasSettings.generalDrawingUtils as DrawingUtils,
+    });
+
+    await this.currentStory?.loadStoredLayers();
+    this.currentStoryIndex = index;
   },
   async loadNextStory() {
     if (
@@ -86,9 +84,15 @@ export const StorySettings = reactive<{
       await this.setCurrentStory(this.currentStoryIndex - 1);
     }
   },
-  saveStories() {
-    storeStories(
-      stringify(markRaw(this.stories), (key: string, value: any) => {
+  saveCurrentStory() {
+    if (this.currentStoryIndex === undefined || this.currentStory === undefined)
+      return;
+    const story = this.currentStory;
+    const key = this.stories[this.currentStoryIndex];
+
+    localStorage.setItem(
+      key,
+      stringify(markRaw(story), (key: string, value: any) => {
         if (["data", "controller", "keyframes"].includes(key)) return undefined;
         return value;
       })
@@ -96,20 +100,17 @@ export const StorySettings = reactive<{
   },
   async duplicateStory(index: number) {
     if (!CanvasSettings.generalDrawingUtils) return;
-    const existingStory = this.stories[index];
-    const storyLength = this.stories.length;
+    const existingStoryKey = this.stories[index];
+    const existingStory = localStorage.getItem(existingStoryKey);
 
-    if (!existingStory) return;
+    if (!existingStory || !existingStoryKey) return;
 
-    const duplicateStory = new Story({
-      layers: [...existingStory.layers],
-      drawingUtils: CanvasSettings.generalDrawingUtils,
-      title: `${existingStory.title}-${storyLength}`,
-    });
+    const newStoryKey = `${existingStoryKey}-${this.stories.length}`;
+    this.stories = [...this.stories, newStoryKey];
+    localStorage.setItem(newStoryKey, existingStory);
 
-    this.stories = [...this.stories, duplicateStory];
+    localStorage.setItem("stories", stringify(markRaw(this.stories)));
     await this.setCurrentStory(this.stories.length - 1);
-    this.saveStories();
   },
   async addNewStory(title: string) {
     if (!CanvasSettings.generalDrawingUtils) return;
@@ -119,20 +120,25 @@ export const StorySettings = reactive<{
       drawingUtils: CanvasSettings.generalDrawingUtils,
     });
 
-    const newStories = [...this.stories, newStory];
-    this.stories = newStories;
+    this.stories.push(title);
+    localStorage.setItem(
+      title,
+      stringify(markRaw(newStory), (key: string, value: any) => {
+        if (["data", "controller", "keyframes"].includes(key)) return undefined;
+        return value;
+      })
+    );
 
-    const newStoryIndex = newStories.length - 1;
-    await this.setCurrentStory(newStoryIndex);
-    this.saveStories();
-    return newStoryIndex;
+    localStorage.setItem("stories", stringify(markRaw(this.stories)));
+    await this.setCurrentStory(this.stories.length - 1);
   },
   async deleteStory(index: number) {
-    this.stories.splice(index, 1);
+    const key = this.stories[index]; // get key
+    this.stories.splice(index, 1); // delete title from list
+    localStorage.removeItem(key); // remove from localStorage
 
-    const newStoryIndex = this.stories.length - 1;
-    await this.setCurrentStory(newStoryIndex);
-    this.saveStories();
+    localStorage.setItem("stories", stringify(markRaw(this.stories)));
+    await this.setCurrentStory(this.stories.length - 1);
   },
 });
 

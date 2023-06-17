@@ -19,6 +19,9 @@ import {
   controllerPlaySubject,
   type SVGPrimitive,
   type AnimatedElementForeshadowingSettings,
+  SELECTED_OPACITY,
+  FORESHADOW_OPACITY,
+  UNSELECTED_OPACITY,
 } from "@/utils";
 import { markRaw } from "vue";
 import _ from "lodash";
@@ -49,6 +52,7 @@ export interface AnimatedElementPlaybackArgs {
   duration: number;
   easeFn?: any;
   selector?: string;
+  displayTrail?: boolean;
 }
 
 export interface ChartsControllerState {
@@ -90,10 +94,15 @@ export interface ChartsControllerState {
   keyframeTimeline?: ReturnType<typeof gsap.timeline>;
   playbackTimeline?: ReturnType<typeof gsap.timeline>;
   playbackExtent: number;
+  totalTime: number;
   currentKeyframeIndex: number;
   startKeyframeIndex: number;
   endKeyframeIndex: number;
   playbackArgs?: AnimatedElementPlaybackArgs;
+
+  selectedOpacity: number;
+  unselectedOpacity: number;
+  foreshadowOpacity: number;
 }
 
 export type D3ScaleTypes =
@@ -111,6 +120,10 @@ export class ChartController {
     const newState = {
       ...args,
       currentSelection: args.currentSelection ?? [],
+      totalTime: 0,
+      selectedOpacity: args.selectedOpacity ?? SELECTED_OPACITY,
+      foreshadowOpacity: args.foreshadowOpacity ?? FORESHADOW_OPACITY,
+      unselectedOpacity: args.unselectedOpacity ?? UNSELECTED_OPACITY,
     } as ChartsControllerState;
     const { xRange, yRange } = this.getRange(newState);
     const { xScale, yScale, zScale } = this.getScalesByOption({
@@ -221,6 +234,9 @@ export class ChartController {
               ),
               drawingUtils: this.state.drawingUtils,
               currentKeyframeIndex: this.state.currentKeyframeIndex,
+              selectedOpacity: this.state.selectedOpacity,
+              unselectedOpacity: this.state.unselectedOpacity,
+              foreshadowOpacity: this.state.foreshadowOpacity,
             });
           }
         }
@@ -249,6 +265,9 @@ export class ChartController {
                 clipBoundaries: generateClipRect,
                 activeSelection,
                 defaultElementDetails: { ...defaultElementDetails },
+                selectedOpacity: this.state.selectedOpacity,
+                unselectedOpacity: this.state.unselectedOpacity,
+                foreshadowOpacity: this.state.foreshadowOpacity,
               });
             } else if (this.state.chartType === ChartType.SCATTER) {
               return new AnimatedCircle({
@@ -264,6 +283,9 @@ export class ChartController {
                 clipBoundaries: generateClipRect,
                 activeSelection,
                 defaultElementDetails: { ...defaultElementDetails },
+                selectedOpacity: this.state.selectedOpacity,
+                unselectedOpacity: this.state.unselectedOpacity,
+                foreshadowOpacity: this.state.foreshadowOpacity,
               });
             } else {
               return new AnimatedCircle({
@@ -279,6 +301,9 @@ export class ChartController {
                 clipBoundaries: generateClipRect,
                 activeSelection,
                 defaultElementDetails: { ...defaultElementDetails },
+                selectedOpacity: this.state.selectedOpacity,
+                unselectedOpacity: this.state.unselectedOpacity,
+                foreshadowOpacity: this.state.foreshadowOpacity,
               });
             }
           }
@@ -297,6 +322,9 @@ export class ChartController {
       currentKeyframeIndex,
       endKeyframeIndex,
       startKeyframeIndex,
+      selectedOpacity,
+      unselectedOpacity,
+      foreshadowOpacity
     } = args;
 
     if (position || dimensions || xDomain || yDomain) {
@@ -323,6 +351,17 @@ export class ChartController {
       if (startKeyframeIndex) {
         this.state.startKeyframeIndex = startKeyframeIndex;
       }
+
+      if (selectedOpacity) {
+        this.state.selectedOpacity = selectedOpacity;
+      }
+      if (unselectedOpacity) {
+        this.state.unselectedOpacity = unselectedOpacity;
+      }
+      if (foreshadowOpacity) {
+        this.state.foreshadowOpacity = foreshadowOpacity;
+      }
+
       this.upsertAnimatedItems();
     }
   }
@@ -376,29 +415,31 @@ export class ChartController {
       selector,
       duration: playbackConfig?.duration ?? 5,
       easeFn: playbackConfig?.easeFn,
+      displayTrail: playbackConfig.displayTrail,
     };
   }
 
   pause() {
+    const defaultSelector =
+      this.state.chartType === ChartType.BAR ? "#rect" : "#circle";
+    const defaultDetails = this.getSampleElement(defaultSelector);
+
     this.state.playbackTimeline?.pause();
     this.state.animatedElements?.forEach((element) => {
+      // element.updateState({
+      //   defaultElementDetails: { ...defaultDetails },
+      // });
       element.pause();
     });
   }
 
-  play(
-    args: {
-      keys?: string[];
-    } & AnimatedElementPlaybackArgs
-  ) {
-    // if (this.state.playbackExtent !== 0) {
-    //   this.state.playbackTimeline?.play();
-    //   this.state.animatedElements?.forEach((element) => {
-    //     element.resume();
-    //   });
-    //   return;
-    // }
-
+  play(args: AnimatedElementPlaybackArgs) {
+    let duration = args.duration;
+    this.state.totalTime =
+      this.state.totalTime + (this.state.playbackTimeline?.totalTime() ?? 0);
+    if (this.state.playbackExtent > 0) {
+      duration = args.duration - this.state.totalTime;
+    }
     const defaultSelector =
       this.state.chartType === ChartType.BAR ? "#rect" : "#circle";
 
@@ -427,7 +468,15 @@ export class ChartController {
       }
     });
 
-    controllerPlaySubject.next(args);
+    console.log({
+      duration,
+      totalTime: this.state.totalTime,
+    });
+
+    controllerPlaySubject.next({
+      ...args,
+      duration,
+    });
 
     this.state.keyframeTimeline?.clear();
     this.state.keyframeTimeline?.pause();
@@ -446,8 +495,9 @@ export class ChartController {
       },
       onComplete: () => {
         this.state.playbackExtent = 0;
+        this.state.totalTime = 0;
       },
-      duration: args.duration,
+      duration: duration,
       ease: args.easeFn,
     });
     this.state.playbackTimeline?.play();
@@ -468,6 +518,7 @@ export class ChartController {
       string,
       AnimatedElementForeshadowingSettings
     > = {};
+    let sortedAnimationElements: AnimatedElement[] = [];
     this.state.animatedElements?.forEach((element) => {
       if (!args) {
         foreshadowingMap[element.controllerState.selectionKey] = {
@@ -476,6 +527,7 @@ export class ChartController {
           foreshadowingStateCount:
             element.controllerState.foreshadowingStateCount,
         };
+        sortedAnimationElements = [...sortedAnimationElements, element];
       } else {
         let bounded = false;
         const keyIncluded = args.keys?.includes(
@@ -512,6 +564,7 @@ export class ChartController {
             foreshadowingMode: args.mode,
             foreshadowingStateCount: args.count ?? 1,
           };
+          sortedAnimationElements = [...sortedAnimationElements, element];
         } else {
           foreshadowingMap[element.controllerState.selectionKey] = {
             isForeshadowed,
@@ -519,9 +572,11 @@ export class ChartController {
             foreshadowingStateCount:
               element.controllerState.foreshadowingStateCount,
           };
+          sortedAnimationElements = [element, ...sortedAnimationElements];
         }
       }
     });
+    this.state.animatedElements = sortedAnimationElements;
     this.state.currentForeshadow = foreshadowingMap;
     this.upsertAnimatedItems("foreshadow");
   }
@@ -538,6 +593,7 @@ export class ChartController {
   }) {
     const selectionList: string[] = [];
     if (args) {
+      let sortedAnimationElements: AnimatedElement[] = [];
       this.state.animatedElements?.forEach((element) => {
         let bounded = false;
         const keyIncluded = args.keys?.includes(
@@ -555,9 +611,13 @@ export class ChartController {
           : Boolean(keyIncluded || bounded);
 
         if (isSelected) {
+          sortedAnimationElements = [...sortedAnimationElements, element];
           selectionList.push(element.controllerState.selectionKey);
+        } else {
+          sortedAnimationElements = [element, ...sortedAnimationElements];
         }
       });
+      this.state.animatedElements = sortedAnimationElements;
     }
     this.state.currentSelection = selectionList;
     this.upsertAnimatedItems("select", args?.selectionLabelKey);
@@ -736,7 +796,7 @@ export class ChartController {
       this.state.drawingUtils.modifyContextStyleAndDraw(
         {
           fontSize: this.state.dimensions.width * 0.15,
-          opacity: 0.7,
+          opacity: this.state.selectedOpacity,
           fillStyle: "#fc036b",
           textAlign: "right",
           shadow: true,
@@ -773,7 +833,7 @@ export class ChartController {
         this.state.yRange[1],
         this.state.xRange,
         FONT_SIZE,
-        3,
+        5,
         undefined,
         false,
         true,

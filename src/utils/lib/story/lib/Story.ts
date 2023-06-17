@@ -69,6 +69,10 @@ export class Story {
     this.unParsedLayers = layers;
   }
 
+  getLayers() {
+    return this.layers;
+  }
+
   updateState({ title }: { title?: string }) {
     if (title) {
       this.title = title;
@@ -194,16 +198,35 @@ export class Story {
     ].includes(type as AnnotationType);
   }
 
+  isListenerLayer(type: string) {
+    return [
+      ListenerType.RECT_POSE,
+      ListenerType.RANGE_POSE,
+      ListenerType.POINT_POSE,
+      ListenerType.OPEN_HAND_POSE,
+      ListenerType.THUMB_POSE,
+      ListenerType.STROKE_LISTENER,
+    ].includes(type as ListenerType);
+  }
+
   getCurrentWidget() {
     return this.currentWidget;
   }
 
   setCurrentWidget(id?: string) {
+    this.currentWidget?.layer.updateState({
+      isHover: false,
+    });
+
     if (id) {
       this.currentWidget = this.getLayer(id);
     } else {
       this.currentWidget = this.getDefaultWidget();
     }
+
+    this.currentWidget?.layer.updateState({
+      isHover: true,
+    });
   }
 
   getDefaultWidget() {
@@ -252,6 +275,12 @@ export class Story {
     });
   }
 
+  getListeners() {
+    return this.layers.filter(({ type }) => {
+      return this.isListenerLayer(type);
+    });
+  }
+
   revealAnnotations(annotationIds: string[]) {
     const annotationsToReveal = this.layers.filter(({ id, type }) => {
       return this.isAnnotationLayer(type) && annotationIds.includes(id);
@@ -276,27 +305,27 @@ export class Story {
     }
   }
 
-  canvasEventListener(
-    eventType: CanvasEvent,
-    eventData: Coordinate2D,
-    save?: () => void
-  ) {
-    const currentWidget = this.currentWidget;
-    if (!currentWidget) return;
+  // canvasEventListener(
+  //   eventType: CanvasEvent,
+  //   eventData: Coordinate2D,
+  //   save?: () => void
+  // ) {
+  //   const currentWidget = this.currentWidget;
+  //   if (!currentWidget) return;
 
-    const listener = currentWidget?.layer?.state?.canvasListener;
-    const boundsInformation = listener?.isInBounds(eventData);
+  //   // const listener = currentWidget?.layer?.state?.canvasListener;
+  //   const boundsInformation = listener?.isInBounds(eventData);
 
-    if (boundsInformation) {
-      const { isInDeleteBounds } = boundsInformation;
+  //   if (boundsInformation) {
+  //     const { isInDeleteBounds } = boundsInformation;
 
-      if (isInDeleteBounds && eventType === CanvasEvent.CLICK) {
-        this.handleDeleteLayer(currentWidget.id, save);
-      } else {
-        listener?.handleEvent(eventType, eventData, save);
-      }
-    }
-  }
+  //     if (isInDeleteBounds && eventType === CanvasEvent.CLICK) {
+  //       this.handleDeleteLayer(currentWidget.id, save);
+  //     } else {
+  //       listener?.handleEvent(eventType, eventData, save);
+  //     }
+  //   }
+  // }
 
   saveThumbnail() {
     //TODO: store in local storage
@@ -307,9 +336,9 @@ export class Story {
 
   draw() {
     this.layers.forEach(({ layer, id }) => {
-      if (id === this.currentWidget?.id) {
-        this.currentWidget.layer.state.canvasListener?.draw();
-      }
+      // if (id === this.currentWidget?.id) {
+      //   this.currentWidget.layer.state.canvasListener?.draw();
+      // }
       layer.draw();
     });
     // this.saveThumbnail();

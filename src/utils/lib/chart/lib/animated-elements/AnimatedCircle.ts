@@ -11,7 +11,6 @@ import {
   type HandleSelectionReturnValue,
   type VisualState,
   TRANSPARENT,
-  SELECTED_OPACITY,
   isInBound,
   type Dimensions,
 } from "@/utils";
@@ -49,7 +48,7 @@ export class AnimatedCircle extends AnimatedElement {
       const isBelowLastValue = position.y > maxBottom;
 
       if (!isOffChart && !isBelowLastValue) {
-        opacity = SELECTED_OPACITY;
+        opacity = this.controllerState.foreshadowOpacity;
         itemAnimationState.position = position;
         itemAnimationState.dimensions = {
           width: RADIUS * 2,
@@ -90,7 +89,7 @@ export class AnimatedCircle extends AnimatedElement {
       this.controllerState.isForeshadowed
     ) {
       shouldPulse = true;
-      opacity = SELECTED_OPACITY;
+      opacity = this.controllerState.foreshadowOpacity;
       const position = {
         x: this.controllerState.xScale(itemUnscaledPosition.x) as number,
         y: this.controllerState.yScale(itemUnscaledPosition.y) as number,
@@ -103,7 +102,7 @@ export class AnimatedCircle extends AnimatedElement {
       const isBelowLastValue = position.y > maxBottom;
 
       if (!isOffChart && !isBelowLastValue) {
-        opacity = SELECTED_OPACITY;
+        opacity = this.controllerState.foreshadowOpacity;
         itemAnimationState.position = position;
         itemAnimationState.dimensions = {
           width: RADIUS * 2,
@@ -193,7 +192,7 @@ export class AnimatedCircle extends AnimatedElement {
 
   drawCurrentState() {
     const color = this.animationState.color;
-    const { opacity, path, label, position, dimensions } =
+    const { opacity, path, label, position, dimensions, pastTrajectory } =
       this.animationState.current;
     const {
       opacity: selectionOpacity,
@@ -207,31 +206,56 @@ export class AnimatedCircle extends AnimatedElement {
       y: position.y + dimensions.height * 0.5 + (label?.fontSize ?? 0) / 2,
     };
 
-    if (selectionPath && selectionOpacity) {
-      const key = this.controllerState.selectionLabelKey;
-
+    if (pastTrajectory) {
       this.controllerState.drawingUtils.modifyContextStyleAndDraw(
         {
-          fillStyle: "white",
-          opacity: selectionOpacity,
+          strokeStyle: "red",
           lineWidth: 3,
-          shadow: true,
+          opacity,
+          fillStyle: "red",
         },
         (context: CanvasRenderingContext2D) => {
-          selectionPath.parsedPath.forEach((parsedPath: any) => {
-            context.translate(selectionPosition.x, selectionPosition.y);
-            context.scale(
-              selectionDims.width / path.xScale,
-              selectionDims.height / path.yScale
-            );
-            this.controllerState.drawingUtils.drawPath({
-              path: parsedPath,
-              mode: "fill",
-              context,
-            });
+          this.controllerState.drawingUtils.drawLine({
+            coordinates: pastTrajectory.map((traj) => ({
+              x: traj.x,
+              y: traj.y,
+            })),
+            shape: LineShape.CURVED,
+            context,
+            drawArrowHead: false,
           });
         }
       );
+    }
+
+    if (selectionPath && selectionOpacity) {
+      const key = this.controllerState.selectionLabelKey;
+
+      // this.controllerState.drawingUtils.modifyContextStyleAndDraw(
+      //   {
+      //     fillStyle: "white",
+      //     opacity: selectionOpacity,
+      //     lineWidth: 3,
+      //     shadow: true,
+      //   },
+      //   (context: CanvasRenderingContext2D) => {
+      //     selectionPath.parsedPath.forEach((parsedPath: any) => {
+      //       context.translate(
+      //         selectionPosition.x - dimensions.width / 2,
+      //         selectionPosition.y - dimensions.height / 2
+      //       );
+      //       context.scale(
+      //         selectionDims.width / path.xScale,
+      //         selectionDims.height / path.yScale
+      //       );
+      //       this.controllerState.drawingUtils.drawPath({
+      //         path: parsedPath,
+      //         mode: "fill",
+      //         context,
+      //       });
+      //     });
+      //   }
+      // );
 
       if (key) {
         this.controllerState.drawingUtils.modifyContextStyleAndDraw(
@@ -267,7 +291,10 @@ export class AnimatedCircle extends AnimatedElement {
           shadow: !(selectionPath && selectionOpacity),
         },
         (context: CanvasRenderingContext2D) => {
-          context.translate(position.x, position.y);
+          context.translate(
+            position.x - dimensions.width / 2,
+            position.y - dimensions.height / 2
+          );
           context.scale(
             dimensions.width / path.xScale,
             dimensions.height / path.yScale
@@ -285,13 +312,17 @@ export class AnimatedCircle extends AnimatedElement {
   private generateLineData() {
     const finalPath: Coordinate2D[] = [];
     let finalOpacity = TRANSPARENT;
+    const { dimensions } = this.animationState.current;
 
     Object.values(this.animationState.foreshadow).forEach(
       (value: VisualState) => {
         const { position, opacity } = value;
 
         if (opacity) {
-          finalPath.push(position);
+          finalPath.push({
+            x: position.x - dimensions.width / 2,
+            y: position.y - dimensions.height / 2,
+          });
           finalOpacity = opacity;
         }
       }

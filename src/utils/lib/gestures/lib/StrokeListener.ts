@@ -25,8 +25,8 @@ export class StrokeListener extends GestureListener {
     },
     gestureTypes = [
       {
-        rightHand: SupportedGestures.POINTING,
-        leftHand: SupportedGestures.POINTING,
+        [HANDS.RIGHT]: SupportedGestures.POINTING,
+        [HANDS.LEFT]: SupportedGestures.POINTING,
       },
     ],
     trackedFingers = [HAND_LANDMARK_IDS.index_finger_tip],
@@ -214,8 +214,24 @@ export class StrokeListener extends GestureListener {
     //   return;
     // }
     if (!dominantHand) {
+      this.pausePlayback();
+      this.state.numRevolutions = 0;
+      this.state.stroke = [];
       return;
     }
+
+    const matchesSpecifiedGesture = dominantHand.gestureData.gestures.some(
+      (gesture: any) =>
+        this.state.gestureTypes
+          .map((type) => type[this.state.handsToTrack.dominant])
+          .includes(gesture.name)
+    );
+
+    // if (matchesSpecifiedGesture) {
+    //   this.handlePoseGesture(dominantHand.fingerPositions);
+    // } else {
+    //   this.resetGestureState();
+    // }
     const indexFingerPosition = dominantHand.fingerPositions[
       HAND_LANDMARK_IDS.index_finger_tip
     ] as Coordinate2D;
@@ -229,7 +245,7 @@ export class StrokeListener extends GestureListener {
     const isInBounds = this.isWithinObjectBounds(indexFingerPosition);
 
     const isFirstDial = this.state.numRevolutions === 0;
-    if (isInBounds) {
+    if (isInBounds && matchesSpecifiedGesture) {
       if (this.state.stroke.length === 0 && isFirstDial) {
         this.state.gestureStartTime = new Date().getTime();
       }
@@ -246,18 +262,19 @@ export class StrokeListener extends GestureListener {
         if (this.state.gestureStartTime && isFirstDial) {
           // const timeTaken =
           //   (new Date().getTime() - this.state.gestureStartTime) / 1000;
-          this.publishToSubject(undefined, AffectOptions.NEUTRAL);
+          this.publishToSubject(undefined, this.state.defaultAffect);
         }
       } else {
         this.state.stroke.push(indexFingerPosition);
       }
-    } else {
-      if (!isFirstDial) {
-        this.pausePlayback();
-      }
-      this.state.numRevolutions = 0;
-      this.state.stroke = [];
-    }
+    } 
+    // else {
+      // if (!isFirstDial) {
+      //   this.pausePlayback();
+      // }
+      // this.state.numRevolutions = 0;
+      // this.state.stroke = [];
+    // }
   }
 
   cancelAnimation() {

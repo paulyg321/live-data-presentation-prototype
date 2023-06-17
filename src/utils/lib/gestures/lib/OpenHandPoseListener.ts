@@ -31,8 +31,8 @@ export class OpenHandPoseListener extends GestureListener {
     },
     gestureTypes = [
       {
-        rightHand: SupportedGestures.OPEN_HAND,
-        leftHand: SupportedGestures.OPEN_HAND,
+        [HANDS.RIGHT]: SupportedGestures.OPEN_HAND,
+        [HANDS.LEFT]: SupportedGestures.OPEN_HAND,
       },
     ],
     trackedFingers = [HAND_LANDMARK_IDS.middle_finger_tip],
@@ -211,10 +211,22 @@ export class OpenHandPoseListener extends GestureListener {
     const dominantHand = fingerData[this.state.handsToTrack.dominant];
 
     if (!dominantHand) {
+      this.resetGestureState();
       return;
     }
 
-    this.handlePoseGesture(dominantHand.fingerPositions);
+    const matchesSpecifiedGesture = dominantHand.gestureData.gestures.some(
+      (gesture: any) =>
+        this.state.gestureTypes
+          .map((type) => type[this.state.handsToTrack.dominant])
+          .includes(gesture.name)
+    );
+
+    if (matchesSpecifiedGesture) {
+      this.handlePoseGesture(dominantHand.fingerPositions);
+    } else {
+      this.resetGestureState();
+    }
   }
 
   draw() {

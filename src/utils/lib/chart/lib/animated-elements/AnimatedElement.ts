@@ -13,12 +13,7 @@ import {
   ForeshadowingStatesMode,
   controllerPlaySubject,
 } from "../../../gestures";
-import { AffectOptions, type DrawingUtils } from "@/utils";
-
-export const FORESHADOW_OPACITY = 0.6;
-export const SELECTED_OPACITY = 1.0;
-export const UNSELECTED_OPACITY = 0.3;
-export const TRANSPARENT = 0.0;
+import { FORESHADOW_OPACITY, SELECTED_OPACITY, TRANSPARENT, UNSELECTED_OPACITY, type DrawingUtils } from "@/utils";
 
 export interface AnimatedElementForeshadowingSettings {
   isForeshadowed: boolean;
@@ -43,6 +38,9 @@ export type AnimatedChartElementArgs = {
   selectionLabelKey?: string;
   defaultElementDetails: ElementDetails;
   domainPerKeyframe?: number[][];
+  selectedOpacity?: number;
+  unselectedOpacity?: number;
+  foreshadowOpacity?: number;
 } & AnimatedElementForeshadowingSettings;
 
 export type AnimatedElementState = AnimatedChartElementArgs & {
@@ -72,6 +70,8 @@ export type VisualState = {
   positionTimeline?: ReturnType<typeof gsap.timeline>;
   sizeTimeline?: ReturnType<typeof gsap.timeline>;
   scaleTimeline?: ReturnType<typeof gsap.timeline>;
+
+  pastTrajectory?: Coordinate2D[];
 
   path: {
     parsedPath: any;
@@ -141,7 +141,11 @@ export type SVGPrimitive =
   | SVGLineElement;
 
 export abstract class AnimatedElement {
-  controllerState: AnimatedElementState;
+  controllerState: AnimatedElementState & {
+    selectedOpacity: number;
+    unselectedOpacity: number;
+    foreshadowOpacity: number;
+  };
   animationState: AnimatedElementVisualState;
 
   constructor(args: AnimatedChartElementArgs) {
@@ -165,7 +169,7 @@ export abstract class AnimatedElement {
     this.animationState = {
       color: args.color,
       current: {
-        opacity: SELECTED_OPACITY,
+        opacity: args.foreshadowOpacity ?? FORESHADOW_OPACITY,
         position: { x: 0, y: 0 },
         dimensions: { width: 0, height: 0 },
         path: {
@@ -208,6 +212,9 @@ export abstract class AnimatedElement {
         playbackTimeline: gsap.timeline(),
         extent: 0,
       },
+      selectedOpacity: args.selectedOpacity ?? SELECTED_OPACITY,
+      foreshadowOpacity: args.foreshadowOpacity ?? FORESHADOW_OPACITY,
+      unselectedOpacity: args.unselectedOpacity ?? UNSELECTED_OPACITY,
     };
 
     controllerPlaySubject.subscribe({
@@ -277,24 +284,16 @@ export abstract class AnimatedElement {
     selectionAnimationState.sizeTimeline?.pause();
 
     this.controllerState.playback.playbackTimeline.clear();
-
-    args.states.forEach(
-      (state: AnimatedElementPlaybackState, index: number) => {
-        this.controllerState.currentKeyframeIndex = state.index;
-        this.updateCurrentAnimationState(
-          StateUpdateType.GROUP_TIMELINE,
-          undefined,
-          args.easeFn,
-          args.duration
-        );
-        this.updateSelectionState(
-          StateUpdateType.GROUP_TIMELINE,
-          undefined,
-          args.easeFn,
-          args.duration
-        );
-      }
-    );
+    this.animationState.current.pastTrajectory = [];
+    args.states.forEach((state: AnimatedElementPlaybackState) => {
+      this.controllerState.currentKeyframeIndex = state.index;
+      this.updateCurrentAnimationState(StateUpdateType.GROUP_TIMELINE, {
+        ...args,
+      });
+      this.updateSelectionState(StateUpdateType.GROUP_TIMELINE, {
+        ...args,
+      });
+    });
 
     this.controllerState.playback.playbackTimeline.clear();
     this.controllerState.playback.playbackTimeline.pause(
@@ -444,9 +443,24 @@ export abstract class AnimatedElement {
     this.updateSelection(args);
     this.updateKeyframe(args);
 
+    if (args.selectedOpacity) {
+      this.controllerState.selectedOpacity = args.selectedOpacity;
+      this.updateSelectionState(StateUpdateType.SET);
+    }
+    if (args.unselectedOpacity) {
+      this.controllerState.unselectedOpacity = args.unselectedOpacity;
+      this.updateSelectionState(StateUpdateType.SET);
+    }
+    if (args.foreshadowOpacity) {
+      this.controllerState.foreshadowOpacity = args.foreshadowOpacity;
+      this.updateForeshadowingAnimationState(StateUpdateType.SET);
+    }
+
     if (args.defaultElementDetails) {
       this.controllerState.defaultElementDetails = args.defaultElementDetails;
-      this.updateCurrentAnimationState(StateUpdateType.SET);
+      this.updateCurrentAnimationState(StateUpdateType.SET, {
+        skipPosition: true,
+      });
       this.updateSelectionState(StateUpdateType.SET);
     }
   }
@@ -510,10 +524,10 @@ export abstract class AnimatedElement {
 
   updateSelectionState(
     updateType: StateUpdateType = StateUpdateType.SET,
-    pathType: AffectOptions = AffectOptions.NEUTRAL,
-    easeFn?: any,
-    duration?: number
-    // isLastTween?: boolean
+    config?: {
+      easeFn?: any;
+      duration?: number;
+    }
   ) {
     const { path, xSize, ySize } = this.controllerState.defaultElementDetails;
     const unscaledPosition =
@@ -525,11 +539,11 @@ export abstract class AnimatedElement {
       ? this.controllerState.isSelected
       : true;
     const newCurrentItemOpacity = isSelected
-      ? SELECTED_OPACITY
-      : UNSELECTED_OPACITY;
+      ? this.controllerState.selectedOpacity
+      : this.controllerState.unselectedOpacity;
     const newSelectedItemOpacity =
       isSelected && this.controllerState.activeSelection
-        ? SELECTED_OPACITY
+        ? this.controllerState.selectedOpacity
         : TRANSPARENT;
 
     const currentItemAnimationState = this.animationState.current;
@@ -569,15 +583,15 @@ export abstract class AnimatedElement {
               selectionAnimationState.path.parsedPath = rawPath;
             },
           },
-          duration,
-          ease: easeFn,
+          duration: config?.duration,
+          ease: config?.easeFn,
         }
       );
 
       selectionAnimationState.opacityTimeline?.to(selectionAnimationState, {
         opacity: newSelectedItemOpacity,
-        duration,
-        ease: easeFn,
+        duration: config?.duration,
+        ease: config?.easeFn,
       });
 
       selectionAnimationState.sizeTimeline?.to(
@@ -585,8 +599,8 @@ export abstract class AnimatedElement {
         {
           width: dimensions.width,
           height: dimensions.height,
-          duration,
-          ease: easeFn,
+          duration: config?.duration,
+          ease: config?.easeFn,
         }
       );
 
@@ -595,15 +609,15 @@ export abstract class AnimatedElement {
         {
           x: position.x,
           y: position.y,
-          duration,
-          ease: easeFn,
+          duration: config?.duration,
+          ease: config?.easeFn,
         }
       );
 
       currentItemAnimationState.opacityTimeline?.to(currentItemAnimationState, {
         opacity: newCurrentItemOpacity,
-        duration,
-        ease: easeFn,
+        duration: config?.duration,
+        ease: config?.easeFn,
       });
 
       selectionAnimationState.opacityTimeline?.play();
@@ -621,15 +635,15 @@ export abstract class AnimatedElement {
               selectionAnimationState.path.parsedPath = rawPath;
             },
           },
-          duration,
-          ease: easeFn,
+          duration: config?.duration,
+          ease: config?.easeFn,
         }
       );
 
       selectionAnimationState.opacityTimeline?.to(selectionAnimationState, {
         opacity: newSelectedItemOpacity,
-        duration,
-        ease: easeFn,
+        duration: config?.duration,
+        ease: config?.easeFn,
       });
 
       selectionAnimationState.sizeTimeline?.to(
@@ -637,8 +651,8 @@ export abstract class AnimatedElement {
         {
           width: dimensions.width,
           height: dimensions.height,
-          duration,
-          ease: easeFn,
+          duration: config?.duration,
+          ease: config?.easeFn,
         }
       );
 
@@ -647,24 +661,27 @@ export abstract class AnimatedElement {
         {
           x: position.x,
           y: position.y,
-          duration,
-          ease: easeFn,
+          duration: config?.duration,
+          ease: config?.easeFn,
         }
       );
 
       currentItemAnimationState.opacityTimeline?.to(currentItemAnimationState, {
         opacity: newCurrentItemOpacity,
-        duration,
-        ease: easeFn,
+        duration: config?.duration,
+        ease: config?.easeFn,
       });
     }
   }
 
   updateCurrentAnimationState(
     updateType: StateUpdateType = StateUpdateType.SET,
-    pathType: AffectOptions = AffectOptions.NEUTRAL,
-    easeFn?: string,
-    duration?: number
+    config?: {
+      easeFn?: string;
+      duration?: number;
+      showTrajectory?: boolean;
+      skipPosition?: boolean;
+    }
   ) {
     const FONT_SIZE = 16;
     const { path, xSize, ySize } = this.controllerState.defaultElementDetails;
@@ -701,9 +718,11 @@ export abstract class AnimatedElement {
         xScale: xSize,
         yScale: ySize,
       };
-
-      currentItemAnimationState.position = position;
       currentItemAnimationState.dimensions = dimensions;
+
+      if (!config?.skipPosition) {
+        currentItemAnimationState.position = position;
+      }
     } else if (updateType === StateUpdateType.ANIMATE) {
       currentItemAnimationState.sizeTimeline?.clear();
       currentItemAnimationState.scaleTimeline?.clear();
@@ -719,18 +738,8 @@ export abstract class AnimatedElement {
               currentItemAnimationState.path.parsedPath = rawPath;
             },
           },
-          duration,
-          ease: easeFn,
-        }
-      );
-
-      currentItemAnimationState.positionTimeline?.to(
-        currentItemAnimationState.position,
-        {
-          x: position.x,
-          y: position.y,
-          duration,
-          ease: easeFn,
+          duration: config?.duration,
+          ease: config?.easeFn,
         }
       );
 
@@ -739,8 +748,8 @@ export abstract class AnimatedElement {
         {
           width: dimensions.width,
           height: dimensions.height,
-          duration,
-          ease: easeFn,
+          duration: config?.duration,
+          ease: config?.easeFn,
         }
       );
 
@@ -749,10 +758,22 @@ export abstract class AnimatedElement {
         {
           xScale: xSize,
           yScale: ySize,
-          duration,
-          ease: easeFn,
+          duration: config?.duration,
+          ease: config?.easeFn,
         }
       );
+
+      if (!config?.skipPosition) {
+        currentItemAnimationState.positionTimeline?.to(
+          currentItemAnimationState.position,
+          {
+            x: position.x,
+            y: position.y,
+            duration: config?.duration,
+            ease: config?.easeFn,
+          }
+        );
+      }
 
       currentItemAnimationState.sizeTimeline?.play();
       currentItemAnimationState.scaleTimeline?.play();
@@ -768,7 +789,7 @@ export abstract class AnimatedElement {
               currentItemAnimationState.path.parsedPath = rawPath;
             },
           },
-          duration: duration ? duration * 0.6 : 1,
+          duration: config?.duration ? config.duration * 0.6 : 1,
           ease: "sine.inOut",
         }
       );
@@ -778,8 +799,8 @@ export abstract class AnimatedElement {
         {
           width: dimensions.width,
           height: dimensions.height,
-          duration,
-          ease: easeFn,
+          duration: config?.duration,
+          ease: config?.easeFn,
         }
       );
 
@@ -788,27 +809,42 @@ export abstract class AnimatedElement {
         {
           xScale: xSize,
           yScale: ySize,
-          duration: duration ? duration * 0.6 : 1,
+          duration: config?.duration ? config.duration * 0.6 : 1,
           ease: "sine.inOut",
         }
       );
 
-      currentItemAnimationState.positionTimeline?.to(
-        currentItemAnimationState.position,
-        {
-          x: position.x,
-          y: position.y,
-          duration,
-          ease: easeFn,
-        }
-      );
+      if (!config?.skipPosition) {
+        currentItemAnimationState.positionTimeline?.to(
+          currentItemAnimationState.position,
+          {
+            x: position.x,
+            y: position.y,
+            duration: config?.duration,
+            ease: config?.easeFn,
+            onUpdate: () => {
+              if (this.controllerState.isSelected && config?.showTrajectory) {
+                const newPosition = {
+                  x: currentItemAnimationState.position.x,
+                  y: currentItemAnimationState.position.y,
+                };
+                if (currentItemAnimationState.pastTrajectory) {
+                  currentItemAnimationState.pastTrajectory.push(newPosition);
+                } else {
+                  currentItemAnimationState.pastTrajectory = [newPosition];
+                }
+              }
+            },
+          }
+        );
+      }
     }
   }
 
   draw() {
-    this.drawCurrentState();
     if (this.controllerState.isForeshadowed) {
       this.drawForeshadowingState();
     }
+    this.drawCurrentState();
   }
 }

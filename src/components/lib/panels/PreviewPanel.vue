@@ -10,8 +10,13 @@ import {
   annotationSubject,
   highlightSubject,
   HighlightListener,
+  type StoryLayer,
+  type LayerType,
+  type Coordinate2D,
+  type Dimensions,
+  isInBound,
 } from "@/utils";
-import { computed, onMounted, ref, watch, watchEffect } from "vue";
+import { onMounted, ref, watch, watchEffect } from "vue";
 import {
   ChartSettings,
   CanvasSettings,
@@ -20,6 +25,7 @@ import {
   handlePlay,
 } from "@/state";
 import { CanvasWrapper, VideoCanvas, AppCanvas } from "@/components";
+import interact from "interactjs";
 
 import { gsap } from "gsap";
 import { MorphSVGPlugin } from "gsap/MorphSVGPlugin";
@@ -27,6 +33,13 @@ import { CustomEase } from "gsap/CustomEase";
 
 gsap.registerPlugin(MorphSVGPlugin);
 gsap.registerPlugin(CustomEase);
+
+const selectionBox = ref<{
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+} | null>(null);
 
 const snackbar = ref<boolean>(false);
 const highlightModeActive = ref<boolean>(false);
@@ -68,7 +81,6 @@ highlightSubject.subscribe({
     const charts = StorySettings.currentStory?.getCharts();
     if (!charts) return;
 
-    console.log(value);
     charts.forEach((chart) => {
       chart.state.controller?.setSelection({
         bounds: {
@@ -119,7 +131,7 @@ playbackSubject.subscribe({
     } else {
       playbackConfig.value = config.data;
 
-      handlePlay(config.data, config.data.svg, undefined, undefined);
+      handlePlay(config.data);
     }
   },
 });
@@ -150,31 +162,270 @@ function draw() {
     StorySettings.currentStory?.draw();
     ChartSettings.extentVisualizer?.draw();
   }
+
+  if (selectionBox.value !== null) {
+    CanvasSettings.generalDrawingUtils?.modifyContextStyleAndDraw(
+      {
+        lineDash: [3, 3],
+        strokeStyle: "steelblue",
+      },
+      (context) => {
+        CanvasSettings.generalDrawingUtils?.drawRect({
+          coordinates: {
+            x: selectionBox.value!.x,
+            y: selectionBox.value!.y,
+          },
+          dimensions: {
+            width: selectionBox.value!.width,
+            height: selectionBox.value!.height,
+          },
+          stroke: true,
+          context,
+        });
+      },
+      ["presenter", "preview"]
+    );
+  }
+
   requestAnimationFrame(() => draw());
 }
 
 function initializeCanvasListeners() {
   const eventsCanvas = CanvasSettings.canvas.events;
+
   if (eventsCanvas) {
-    [
-      CanvasEvent.MOUSE_DOWN,
-      CanvasEvent.MOUSE_MOVE,
-      CanvasEvent.MOUSE_UP,
-      CanvasEvent.CLICK,
-    ].forEach((event: CanvasEvent) => {
-      CanvasSettings.canvas.events?.addEventListener(
-        event,
-        (mouseEvent: MouseEvent) => {
-          const rect = eventsCanvas.getBoundingClientRect();
-          const x = mouseEvent.clientX - rect.left;
-          const y = mouseEvent.clientY - rect.top;
-          StorySettings.currentStory?.canvasEventListener(event, { x, y }, () =>
-            StorySettings.saveStories()
-          );
+    let selectionStart: Coordinate2D | null = null;
+    let selectedItems: {
+      type: LayerType;
+      id: string;
+      layer: StoryLayer;
+    }[] = [];
+
+    interact(eventsCanvas)
+      .draggable({
+        listeners: {
+          move: (event) => {
+            const layers = StorySettings.currentStory?.getLayers();
+            let modifications = event.target.getAttribute("data-index");
+            if (
+              !layers ||
+              modifications === "undefined" ||
+              modifications === null
+            )
+              return;
+
+            modifications = JSON.parse(modifications);
+
+            if (modifications.isGroup) {
+              selectedItems.forEach((item) => {
+                item?.layer.updatePosition(event.dx, event.dy);
+              });
+              if (selectionBox.value) {
+                selectionBox.value = {
+                  ...selectionBox.value,
+                  x: selectionBox.value?.x + event.dx,
+                  y: selectionBox.value?.y + event.dy,
+                };
+              }
+            } else {
+              const target = layers[modifications.index];
+              if (modifications.isDrag) {
+                target?.layer.updatePosition(event.dx, event.dy);
+              } else if (modifications.isResize) {
+                target?.layer.updateSize(event.dx, event.dy);
+              }
+            }
+          },
+        },
+      })
+      .on("down", function (event) {
+        const rect = eventsCanvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        const layers = StorySettings.currentStory?.getLayers();
+
+        if (!layers) return;
+        // If there are selected items and the click is inside the selection box return (it's probably a drag going on)
+        if (
+          selectedItems.length > 0 &&
+          selectionBox.value &&
+          isInBound(
+            { x, y },
+            { position: selectionBox.value, dimensions: selectionBox.value }
+          )
+        ) {
+          return;
         }
-      );
-    });
+        // If there are selected items and the click is outside the selection box
+        if (
+          selectedItems.length > 0 &&
+          selectionBox.value &&
+          !isInBound(
+            { x, y },
+            { position: selectionBox.value, dimensions: selectionBox.value }
+          )
+        ) {
+          // Deselect all items
+          selectedItems.forEach((item) => {
+            item?.layer.updateState({ isHover: false });
+          });
+          selectedItems = [];
+          selectionBox.value = null;
+          return;
+        }
+
+        for (let index = 0; index < layers.length; index++) {
+          const item: {
+            type: LayerType;
+            id: string;
+            layer: StoryLayer;
+          } = layers[index];
+
+          if (item.layer.isWithinObjectBounds({ x, y })) {
+            if (item.layer.isWithinResizeBounds({ x, y })) {
+              event.target.setAttribute(
+                "data-index",
+                JSON.stringify({
+                  index,
+                  isDrag: false,
+                  isGroup: false,
+                  isResize: true,
+                })
+              );
+            } else {
+              event.target.setAttribute(
+                "data-index",
+                JSON.stringify({
+                  index,
+                  isDrag: true,
+                  isGroup: false,
+                  isResize: false,
+                })
+              );
+            }
+            return;
+          }
+        }
+
+        // No item was clicked, start a bounding box
+        selectionStart = { x, y };
+      })
+      .on("up", function (event) {
+        const rect = eventsCanvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        const layers = StorySettings.currentStory?.getLayers();
+
+        if (!layers) return;
+
+        // If a bounding box was being drawn
+        if (selectionStart) {
+          selectionBox.value = {
+            x: Math.min(selectionStart.x, x),
+            y: Math.min(selectionStart.y, y),
+            width: Math.abs(selectionStart.x - x),
+            height: Math.abs(selectionStart.y - y),
+          };
+
+          // Select all items within the bounding box
+          selectedItems = layers.filter((item) =>
+            item.layer.isWithinSelectionBounds(selectionBox.value!)
+          );
+
+          if (selectedItems.length > 0) {
+            event.target.setAttribute(
+              "data-index",
+              JSON.stringify({
+                isGroup: true,
+                isDrag: true,
+                isResize: false,
+              })
+            );
+          }
+        } else {
+          event.target.setAttribute("data-index", undefined);
+        }
+
+        // Reset the starting point of the bounding box
+        selectionStart = null;
+      })
+      .on("mousemove", function (event) {
+        const rect = eventsCanvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        const layers = StorySettings.currentStory?.getLayers();
+
+        if (!layers || selectedItems.length > 0) return;
+
+        // If a bounding box was being drawn
+        if (selectionStart) {
+          selectionBox.value = {
+            x: Math.min(selectionStart.x, x),
+            y: Math.min(selectionStart.y, y),
+            width: Math.abs(selectionStart.x - x),
+            height: Math.abs(selectionStart.y - y),
+          };
+
+          // Select all items within the bounding box
+          layers.forEach((item) => {
+            if (item.layer.isWithinSelectionBounds(selectionBox.value!)) {
+              item.layer.updateState({
+                isHover: true,
+              });
+            } else {
+              item.layer.updateState({
+                isHover: false,
+              });
+            }
+          });
+          return;
+        }
+
+        for (let index = 0; index < layers.length; index++) {
+          const item: {
+            type: LayerType;
+            id: string;
+            layer: StoryLayer;
+          } = layers[index];
+
+          if (item.layer.isWithinObjectBounds({ x, y })) {
+            if (item.layer.isWithinResizeBounds({ x, y })) {
+              eventsCanvas.style.cursor = "nwse-resize";
+            } else {
+              eventsCanvas.style.cursor = "move";
+            }
+
+            item.layer.updateState({
+              isHover: true,
+            });
+            return;
+          } else {
+            item.layer.updateState({
+              isHover: false,
+            });
+          }
+        }
+        // Reset cursor
+        eventsCanvas.style.cursor = "auto";
+      });
   }
+  //   [
+  //     CanvasEvent.MOUSE_DOWN,
+  //     CanvasEvent.MOUSE_MOVE,
+  //     CanvasEvent.MOUSE_UP,
+  //     CanvasEvent.CLICK,
+  //   ].forEach((event: CanvasEvent) => {
+  //     CanvasSettings.canvas.events?.addEventListener(
+  //       event,
+  //       (mouseEvent: MouseEvent) => {
+  //         const rect = eventsCanvas.getBoundingClientRect();
+  //         const x = mouseEvent.clientX - rect.left;
+  //         const y = mouseEvent.clientY - rect.top;
+  //         StorySettings.currentStory?.canvasEventListener(event, { x, y });
+  //       }
+  //     );
+  //   });
+  // }
 }
 
 function handleReset(type: string) {
@@ -199,7 +450,6 @@ onMounted(() => {
   ChartSettings.setExtentVisualizer();
   const drawingUtils = CanvasSettings.generalDrawingUtils;
   if (!drawingUtils) return;
-  console.log("HERE");
   _highlightListener.value = new HighlightListener({
     position: {
       x: CanvasSettings.dimensions.width / 2 - 25,
@@ -246,7 +496,7 @@ onMounted(() => {
       :width="CanvasSettings.dimensions.width"
       :height="CanvasSettings.dimensions.height"
       :class="className"
-      :ref="(el) => CanvasSettings.setCanvas(el as HTMLCanvasElement, 'events')"
+      :ref="(el: HTMLCanvasElement) => CanvasSettings.setCanvas(el, 'events')"
     ></canvas>
   </CanvasWrapper>
   <v-container>
@@ -311,5 +561,10 @@ canvas {
 
 #drawing-board {
   opacity: 0;
+}
+
+.svg-icon {
+  width: 10px;
+  height: 10px;
 }
 </style>

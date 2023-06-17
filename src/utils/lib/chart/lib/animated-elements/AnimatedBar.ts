@@ -92,7 +92,7 @@ export class AnimatedBar extends AnimatedElement {
       const isBelowLastValue = circleBounds.y > maxBottom;
 
       if (!isOffChart) {
-        opacity = FORESHADOW_OPACITY;
+        opacity = this.controllerState.foreshadowOpacity;
         // is next index
         itemAnimationState.label = {
           position: {
@@ -165,7 +165,7 @@ export class AnimatedBar extends AnimatedElement {
     let shouldPulse = false;
     if (index === finalForeshadowingIndex && isForeshadowed) {
       shouldPulse = true;
-      opacity = FORESHADOW_OPACITY;
+      opacity = this.controllerState.foreshadowOpacity;
       const [_, endYrange] = this.controllerState.yScale.range() as number[];
       const [startXrange, endXrange] =
         this.controllerState.xScale.range() as number[];
@@ -546,11 +546,6 @@ export class AnimatedBar extends AnimatedElement {
         yScale: this.controllerState.yScale,
       });
 
-    console.log({
-      rectDimensions,
-      position,
-      hand: boundaries.position,
-    });
     return isInBound(boundaries.position, {
       position,
       dimensions: rectDimensions,

@@ -135,14 +135,13 @@ export const currentChart = computed(() => {
 
 export function handlePlay(
   config: PlaybackSettingsConfig,
-  svg?: string,
   startKeyframe?: number,
   endKeyframe?: number
 ) {
   let selector: string | undefined;
-  if (svg) {
+  if (config.svg) {
     selector = "#st0";
-    d3.select("#st0").attr("d", svg);
+    d3.select("#st0").attr("d", config.svg);
   }
 
   const args =

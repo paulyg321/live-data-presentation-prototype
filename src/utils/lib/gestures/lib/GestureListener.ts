@@ -23,10 +23,24 @@ import {
   AffectOptions,
   RESET_ALL_KEY,
   annotationSubject,
+  isInBound,
 } from "@/utils";
 import { StateUpdateType } from "../../chart";
 import type { Timer } from "d3";
 import type { Subject, Subscription } from "rxjs";
+
+export function migrateGestureTypes(types: any[]) {
+  return types.map((type: any) => {
+    if (type.rightHand || type.leftHand) {
+      return {
+        [HANDS.RIGHT]: type.rightHand,
+        [HANDS.LEFT]: type.leftHand,
+      };
+    }
+
+    return type;
+  });
+}
 
 export const DEFAULT_TRIGGER_DURATION = 5000; // 5 SECONDS
 export const DEFAULT_POSE_DURATION = 1000; // 1 second
@@ -66,6 +80,7 @@ export interface PlaybackSettingsConfig {
   easeFn: string;
   playbackMode: StateUpdateType;
   svg?: string;
+  displayTrail?: boolean;
 }
 
 export type PlaybackSettings = Record<AffectOptions, PlaybackSettingsConfig>;
@@ -85,8 +100,8 @@ export interface GestureListenerConstructorArgs {
     nonDominant: HANDS;
   };
   gestureTypes?: {
-    rightHand: SupportedGestures;
-    leftHand: SupportedGestures;
+    [HANDS.LEFT]: SupportedGestures;
+    [HANDS.RIGHT]: SupportedGestures;
   }[];
   resetKeys?: Set<string>;
   drawingUtils: DrawingUtils;
@@ -110,10 +125,13 @@ export interface GestureListenerConstructorArgs {
     key: AffectOptions;
     value: PlaybackSettingsConfig;
   };
+  defaultAffect?: AffectOptions;
   endKeyframe?: { value: string; index: number };
   strokeRecognizer?: DollarRecognizer;
   selectionLabelKey?: string;
   isActive?: boolean;
+  label?: string;
+  isHover?: boolean;
 }
 
 export interface GestureListenerState {
@@ -134,8 +152,8 @@ export interface GestureListenerState {
   };
   gestureTypes:
     | {
-        rightHand: SupportedGestures;
-        leftHand: SupportedGestures;
+        [HANDS.RIGHT]: SupportedGestures;
+        [HANDS.LEFT]: SupportedGestures;
       }[];
 
   // Stroke settings
@@ -164,6 +182,7 @@ export interface GestureListenerState {
   triggerDuration?: number;
 
   playbackSettings: PlaybackSettings;
+  defaultAffect?: AffectOptions;
   endKeyframe?: { value: string; index: number };
 
   selectionKeys: string[];
@@ -177,6 +196,10 @@ export interface GestureListenerState {
   numRevolutions: number;
   gestureStartTime?: number;
   isActive?: boolean;
+
+  label?: string;
+
+  isHover?: boolean;
 }
 
 export type GestureListenerSubjectMap = { [key: string]: Subject<any> };
@@ -184,6 +207,7 @@ export type GestureListenerSubjectMap = { [key: string]: Subject<any> };
 export interface ProcessedGestureListenerFingerData {
   detectedGesture: SupportedGestures;
   fingerPositions: Coordinate2D[];
+  gestureData: any;
 }
 
 export type PosePosition = Record<HANDS, Record<number, Coordinate2D>>;
@@ -239,6 +263,8 @@ export abstract class GestureListener {
     playbackSettings = DEFAULT_PLAYBACK_SETTINGS,
     selectionLabelKey,
     isActive,
+    defaultAffect = AffectOptions.NEUTRAL,
+    label = "",
   }: GestureListenerConstructorArgs) {
     this.state = {
       position,
@@ -253,7 +279,7 @@ export abstract class GestureListener {
         drawingUtils,
       }),
       handsToTrack,
-      gestureTypes,
+      gestureTypes: migrateGestureTypes(gestureTypes),
       gestureSubject,
       gestureSubscription: gestureSubject.subscribe({
         next: (data: any) => this.handler(data),
@@ -292,6 +318,9 @@ export abstract class GestureListener {
       selectionLabelKey,
       numRevolutions: 0,
       isActive,
+      defaultAffect,
+      label,
+      isHover: false,
     };
 
     this.setResetHandler();
@@ -319,6 +348,9 @@ export abstract class GestureListener {
     endKeyframe,
     selectionLabelKey,
     isActive,
+    defaultAffect,
+    label,
+    isHover,
   }: Partial<GestureListenerConstructorArgs>) {
     if (position) {
       this.state.position = position;
@@ -382,6 +414,16 @@ export abstract class GestureListener {
     if (isActive !== undefined) {
       this.state.isActive = isActive;
     }
+    if (defaultAffect) {
+      this.state.defaultAffect = defaultAffect;
+    }
+    if (label) {
+      this.state.label = label;
+    }
+    if (isHover !== undefined) {
+      this.state.isHover = isHover;
+    }
+
     this.state.selectionLabelKey = selectionLabelKey;
   }
 
@@ -455,7 +497,7 @@ export abstract class GestureListener {
     }
   }
 
-  private validateGesture({
+  private processHandData({
     landmarkData,
     gestureData,
     gestureType,
@@ -464,24 +506,17 @@ export abstract class GestureListener {
     gestureData: any;
     gestureType: SupportedGestures;
   }): ProcessedGestureListenerFingerData | undefined {
-    const matchesSpecifiedGesture = gestureData.gestures.some(
-      (gesture: any) => gesture.name === gestureType
-    );
-
-    if (matchesSpecifiedGesture) {
-      const fingerPositions = landmarkData.map((finger: any) => {
-        return {
-          x: finger.x ?? undefined,
-          y: finger.y ?? undefined,
-        };
-      });
+    const fingerPositions = landmarkData.map((finger: any) => {
       return {
-        detectedGesture: gestureType,
-        fingerPositions,
+        x: finger.x ?? undefined,
+        y: finger.y ?? undefined,
       };
-    }
-
-    return undefined;
+    });
+    return {
+      detectedGesture: gestureType,
+      fingerPositions,
+      gestureData,
+    };
   }
 
   resetHandler() {
@@ -542,7 +577,7 @@ export abstract class GestureListener {
     }
   }
 
-  protected renderKeyframe() {
+  protected renderLabel() {
     this.state.drawingUtils.modifyContextStyleAndDraw(
       {
         fillStyle: "skyblue",
@@ -554,7 +589,7 @@ export abstract class GestureListener {
             x: this.state.position.x + 10,
             y: this.state.position.y + 20,
           },
-          text: this.state.endKeyframe?.value ?? "",
+          text: this.state.label ?? "",
           context,
         });
       },
@@ -577,6 +612,10 @@ export abstract class GestureListener {
       },
       ["presenter", "preview"]
     );
+    this.renderLabel();
+    if (this.state.isHover) {
+      this.drawHoverState();
+    }
   }
 
   renderStrokePath() {
@@ -626,23 +665,108 @@ export abstract class GestureListener {
     this.state.handsToTrack = hands;
   }
 
-  isWithinObjectBounds(position: Coordinate2D) {
-    const { x: minX, y: minY } = this.state.position;
-    const { maxX, maxY } = {
-      maxX: this.state.position.x + this.state.dimensions.width,
-      maxY: this.state.position.y + this.state.dimensions.height,
+  updatePosition(dx: number, dy: number) {
+    this.state.position = {
+      x: this.state.position.x + dx,
+      y: this.state.position.y + dy,
+    } as Coordinate2D;
+  }
+
+  updateSize(dx: number, dy: number) {
+    this.state.dimensions = {
+      width: this.state.dimensions.width + dx,
+      height: this.state.dimensions.height + dy,
     };
+  }
 
-    if (
-      position.x > minX &&
-      position.x < maxX &&
-      position.y > minY &&
-      position.y < maxY
-    ) {
-      return true;
-    }
+  isWithinObjectBounds(position: Coordinate2D) {
+    return isInBound(position, {
+      position: this.state.position,
+      dimensions: this.state.dimensions,
+    });
+  }
 
-    return false;
+  isWithinSelectionBounds(selectionBounds: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }) {
+    const coordinatesToCheck = [
+      { ...this.state.position },
+      {
+        x: this.state.position.x + this.state.dimensions.width,
+        y: this.state.position.y + this.state.dimensions.height,
+      },
+    ];
+
+    const isInBounds = coordinatesToCheck.reduce(
+      (isInSelectionBounds: boolean, coordinate: Coordinate2D) => {
+        return (
+          isInBound(coordinate, {
+            position: {
+              ...selectionBounds,
+            },
+            dimensions: {
+              ...selectionBounds,
+            },
+          }) && isInSelectionBounds
+        );
+      },
+      true
+    );
+
+    return isInBounds;
+  }
+
+  isWithinResizeBounds(position: Coordinate2D) {
+    return isInBound(position, {
+      position: {
+        x: this.state.position.x + this.state.dimensions.width - 10,
+        y: this.state.position.y + this.state.dimensions.height - 10,
+      },
+      dimensions: {
+        width: 10,
+        height: 10,
+      },
+    });
+  }
+
+  drawHoverState() {
+    this.state.drawingUtils.modifyContextStyleAndDraw(
+      {
+        lineDash: [3, 3],
+        strokeStyle: "steelblue",
+      },
+      (context) => {
+        this.state.drawingUtils.drawRect({
+          coordinates: this.state.position,
+          dimensions: this.state.dimensions,
+          stroke: true,
+          context,
+        });
+      },
+      ["presenter", "preview"]
+    );
+    this.state.drawingUtils.modifyContextStyleAndDraw(
+      {
+        strokeStyle: "grey",
+        fillStyle: "white",
+      },
+      (context) => {
+        this.state.drawingUtils.drawCircle({
+          coordinates: {
+            x: this.state.position.x + this.state.dimensions.width,
+            y: this.state.position.y + this.state.dimensions.height,
+          },
+          radius: 10,
+          stroke: true,
+          fill: true,
+          context,
+        });
+      },
+      ["presenter", "preview"]
+    );
   }
 
   triggerDetection(onComplete: () => void) {
@@ -764,22 +888,22 @@ export abstract class GestureListener {
 
     this.state.gestureTypes.forEach(
       (gestureType: {
-        rightHand: SupportedGestures;
-        leftHand: SupportedGestures;
+        [HANDS.LEFT]: SupportedGestures;
+        [HANDS.RIGHT]: SupportedGestures;
       }) => {
         if (rightHandGestures && rightHandLandmarks) {
-          rightHandData = this.validateGesture({
+          rightHandData = this.processHandData({
             landmarkData: rightHandLandmarks,
             gestureData: rightHandGestures,
-            gestureType: gestureType.rightHand,
+            gestureType: gestureType[HANDS.RIGHT],
           });
         }
 
         if (leftHandGestures && leftHandLandmarks) {
-          leftHandData = this.validateGesture({
+          leftHandData = this.processHandData({
             landmarkData: leftHandLandmarks,
             gestureData: leftHandGestures,
-            gestureType: gestureType.leftHand,
+            gestureType: gestureType[HANDS.LEFT],
           });
         }
 

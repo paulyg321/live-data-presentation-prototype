@@ -18,6 +18,8 @@ import {
   ListenerMode,
 } from "@/utils";
 
+
+
 export type PointPoseListenerConstructorArgs = GestureListenerConstructorArgs;
 
 const REFERENCE_POINT_BOUNDS = 30;
@@ -30,8 +32,8 @@ export class PointPoseListener extends GestureListener {
     },
     gestureTypes = [
       {
-        rightHand: SupportedGestures.POINTING,
-        leftHand: SupportedGestures.POINTING,
+        [HANDS.RIGHT]: SupportedGestures.POINTING,
+        [HANDS.LEFT]: SupportedGestures.POINTING,
       },
     ],
     trackedFingers = [HAND_LANDMARK_IDS.index_finger_tip],
@@ -208,12 +210,23 @@ export class PointPoseListener extends GestureListener {
 
   protected handleNewData(fingerData: ListenerProcessedFingerData): void {
     const dominantHand = fingerData[this.state.handsToTrack.dominant];
-
     if (!dominantHand) {
+      this.resetGestureState();
       return;
     }
 
-    this.handlePoseGesture(dominantHand.fingerPositions);
+    const matchesSpecifiedGesture = dominantHand.gestureData.gestures.some(
+      (gesture: any) =>
+        this.state.gestureTypes
+          .map((type) => type[this.state.handsToTrack.dominant])
+          .includes(gesture.name)
+    );
+
+    if (matchesSpecifiedGesture) {
+      this.handlePoseGesture(dominantHand.fingerPositions);
+    } else {
+      this.resetGestureState();
+    }
   }
 
   draw() {

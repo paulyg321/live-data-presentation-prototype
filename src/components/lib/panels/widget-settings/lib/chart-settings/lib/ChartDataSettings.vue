@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
 import * as monaco from "monaco-editor";
-import { Chart, ChartType } from "@/utils";
+import { Chart, ChartType, ScaleTypes, scaleOptions } from "@/utils";
 import _ from "lodash";
 import {
   CanvasSettings,
@@ -59,6 +59,8 @@ const dataAccessor = ref<string>();
 const xField = ref<string>();
 const yField = ref<string>();
 const zField = ref<string>();
+const xAxisScale = ref<ScaleTypes | undefined>();
+const yAxisScale = ref<ScaleTypes | undefined>();
 const groupBy = ref<string>();
 const selectionField = ref<string>();
 const columnOptions = ref<any>([]);
@@ -72,6 +74,8 @@ function resetForm() {
   xField.value = undefined;
   yField.value = undefined;
   zField.value = undefined;
+  xAxisScale.value = undefined;
+  yAxisScale.value = undefined;
   groupBy.value = undefined;
   selectionField.value = undefined;
 }
@@ -91,6 +95,8 @@ function loadExistingChartData() {
       xField.value = existingChart.state.xField;
       yField.value = existingChart.state.yField;
       zField.value = existingChart.state.zField;
+      xAxisScale.value = existingChart.state.xScaleType;
+      yAxisScale.value = existingChart.state.yScaleType;
       groupBy.value = existingChart.state.groupBy;
       selectionField.value = existingChart.state.selectionField;
     }
@@ -124,6 +130,8 @@ async function createChart() {
       selectionField: selectionField.value,
       dimensions: initialChartDimensions,
       canvasDimensions: initialCanvasDimensions,
+      xScaleType: xAxisScale.value,
+      yScaleType: yAxisScale.value,
       drawingUtils,
       position: {
         x:
@@ -139,10 +147,7 @@ async function createChart() {
     await newChart.init();
 
     StorySettings.currentStory.addLayer(chartType.value, newChart);
-    StorySettings.saveStories();
     resetForm();
-  } else {
-    console.log("All required fields were not provided");
   }
 }
 
@@ -249,10 +254,26 @@ onMounted(() => {
           </v-col>
           <v-col lg="12">
             <v-autocomplete
+              label="X Axis Scale"
+              v-model="xAxisScale"
+              :items="scaleOptions"
+              clearable
+            ></v-autocomplete>
+          </v-col>
+          <v-col lg="12">
+            <v-autocomplete
               label="Y Field *"
               v-model="yField"
               :items="columnOptions"
               :rules="[getFieldValidator('yField')]"
+            ></v-autocomplete>
+          </v-col>
+          <v-col lg="12">
+            <v-autocomplete
+              label="Y Axis Scale"
+              v-model="yAxisScale"
+              :items="scaleOptions"
+              clearable
             ></v-autocomplete>
           </v-col>
           <v-col lg="12">

@@ -12,7 +12,8 @@ const textSettings = reactive<{
     color: string;
     fontSize: number;
     text: string;
-    opacity: number;
+    maxOpacity: number;
+    isPermanent: boolean;
   };
 }>({
   state: {
@@ -21,7 +22,8 @@ const textSettings = reactive<{
     color: "white",
     fontSize: 16,
     text: "Text",
-    opacity: 1,
+    maxOpacity: 1,
+    isPermanent: false,
   },
 });
 
@@ -51,12 +53,12 @@ watch(
       color: textSettings.state.color,
       fontSize: textSettings.state.fontSize,
       text: textSettings.state.text,
-      opacity: textSettings.state.opacity,
+      maxOpacity: textSettings.state.maxOpacity,
+      isPermanent: textSettings.state.isPermanent,
     };
   },
   (state) => {
     currentWidget.value?.updateState(state);
-    StorySettings.saveStories();
   }
 );
 </script>
@@ -67,6 +69,12 @@ watch(
     </v-col>
     <v-col lg="6">
       <v-btn @click="() => currentWidget?.handleHide()">Hide</v-btn>
+    </v-col>
+    <v-col lg="12">
+      <v-checkbox
+        label="Keep Permanent"
+        v-model="textSettings.state.isPermanent"
+      ></v-checkbox>
     </v-col>
     <v-col lg="12">
       <v-text-field
@@ -95,7 +103,8 @@ watch(
         max="1"
         min="0"
         label="Opacity"
-        v-model="textSettings.state.opacity"
+        thumb-label="always"
+        v-model="textSettings.state.maxOpacity"
       ></v-slider>
     </v-col>
     <v-col lg="12">

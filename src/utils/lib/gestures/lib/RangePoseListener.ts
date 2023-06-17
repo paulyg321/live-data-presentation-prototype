@@ -29,8 +29,8 @@ export class RangePoseListener extends GestureListener {
     },
     gestureTypes = [
       {
-        rightHand: SupportedGestures.OPEN_HAND,
-        leftHand: SupportedGestures.OPEN_HAND,
+        [HANDS.RIGHT]: SupportedGestures.OPEN_HAND,
+        [HANDS.LEFT]: SupportedGestures.OPEN_HAND,
       },
     ],
     trackedFingers = [
@@ -252,10 +252,32 @@ export class RangePoseListener extends GestureListener {
     const leftHand = fingerData[HANDS.LEFT];
 
     if (!rightHand || !leftHand) {
+      this.resetGestureState();
       return;
     }
 
-    this.handlePoseGesture(rightHand.fingerPositions, leftHand.fingerPositions);
+    const matchesRightHandGesture = rightHand.gestureData.gestures.some(
+      (gesture: any) =>
+        this.state.gestureTypes
+          .map((type) => type[HANDS.RIGHT])
+          .includes(gesture.name)
+    );
+
+    const matchesLeftHandGesture = leftHand.gestureData.gestures.some(
+      (gesture: any) =>
+        this.state.gestureTypes
+          .map((type) => type[HANDS.LEFT])
+          .includes(gesture.name)
+    );
+
+    if (matchesLeftHandGesture && matchesRightHandGesture) {
+      this.handlePoseGesture(
+        rightHand.fingerPositions,
+        leftHand.fingerPositions
+      );
+    } else {
+      this.resetGestureState();
+    }
   }
 
   draw() {

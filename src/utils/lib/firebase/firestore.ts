@@ -22,11 +22,11 @@ const firebaseConfig = {
 const firebase = initializeApp(firebaseConfig);
 export const db = getFirestore(firebase);
 
-export async function storeStories(data: string) {
+export function storeStories(data: string) {
   localStorage.setItem("stories", data);
 }
 
-export async function getStories() {
+export function getStories() {
   const stories = localStorage.getItem("stories");
   if (stories) {
     return stories;

@@ -8,8 +8,14 @@ import {
   type ChartsControllerState,
   getStoredData,
   storeData,
+  isInBound,
 } from "@/utils";
 import _ from "lodash";
+
+export const FORESHADOW_OPACITY = 0.6;
+export const SELECTED_OPACITY = 1.0;
+export const UNSELECTED_OPACITY = 0.3;
+export const TRANSPARENT = 0.0;
 
 export enum ScaleTypes {
   LINEAR = "scaleLinear",
@@ -19,6 +25,15 @@ export enum ScaleTypes {
   TIME = "scaleTime",
   SEQ = "scaleSequential",
 }
+
+export const scaleOptions = [
+  ScaleTypes.LINEAR,
+  ScaleTypes.SQRT,
+  ScaleTypes.POW,
+  ScaleTypes.LOG,
+  ScaleTypes.TIME,
+  ScaleTypes.SEQ,
+];
 
 export enum Affect {
   JOY = "joy",
@@ -58,7 +73,7 @@ export interface NewChartArgs {
   selectionField?: string; // field to use to match when selecting (default is key)
   groupBy?: string; // grouping to use when coloring
 
-  position?: Coordinate2D;
+  position: Coordinate2D;
   dimensions: Dimensions;
   canvasDimensions: Dimensions;
   // Utils
@@ -68,6 +83,13 @@ export interface NewChartArgs {
   endKeyframeIndex?: number;
   dataId?: string;
   dataFieldNames: string[];
+  selectedOpacity?: number;
+  unselectedOpacity?: number;
+  foreshadowOpacity?: number;
+
+  xScaleType?: ScaleTypes;
+  yScaleType?: ScaleTypes;
+  isHover?: boolean;
 }
 
 export type ChartState = NewChartArgs & {
@@ -88,6 +110,10 @@ export type ChartState = NewChartArgs & {
   currentKeyframeIndex: number;
   startKeyframeIndex: number;
   endKeyframeIndex: number;
+  selectedOpacity: number;
+  unselectedOpacity: number;
+  foreshadowOpacity: number;
+  isHover?: boolean;
 };
 
 export class Chart {
@@ -124,6 +150,11 @@ export class Chart {
     startKeyframeIndex = 0,
     endKeyframeIndex = 0,
     dataFieldNames,
+    selectedOpacity = SELECTED_OPACITY,
+    foreshadowOpacity = FORESHADOW_OPACITY,
+    unselectedOpacity = UNSELECTED_OPACITY,
+    xScaleType = ScaleTypes.LINEAR,
+    yScaleType = ScaleTypes.LINEAR,
   }: NewChartArgs) {
     this.state = {
       title,
@@ -150,14 +181,17 @@ export class Chart {
         drawingUtils,
       }),
       canvasDimensions,
-      xScaleType: ScaleTypes.LINEAR,
-      yScaleType: ScaleTypes.LINEAR,
+      xScaleType,
+      yScaleType,
       keyframes: [],
       currentKeyframeIndex,
       startKeyframeIndex,
       endKeyframeIndex,
       selectOptions: [],
       dataFieldNames,
+      selectedOpacity: selectedOpacity,
+      foreshadowOpacity: foreshadowOpacity,
+      unselectedOpacity: unselectedOpacity,
     };
   }
 
@@ -185,6 +219,10 @@ export class Chart {
     currentKeyframeIndex?: number;
     startKeyframeIndex?: number;
     endKeyframeIndex?: number;
+    selectedOpacity?: number;
+    unselectedOpacity?: number;
+    foreshadowOpacity?: number;
+    isHover?: boolean;
   }) {
     if (args.position) {
       this.state.position = args.position;
@@ -199,13 +237,24 @@ export class Chart {
     if (args.startKeyframeIndex) {
       this.state.startKeyframeIndex = args.startKeyframeIndex;
     }
-
     if (args.currentKeyframeIndex) {
       this.state.currentKeyframeIndex = args.currentKeyframeIndex;
     }
-
     if (args.endKeyframeIndex) {
       this.state.endKeyframeIndex = args.endKeyframeIndex;
+    }
+
+    if (args.selectedOpacity) {
+      this.state.selectedOpacity = args.selectedOpacity;
+    }
+    if (args.unselectedOpacity) {
+      this.state.unselectedOpacity = args.unselectedOpacity;
+    }
+    if (args.foreshadowOpacity) {
+      this.state.foreshadowOpacity = args.foreshadowOpacity;
+    }
+    if (args.isHover !== undefined) {
+      this.state.isHover = args.isHover;
     }
 
     this.state.controller?.updateState(args);
@@ -425,6 +474,116 @@ export class Chart {
     }));
   }
 
+  isWithinObjectBounds(position: Coordinate2D) {
+    return isInBound(position, {
+      position: this.state.position,
+      dimensions: this.state.dimensions,
+    });
+  }
+
+  isWithinSelectionBounds(selectionBounds: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }) {
+    const coordinatesToCheck = [
+      { ...this.state.position },
+      {
+        x: this.state.position.x + this.state.dimensions.width,
+        y: this.state.position.y + this.state.dimensions.height,
+      },
+    ];
+
+    return coordinatesToCheck.reduce(
+      (isInSelectionBounds: boolean, coordinate: Coordinate2D) => {
+        return (
+          isInBound(coordinate, {
+            position: {
+              ...selectionBounds,
+            },
+            dimensions: {
+              ...selectionBounds,
+            },
+          }) && isInSelectionBounds
+        );
+      },
+      true
+    );
+  }
+
+  isWithinResizeBounds(position: Coordinate2D) {
+    return isInBound(position, {
+      position: {
+        x: this.state.position.x + this.state.dimensions.width - 10,
+        y: this.state.position.y + this.state.dimensions.height - 10,
+      },
+      dimensions: {
+        width: 10,
+        height: 10,
+      },
+    });
+  }
+
+  drawHoverState() {
+    this.state.drawingUtils.modifyContextStyleAndDraw(
+      {
+        lineDash: [3, 3],
+        strokeStyle: "steelblue",
+      },
+      (context) => {
+        this.state.drawingUtils.drawRect({
+          coordinates: this.state.position,
+          dimensions: this.state.dimensions,
+          stroke: true,
+          context,
+        });
+      },
+      ["presenter", "preview"]
+    );
+    this.state.drawingUtils.modifyContextStyleAndDraw(
+      {
+        fillStyle: "white",
+        strokeStyle: "grey",
+      },
+      (context) => {
+        this.state.drawingUtils.drawCircle({
+          coordinates: {
+            x: this.state.position.x + this.state.dimensions.width,
+            y: this.state.position.y + this.state.dimensions.height,
+          },
+          radius: 10,
+          stroke: true,
+          fill: true,
+          context,
+        });
+      },
+      ["presenter", "preview"]
+    );
+  }
+
+  updatePosition(dx: number, dy: number) {
+    this.state.position = {
+      x: this.state.position.x + dx,
+      y: this.state.position.y + dy,
+    } as Coordinate2D;
+
+    this.state.controller?.updateState({
+      position: this.state.position,
+    });
+  }
+
+  updateSize(dx: number, dy: number) {
+    this.state.dimensions = {
+      width: this.state.dimensions.width + dx,
+      height: this.state.dimensions.height + dy,
+    };
+
+    this.state.controller?.updateState({
+      dimensions: this.state.dimensions,
+    });
+  }
+
   private initializeChartItems() {
     const colorScale = this.getColorScale();
     let initializeChartArgs;
@@ -465,6 +624,9 @@ export class Chart {
       endKeyframeIndex: this.state.endKeyframeIndex,
       playbackExtent: 0,
       chartType: this.state.type,
+      selectedOpacity: this.state.selectedOpacity,
+      unselectedOpacity: this.state.unselectedOpacity,
+      foreshadowOpacity: this.state.foreshadowOpacity,
     } as ChartsControllerState;
 
     switch (this.state.type) {
@@ -478,5 +640,8 @@ export class Chart {
 
   draw() {
     this.state.controller?.draw();
+    if (this.state.isHover) {
+      this.drawHoverState();
+    }
   }
 }

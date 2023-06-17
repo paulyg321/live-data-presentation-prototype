@@ -48,14 +48,6 @@ onMounted(() => {
                 "
               >
                 <template v-slot:append>
-                  <!-- <v-btn
-                    color="deep-purple-lighten-2"
-                    icon="mdi-select"
-                    variant="elevated"
-                    density="compact"
-                    v-clipboard="() => element.id"
-                    class="mr-2"
-                  ></v-btn> -->
                   <v-btn
                     color="deep-purple-lighten-2"
                     icon="mdi-delete-empty"

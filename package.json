@@ -28,6 +28,7 @@
     "flatted": "^3.2.7",
     "gsap": "file:gsap-bonus.tgz",
     "handtrackjs": "^0.1.5",
+    "interactjs": "^1.10.17",
     "lodash": "^4.17.21",
     "lz-string": "^1.5.0",
     "monaco-editor": "^0.34.1",

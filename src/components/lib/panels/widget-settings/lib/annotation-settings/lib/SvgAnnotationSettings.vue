@@ -15,8 +15,9 @@ const svgSettings = reactive<{
     alternateColor: string;
     lineWidth: number;
     fill: boolean;
-    opacity: number;
+    maxOpacity: number;
     path: string;
+    isPermanent: boolean;
   };
 }>({
   state: {
@@ -26,8 +27,9 @@ const svgSettings = reactive<{
     alternateColor: "black",
     lineWidth: 4,
     fill: false,
-    opacity: 1,
+    maxOpacity: 1,
     path: "",
+    isPermanent: false,
   },
 });
 
@@ -58,12 +60,12 @@ watch(
       alternateColor: svgSettings.state.alternateColor,
       lineWidth: svgSettings.state.lineWidth,
       fill: svgSettings.state.fill,
-      opacity: svgSettings.state.opacity,
+      maxOpacity: svgSettings.state.maxOpacity,
+      isPermanent: svgSettings.state.isPermanent,
     };
   },
   (state) => {
     currentWidget.value?.updateState(state);
-    StorySettings.saveStories();
   }
 );
 
@@ -98,6 +100,12 @@ function handleSavePath() {
       <v-btn @click="() => currentWidget?.handleHide()">Hide</v-btn>
     </v-col>
     <v-col lg="12">
+      <v-checkbox
+        label="Keep Permanent"
+        v-model="svgSettings.state.isPermanent"
+      ></v-checkbox>
+    </v-col>
+    <v-col lg="12">
       <v-text-field
         v-model="svgSettings.state.animationDuration"
         type="number"
@@ -124,7 +132,8 @@ function handleSavePath() {
         max="1"
         min="0"
         label="Opacity"
-        v-model="svgSettings.state.opacity"
+        thumb-label="always"
+        v-model="svgSettings.state.maxOpacity"
       ></v-slider>
     </v-col>
     <v-col lg="12">
@@ -132,6 +141,7 @@ function handleSavePath() {
         max="15"
         min="0"
         label="Line Width"
+        thumb-label="always"
         v-model="svgSettings.state.lineWidth"
       ></v-slider>
     </v-col>

@@ -12,7 +12,8 @@ const shapeSettings = reactive<{
     color: string;
     lineWidth: number;
     fill: boolean;
-    opacity: number;
+    maxOpacity: number;
+    isPermanent: boolean;
   };
 }>({
   state: {
@@ -21,7 +22,8 @@ const shapeSettings = reactive<{
     color: "white",
     lineWidth: 4,
     fill: false,
-    opacity: 1,
+    maxOpacity: 1,
+    isPermanent: false,
   },
 });
 
@@ -52,12 +54,12 @@ watch(
       color: shapeSettings.state.color,
       lineWidth: shapeSettings.state.lineWidth,
       fill: shapeSettings.state.fill,
-      opacity: shapeSettings.state.opacity,
+      maxOpacity: shapeSettings.state.maxOpacity,
+      isPermanent: shapeSettings.state.isPermanent,
     };
   },
   (state) => {
     currentWidget.value?.updateState(state);
-    StorySettings.saveStories();
   }
 );
 </script>
@@ -68,6 +70,12 @@ watch(
     </v-col>
     <v-col lg="6">
       <v-btn @click="() => currentWidget?.handleHide()">Hide</v-btn>
+    </v-col>
+    <v-col lg="12">
+      <v-checkbox
+        label="Keep Permanent"
+        v-model="shapeSettings.state.isPermanent"
+      ></v-checkbox>
     </v-col>
     <v-col lg="12">
       <v-text-field
@@ -96,7 +104,8 @@ watch(
         max="1"
         min="0"
         label="Opacity"
-        v-model="shapeSettings.state.opacity"
+        thumb-label="always"
+        v-model="shapeSettings.state.maxOpacity"
       ></v-slider>
     </v-col>
     <v-col lg="12">
@@ -104,6 +113,7 @@ watch(
         max="15"
         min="0"
         label="Line Width"
+        thumb-label="always"
         v-model="shapeSettings.state.lineWidth"
       ></v-slider>
     </v-col>

@@ -1,7 +1,8 @@
 <script lang="ts" setup>
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
 import { StorySettings } from "@/state";
 import draggable from "vuedraggable";
+import { parse } from "flatted";
 
 const title = ref("");
 const dialog = ref(false);
@@ -15,6 +16,17 @@ function closeMenu() {
   title.value = "";
   dialog.value = false;
 }
+
+async function initializeStories() {
+  const stories = localStorage.getItem("stories");
+  if (stories) {
+    StorySettings.stories = parse(stories);
+  }
+}
+
+onMounted(() => {
+  initializeStories();
+});
 </script>
 <template>
   <v-container class="d-flex h-100 flex-column">
@@ -37,11 +49,18 @@ function closeMenu() {
                   class="h-100 d-flex flex-column"
                 >
                   <v-card-title class="text-deep-purple-lighten-2 flex-1">{{
-                    element.title
+                    element
                   }}</v-card-title>
 
                   <v-card-actions class="flex-1">
                     <v-spacer></v-spacer>
+                    <v-btn
+                      v-if="index === StorySettings.currentStoryIndex"
+                      color="deep-purple-lighten-2"
+                      variant="elevated"
+                      icon="mdi-content-save"
+                      @click="StorySettings.saveCurrentStory()"
+                    ></v-btn>
                     <v-btn
                       color="deep-purple-lighten-2"
                       variant="elevated"

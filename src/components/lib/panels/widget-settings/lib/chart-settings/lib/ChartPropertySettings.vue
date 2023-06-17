@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { StorySettings, currentChart } from "@/state";
+import {  currentChart } from "@/state";
 import { onMounted, ref, watch, watchEffect } from "vue";
 
 const keyframes = ref<string[]>();
 const playbackSliderRange = ref<number[]>([0, 1]);
+const selectedOpacity = ref<number>(1);
+const unselectedOpacity = ref<number>(0.3);
+const foreshadowOpacity = ref<number>(1);
 
 watchEffect(() => {
   keyframes.value = currentChart.value?.state.keyframes;
@@ -13,9 +16,11 @@ function handleUpdateChart() {
   currentChart.value?.updateState({
     startKeyframeIndex: playbackSliderRange.value[0],
     endKeyframeIndex: playbackSliderRange.value[1],
+    selectedOpacity: selectedOpacity.value,
+    unselectedOpacity: unselectedOpacity.value,
+    foreshadowOpacity: foreshadowOpacity.value,
   });
-  StorySettings.saveStories();
-};
+}
 
 watch(currentChart, handleUpdateForm);
 
@@ -27,6 +32,9 @@ function handleUpdateForm() {
       currentChart.value.state.startKeyframeIndex,
       currentChart.value.state.endKeyframeIndex,
     ];
+    selectedOpacity.value = currentChart.value.state.selectedOpacity;
+    unselectedOpacity.value = currentChart.value.state.unselectedOpacity;
+    foreshadowOpacity.value = currentChart.value.state.foreshadowOpacity;
   }
 }
 </script>
@@ -53,6 +61,35 @@ function handleUpdateForm() {
             </template>
           </v-range-slider>
         </v-col>
+        <v-row>
+          <v-col lg="12">
+            <v-slider
+              max="1"
+              min="0"
+              label="Selected Opacity"
+              thumb-label="always"
+              v-model="selectedOpacity"
+            ></v-slider>
+          </v-col>
+          <v-col lg="12">
+            <v-slider
+              max="1"
+              min="0"
+              label="Unselected Opacity"
+              thumb-label="always"
+              v-model="unselectedOpacity"
+            ></v-slider>
+          </v-col>
+          <v-col lg="12">
+            <v-slider
+              max="1"
+              min="0"
+              label="Foreshadow Opacity"
+              thumb-label="always"
+              v-model="foreshadowOpacity"
+            ></v-slider>
+          </v-col>
+        </v-row>
       </v-row>
       <v-row>
         <v-col lg="12">

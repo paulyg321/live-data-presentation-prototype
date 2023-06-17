@@ -29,8 +29,8 @@ export class RectPoseListener extends GestureListener {
     },
     gestureTypes = [
       {
-        rightHand: SupportedGestures.POINTING,
-        leftHand: SupportedGestures.POINTING,
+        [HANDS.RIGHT]: SupportedGestures.POINTING,
+        [HANDS.LEFT]: SupportedGestures.POINTING,
       },
     ],
     trackedFingers = [
@@ -246,10 +246,32 @@ export class RectPoseListener extends GestureListener {
     const leftHand = fingerData[HANDS.LEFT];
 
     if (!rightHand || !leftHand) {
+      this.resetGestureState();
       return;
     }
 
-    this.handlePoseGesture(rightHand.fingerPositions, leftHand.fingerPositions);
+    const matchesRightHandGesture = rightHand.gestureData.gestures.some(
+      (gesture: any) =>
+        this.state.gestureTypes
+          .map((type) => type[HANDS.RIGHT])
+          .includes(gesture.name)
+    );
+
+    const matchesLeftHandGesture = leftHand.gestureData.gestures.some(
+      (gesture: any) =>
+        this.state.gestureTypes
+          .map((type) => type[HANDS.LEFT])
+          .includes(gesture.name)
+    );
+
+    if (matchesLeftHandGesture && matchesRightHandGesture) {
+      this.handlePoseGesture(
+        rightHand.fingerPositions,
+        leftHand.fingerPositions
+      );
+    } else {
+      this.resetGestureState();
+    }
   }
 
   draw() {

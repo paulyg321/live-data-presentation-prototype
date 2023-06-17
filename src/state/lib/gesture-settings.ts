@@ -6,6 +6,7 @@ import {
   ListenerMode,
   ForeshadowingStatesMode,
   StateUpdateType,
+  AffectOptions,
 } from "@/utils";
 import { CanvasSettings } from "@/state";
 
@@ -64,6 +65,8 @@ export const GestureSettingsState = reactive<{
     | StateUpdateType.INDIVIDUAL_TWEENS
     | StateUpdateType.GROUP_TIMELINE;
   selectionLabelKey?: string;
+  defaultAffect: AffectOptions;
+  label: string;
 }>({
   endKeyframe: undefined,
   gestureName: "",
@@ -81,4 +84,6 @@ export const GestureSettingsState = reactive<{
   restrictToBounds: false,
   playbackDuration: 5,
   playbackMode: StateUpdateType.GROUP_TIMELINE,
+  defaultAffect: AffectOptions.NEUTRAL,
+  label: "",
 });

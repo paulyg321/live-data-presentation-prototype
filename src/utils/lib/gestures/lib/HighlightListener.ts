@@ -21,8 +21,8 @@ export class HighlightListener extends GestureListener {
     },
     gestureTypes = [
       {
-        rightHand: SupportedGestures.POINTING,
-        leftHand: SupportedGestures.POINTING,
+        [HANDS.RIGHT]: SupportedGestures.POINTING,
+        [HANDS.LEFT]: SupportedGestures.POINTING,
       },
     ],
     trackedFingers = [HAND_LANDMARK_IDS.index_finger_tip],
@@ -77,14 +77,23 @@ export class HighlightListener extends GestureListener {
       return;
     }
 
-    const indexPosition = dominantHand.fingerPositions[
-      HAND_LANDMARK_IDS.index_finger_tip
-    ] as Coordinate2D;
-
-    this.publishToSubjectIfExists(
-      GestureListener.highlighSubjectKey,
-      indexPosition
+    const matchesSpecifiedGesture = dominantHand.gestureData.gestures.some(
+      (gesture: any) =>
+        this.state.gestureTypes
+          .map((type) => type[this.state.handsToTrack.dominant])
+          .includes(gesture.name)
     );
+
+    if (matchesSpecifiedGesture) {
+      const indexPosition = dominantHand.fingerPositions[
+        HAND_LANDMARK_IDS.index_finger_tip
+      ] as Coordinate2D;
+
+      this.publishToSubjectIfExists(
+        GestureListener.highlighSubjectKey,
+        indexPosition
+      );
+    }
   }
 
   draw() {
