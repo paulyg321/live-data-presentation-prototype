@@ -18,8 +18,8 @@ for (const finger of [
 
 // pointingGesture.addCurl(fp.Finger.Thumb, fp.FingerCurl.NoCurl);
 
-// pointingGesture.addCurl(fp.Finger.Index, fp.FingerCurl.NoCurl);
-// pointingGesture.addCurl(fp.Finger.Index, fp.FingerCurl.HalfCurl);
+pointingGesture.addCurl(fp.Finger.Index, fp.FingerCurl.NoCurl);
+pointingGesture.addCurl(fp.Finger.Index, fp.FingerCurl.HalfCurl);
 // pointingGesture.addDirection(fp.Finger.Thumb, fp.FingerDirection.VerticalUp);
 // pointingGesture.addDirection(
 //   fp.Finger.Thumb,
@@ -45,17 +45,17 @@ for (const finger of [
   fp.Finger.Pinky,
 ]) {
   openHandGesture.addCurl(finger, fp.FingerCurl.NoCurl, 1.0);
-  openHandGesture.addDirection(fp.Finger.Thumb, fp.FingerDirection.VerticalUp);
-  openHandGesture.addDirection(
-    fp.Finger.Thumb,
-    fp.FingerDirection.DiagonalUpLeft,
-    0.9
-  );
-  openHandGesture.addDirection(
-    fp.Finger.Thumb,
-    fp.FingerDirection.DiagonalUpRight,
-    0.9
-  );
+  // openHandGesture.addDirection(fp.Finger.Thumb, fp.FingerDirection.VerticalUp);
+  // openHandGesture.addDirection(
+  //   fp.Finger.Thumb,
+  //   fp.FingerDirection.DiagonalUpLeft,
+  //   0.9
+  // );
+  // openHandGesture.addDirection(
+  //   fp.Finger.Thumb,
+  //   fp.FingerDirection.DiagonalUpRight,
+  //   0.9
+  // );
 }
 
 // left L - foreshadowing

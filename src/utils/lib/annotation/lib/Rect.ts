@@ -12,7 +12,6 @@ export interface RectState {
   lineWidth: number;
   opacity: number;
   maxOpacity: number;
-  canvasListener: CanvasElementListener;
   drawingUtils: DrawingUtils;
   color?: string;
   animationDuration: number;
@@ -48,15 +47,6 @@ export class Rect {
       lineWidth,
       opacity,
       fill,
-      canvasListener: new CanvasElementListener({
-        position,
-        dimensions,
-        isCircle: false,
-        drawingUtils,
-        updateFn: (value) => {
-          this.updateState(value);
-        },
-      }),
       drawingUtils,
       color,
       animationDuration: animationDuration ?? 1,
@@ -128,8 +118,6 @@ export class Rect {
     if (isHover !== undefined) {
       this.state.isHover = isHover;
     }
-
-    this.state.canvasListener.updateState(args);
   }
 
   handleUnveil() {

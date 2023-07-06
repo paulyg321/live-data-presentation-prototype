@@ -1,7 +1,6 @@
 import { gsap } from "gsap";
 import type { Coordinate2D, Dimensions } from "../../chart";
 import type { DrawingUtils } from "../../drawing";
-import type { CanvasElementListener } from "../../interactions";
 import { markRaw } from "vue";
 import { isInBound } from "@/utils";
 
@@ -11,7 +10,6 @@ export interface TextState {
   fontSize: number;
   opacity: number;
   maxOpacity: number;
-  // canvasListener: CanvasElementListener;
   drawingUtils: DrawingUtils;
   color?: string;
   animationDuration: number;
@@ -122,8 +120,6 @@ export class Text {
     if (isHover !== undefined) {
       this.state.isHover = isHover;
     }
-
-    // this.state.canvasListener.updateState(args);
   }
 
   handleUnveil() {

@@ -29,7 +29,7 @@ export enum SupportedGestures {
   FORESHADOWING_RIGHT_C = "foreshadowing-right-c",
 }
 
-export const RESET_ALL_KEY = "Space";
+export const RESET_ALL_KEY = "";
 
 export function getGestureListenerResetKeys(
   keys?: string | string[]

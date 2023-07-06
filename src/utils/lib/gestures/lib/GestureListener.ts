@@ -51,18 +51,21 @@ export const DEFAULT_PLAYBACK_SETTINGS = {
     easeFn: "none",
     playbackMode: StateUpdateType.GROUP_TIMELINE,
     svg: undefined,
+    displayTrail: false,
   },
   [AffectOptions.POSITIVE]: {
     duration: 5,
     easeFn: "none",
     playbackMode: StateUpdateType.GROUP_TIMELINE,
     svg: undefined,
+    displayTrail: false,
   },
   [AffectOptions.NEGATIVE]: {
     duration: 5,
     easeFn: "none",
     playbackMode: StateUpdateType.INDIVIDUAL_TWEENS,
     svg: undefined,
+    displayTrail: false,
   },
 };
 
@@ -423,8 +426,9 @@ export abstract class GestureListener {
     if (isHover !== undefined) {
       this.state.isHover = isHover;
     }
-
-    this.state.selectionLabelKey = selectionLabelKey;
+    if (selectionLabelKey) {
+      this.state.selectionLabelKey = selectionLabelKey;
+    }
   }
 
   private setResetHandler() {

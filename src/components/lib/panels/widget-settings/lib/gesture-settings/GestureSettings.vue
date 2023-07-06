@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, onMounted, ref, watch, watchEffect } from "vue";
+import { onMounted, ref, watch, watchEffect } from "vue";
 import {
   HANDS,
   type GestureListener,
@@ -11,6 +11,8 @@ import {
   GestureSettingsState,
   currentChart,
   handlePlay,
+  DEFAULT_GESTURE_SETTINGS,
+  isUpdateFromAutocomplete,
 } from "@/state";
 import {
   ForeshadowingSettings,
@@ -20,17 +22,15 @@ import {
 } from "@/components";
 const currentWidget = ref<GestureListener>();
 const widgetType = ref<ListenerType>();
-const keyframes = ref<string[]>();
 
 watchEffect(() => {
-  keyframes.value = currentChart.value?.state.keyframes;
   widgetType.value = StorySettings.currentStory?.currentWidget
     ?.type as ListenerType;
   currentWidget.value = StorySettings.currentStory?.currentWidget
     ?.layer as GestureListener;
 });
 
-watch(currentWidget, handleUpdateGestureState);
+watch(currentWidget, handleUpdateGestureState, { immediate: false });
 onMounted(handleUpdateGestureState);
 
 watch(
@@ -63,25 +63,30 @@ watch(
   },
   (state) => {
     currentWidget.value?.updateState(state);
-  }
+  },
+  { immediate: false }
 );
 
 watch(
   () => GestureSettingsState.selectionKeys,
   () => {
-    const isAnnotation =
-      GestureSettingsState.listenerMode === ListenerMode.ANNOTATE;
-    if (!isAnnotation && GestureSettingsState.selectionKeys.length > 0) {
-      const bounds = currentChart.value?.state.controller?.getSelectionBounds(
-        GestureSettingsState.selectionKeys
-      );
+    if (isUpdateFromAutocomplete.value) {
+      const isAnnotation =
+        GestureSettingsState.listenerMode === ListenerMode.ANNOTATE;
+      if (!isAnnotation && GestureSettingsState.selectionKeys.length > 0) {
+        const bounds = currentChart.value?.state.controller?.getSelectionBounds(
+          GestureSettingsState.selectionKeys
+        );
 
-      if (bounds) {
-        currentWidget.value?.updateState({
-          position: bounds.position,
-          dimensions: bounds.dimensions,
-        });
+        if (bounds) {
+          currentWidget.value?.updateState({
+            position: bounds.position,
+            dimensions: bounds.dimensions,
+          });
+        }
       }
+      // Reset the flag after handling the update
+      isUpdateFromAutocomplete.value = false;
     }
   }
 );
@@ -106,8 +111,6 @@ function handleUpdateGestureState() {
       poseDuration,
       resetPauseDuration,
       triggerDuration,
-      // resetKeys,
-      // mode,
       selectionKeys,
       foreshadowingStatesCount,
       foreshadowingStatesMode,
@@ -117,68 +120,26 @@ function handleUpdateGestureState() {
       selectionLabelKey,
       defaultAffect,
       label,
-    } = currentWidget.value.state;
-
-    if (widgetType.value === ListenerType.STROKE_LISTENER) {
-      GestureSettingsState.gestures = getGestures();
-    }
+    } = {
+      ...DEFAULT_GESTURE_SETTINGS,
+      ...currentWidget.value.state,
+    };
     GestureSettingsState.dominantHand = handsToTrack.dominant;
-    if (listenerMode) {
-      GestureSettingsState.listenerMode = listenerMode;
-    }
-    if (strokeTriggerName) {
-      GestureSettingsState.strokeTriggerName = strokeTriggerName;
-    }
-    if (poseDuration) {
-      GestureSettingsState.poseDuration = poseDuration;
-    }
-    if (resetPauseDuration) {
-      GestureSettingsState.resetPauseDuration = resetPauseDuration;
-    }
-    if (triggerDuration) {
-      GestureSettingsState.triggerDuration = triggerDuration;
-    }
-    if (selectionKeys) {
-      GestureSettingsState.selectionKeys = selectionKeys;
-    }
-    if (foreshadowingStatesCount) {
-      GestureSettingsState.foreshadowingStatesCount = foreshadowingStatesCount;
-    }
-    if (foreshadowingStatesMode) {
-      GestureSettingsState.foreshadowingStatesMode = foreshadowingStatesMode;
-    }
-    if (useBounds) {
-      GestureSettingsState.useBounds = useBounds;
-    }
-    if (restrictToBounds) {
-      GestureSettingsState.restrictToBounds = restrictToBounds;
-    }
-    if (endKeyframe) {
-      GestureSettingsState.endKeyframe = endKeyframe;
-    }
-    if (selectionLabelKey) {
-      GestureSettingsState.selectionLabelKey = selectionLabelKey;
-    }
-    if (defaultAffect) {
-      GestureSettingsState.defaultAffect = defaultAffect;
-    }
-    if (label) {
-      GestureSettingsState.label = label;
-    }
+    GestureSettingsState.listenerMode = listenerMode;
+    GestureSettingsState.strokeTriggerName = strokeTriggerName;
+    GestureSettingsState.poseDuration = poseDuration;
+    GestureSettingsState.resetPauseDuration = resetPauseDuration;
+    GestureSettingsState.triggerDuration = triggerDuration;
+    GestureSettingsState.selectionKeys = selectionKeys;
+    GestureSettingsState.foreshadowingStatesCount = foreshadowingStatesCount;
+    GestureSettingsState.foreshadowingStatesMode = foreshadowingStatesMode;
+    GestureSettingsState.useBounds = useBounds;
+    GestureSettingsState.restrictToBounds = restrictToBounds;
+    GestureSettingsState.endKeyframe = endKeyframe;
+    GestureSettingsState.selectionLabelKey = selectionLabelKey;
+    GestureSettingsState.defaultAffect = defaultAffect;
+    GestureSettingsState.label = label;
   }
-}
-
-function getGestures() {
-  if (!currentWidget.value) return [];
-
-  return currentWidget.value.state.strokeRecognizer
-    .getGestureNames()
-    .map((name: string, index: number) => {
-      return {
-        title: name,
-        value: index,
-      };
-    });
 }
 </script>
 <template>

@@ -12,6 +12,7 @@ import {
 import { markRaw, reactive, watch } from "vue";
 import { CanvasSettings } from "./canvas-settings";
 import { parse, stringify } from "flatted";
+import { PortalState } from "./portal-state";
 
 export const widgetIconMap: Record<string, string> = {
   [ChartType.BAR]: "mdi-chart-bar",
@@ -97,6 +98,7 @@ export const StorySettings = reactive<{
         return value;
       })
     );
+    localStorage.setItem("stories", stringify(markRaw(this.stories)));
   },
   async duplicateStory(index: number) {
     if (!CanvasSettings.generalDrawingUtils) return;
@@ -143,13 +145,13 @@ export const StorySettings = reactive<{
 });
 
 document.addEventListener("keydown", async (event) => {
-  if (event.key == LEFT) {
+  if (event.key == LEFT && PortalState.audiencePortalOpen) {
     await StorySettings.loadPrevStory();
   }
 });
 
 document.addEventListener("keydown", async (event) => {
-  if (event.code == RIGHT) {
+  if (event.code == RIGHT && PortalState.audiencePortalOpen) {
     await StorySettings.loadNextStory();
   }
 });

@@ -333,7 +333,6 @@ export abstract class AnimatedElement {
           );
         },
         onComplete: () => {
-          this.updateForeshadowingAnimationState();
           this.controllerState.playback.extent = 0;
         },
         duration: args.duration,
@@ -344,8 +343,7 @@ export abstract class AnimatedElement {
   }
 
   updateForeshadowingAnimationState(
-    updateType: StateUpdateType = StateUpdateType.ANIMATE,
-    isLastTween?: boolean
+    updateType: StateUpdateType = StateUpdateType.ANIMATE
   ) {
     const pulseConfig = {
       duration: 2,
@@ -381,7 +379,7 @@ export abstract class AnimatedElement {
               ],
           };
 
-          if (index > this.controllerState.currentKeyframeIndex) {
+          if (index >= this.controllerState.currentKeyframeIndex) {
             switch (this.controllerState.foreshadowingMode) {
               case ForeshadowingStatesMode.TRAJECTORY: {
                 // Check if its foreshadowed and whether should pulse - opacity = 0 and shouldPulse - false if not
@@ -428,7 +426,7 @@ export abstract class AnimatedElement {
             },
             {
               opacity,
-              ...(opacity && shouldPulse && isLastTween ? pulseConfig : {}),
+              ...(opacity && shouldPulse ? pulseConfig : {}),
             }
           );
         }
@@ -679,7 +677,7 @@ export abstract class AnimatedElement {
     config?: {
       easeFn?: string;
       duration?: number;
-      showTrajectory?: boolean;
+      displayTrail?: boolean;
       skipPosition?: boolean;
     }
   ) {
@@ -823,7 +821,7 @@ export abstract class AnimatedElement {
             duration: config?.duration,
             ease: config?.easeFn,
             onUpdate: () => {
-              if (this.controllerState.isSelected && config?.showTrajectory) {
+              if (this.controllerState.isSelected && config?.displayTrail) {
                 const newPosition = {
                   x: currentItemAnimationState.position.x,
                   y: currentItemAnimationState.position.y,
@@ -833,6 +831,8 @@ export abstract class AnimatedElement {
                 } else {
                   currentItemAnimationState.pastTrajectory = [newPosition];
                 }
+              } else {
+                currentItemAnimationState.pastTrajectory = [];
               }
             },
           }

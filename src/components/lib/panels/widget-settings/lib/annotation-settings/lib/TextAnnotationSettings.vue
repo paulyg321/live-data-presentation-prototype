@@ -65,10 +65,10 @@ watch(
 <template>
   <v-row>
     <v-col lg="6">
-      <v-btn @click="() => currentWidget?.handleUnveil()">Unveil</v-btn>
+      <v-btn block @click="() => currentWidget?.handleUnveil()">Unveil</v-btn>
     </v-col>
     <v-col lg="6">
-      <v-btn @click="() => currentWidget?.handleHide()">Hide</v-btn>
+      <v-btn block @click="() => currentWidget?.handleHide()">Hide</v-btn>
     </v-col>
     <v-col lg="12">
       <v-checkbox

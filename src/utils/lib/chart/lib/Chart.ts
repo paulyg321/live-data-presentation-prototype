@@ -44,7 +44,7 @@ export enum Affect {
 export const NON_FOCUSED_COLOR = "grey";
 
 // excluded
-export const MAX_DOMAIN_Y = 6;
+export const MAX_DOMAIN_Y = 8;
 // included
 export const MIN_DOMAIN_Y = 1;
 
@@ -200,13 +200,15 @@ export class Chart {
       throw new Error("Unable to get the chart dataset");
 
     if (!this.state.data && this.state.dataId) {
-      // get from db
       this.state.data = await getStoredData(this.state.dataId);
     }
 
     if (this.state.data && !this.state.dataId) {
       // Store in DB
-      this.state.dataId = await storeData(JSON.stringify(this.state.data));
+      const uniqueKey = await storeData(JSON.stringify(this.state.data));
+      if (uniqueKey) {
+        this.state.dataId = uniqueKey;
+      }
     }
 
     this.setDataDomains(this.state.type);
@@ -255,6 +257,7 @@ export class Chart {
     }
     if (args.isHover !== undefined) {
       this.state.isHover = args.isHover;
+      return;
     }
 
     this.state.controller?.updateState(args);

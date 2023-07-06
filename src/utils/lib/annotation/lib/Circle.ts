@@ -1,7 +1,6 @@
 import { gsap } from "gsap";
 import type { Coordinate2D, Dimensions } from "../../chart";
 import type { DrawingUtils } from "../../drawing";
-import { CanvasElementListener } from "../../interactions";
 import { markRaw } from "vue";
 import { isInBound } from "@/utils";
 
@@ -11,7 +10,6 @@ export interface CircleState {
   fill: boolean;
   lineWidth: number;
   opacity: number;
-  canvasListener: CanvasElementListener;
   drawingUtils: DrawingUtils;
   color?: string;
   animationDuration: number;
@@ -48,15 +46,6 @@ export class Circle {
       lineWidth,
       opacity,
       fill,
-      canvasListener: new CanvasElementListener({
-        position,
-        dimensions,
-        isCircle: false,
-        drawingUtils,
-        updateFn: (value) => {
-          this.updateState(value);
-        },
-      }),
       drawingUtils,
       color,
       animationDuration: animationDuration ?? 1,
@@ -128,8 +117,6 @@ export class Circle {
     if (isHover !== undefined) {
       this.state.isHover = isHover;
     }
-
-    this.state.canvasListener.updateState(args);
   }
 
   handleUnveil() {

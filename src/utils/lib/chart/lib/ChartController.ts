@@ -111,7 +111,8 @@ export type D3ScaleTypes =
   | d3.ScaleTime<number, number, unknown>
   | d3.ScalePower<number, number, unknown>
   | d3.ScalePower<number, number, unknown>
-  | d3.ScaleSequential<number, unknown>;
+  | d3.ScaleSequential<number, unknown>
+  | d3.ScaleSymLog<number, number, unknown>;
 
 export class ChartController {
   state: ChartsControllerState;
@@ -324,7 +325,7 @@ export class ChartController {
       startKeyframeIndex,
       selectedOpacity,
       unselectedOpacity,
-      foreshadowOpacity
+      foreshadowOpacity,
     } = args;
 
     if (position || dimensions || xDomain || yDomain) {
@@ -434,11 +435,23 @@ export class ChartController {
   }
 
   play(args: AnimatedElementPlaybackArgs) {
-    let duration = args.duration;
-    this.state.totalTime =
-      this.state.totalTime + (this.state.playbackTimeline?.totalTime() ?? 0);
+    const duration = args.duration;
+    /**
+     * I took out regenerating the affect because I recommend splitting affects per slide
+     * This is because if we recompute, then foreshadowing logic starts to get questionable
+     * Things we want the foreshadowing to remain the same throughout our animation.
+     * Ease functions are also hard to understand when the animation is recomputed with the same ease
+     */
+    // this.state.totalTime =
+    //   this.state.totalTime + (this.state.playbackTimeline?.totalTime() ?? 0);
     if (this.state.playbackExtent > 0) {
-      duration = args.duration - this.state.totalTime;
+      this.state.animatedElements?.forEach((element) => {
+        // element.updateState({
+        //   defaultElementDetails: { ...defaultDetails },
+        // });
+        element.resume();
+      });
+      // duration = args.duration - this.state.totalTime;
     }
     const defaultSelector =
       this.state.chartType === ChartType.BAR ? "#rect" : "#circle";
@@ -466,11 +479,6 @@ export class ChartController {
           defaultElementDetails: { ...defaultDetails },
         });
       }
-    });
-
-    console.log({
-      duration,
-      totalTime: this.state.totalTime,
     });
 
     controllerPlaySubject.next({
@@ -654,7 +662,7 @@ export class ChartController {
           .range(args.range);
       case ScaleTypes.LOG:
         return d3
-          .scaleLog<number, number, unknown>()
+          .scaleSymlog<number, number, unknown>()
           .domain(args.domain)
           .range(args.range);
       case ScaleTypes.TIME:
@@ -701,7 +709,6 @@ export class ChartController {
     const yScaleType = args.yScaleType;
     const yDomain = args.yDomain;
     const yRange = args.yRange;
-
     const xScale = this.getScales({
       scaleType: xScaleType,
       domain: xDomain,
@@ -795,8 +802,8 @@ export class ChartController {
     if (keyframe) {
       this.state.drawingUtils.modifyContextStyleAndDraw(
         {
-          fontSize: this.state.dimensions.width * 0.15,
-          opacity: this.state.selectedOpacity,
+          fontSize: this.state.dimensions.width * 0.10,
+          opacity: this.state.selectedOpacity * 0.5,
           fillStyle: "#fc036b",
           textAlign: "right",
           shadow: true,

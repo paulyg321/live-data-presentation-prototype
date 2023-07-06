@@ -77,12 +77,14 @@ enum SettingsTab {
 const currentTab = ref<SettingsTab | null>();
 const chartType = ref<ChartType | undefined>();
 const disableChartType = computed(() => {
-  return StorySettings.currentStory === undefined;
+  return false;
+  // return StorySettings.currentStory === undefined;
 });
 const disablePoses = computed(() => {
-  const charts = StorySettings.currentStory?.getCharts();
+  return false;
+  // const charts = StorySettings.currentStory?.getCharts();
 
-  return !(charts && charts.length > 0);
+  // return !(charts && charts.length > 0);
 });
 
 function handleSaveChart() {
@@ -580,7 +582,7 @@ onMounted(() => {
           </v-tooltip>
         </v-list>
       </v-navigation-drawer>
-      <v-navigation-drawer permanent location="left" width="600">
+      <v-navigation-drawer permanent location="left" width="450">
         <div v-if="currentTab === SettingsTab.WIDGET_SETTINGS">
           <WidgetSettings />
         </div>

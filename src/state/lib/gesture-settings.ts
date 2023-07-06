@@ -44,6 +44,27 @@ watchEffect(() => {
   });
 });
 
+
+export const DEFAULT_GESTURE_SETTINGS = {
+  endKeyframe: undefined,
+  gestureName: "",
+  gestures: [],
+  dominantHand: HANDS.RIGHT,
+  listenerMode: undefined,
+  strokeTriggerName: "",
+  poseDuration: 500,
+  resetPauseDuration: 1000,
+  triggerDuration: 1000,
+  selectionKeys: [],
+  foreshadowingStatesCount: 1,
+  foreshadowingStatesMode: ForeshadowingStatesMode.TRAJECTORY,
+  useBounds: false,
+  restrictToBounds: false,
+  playbackDuration: 5,
+  defaultAffect: AffectOptions.NEUTRAL,
+  label: "",
+};
+
 export const GestureSettingsState = reactive<{
   gestureName: string;
   endKeyframe?: { value: string; index: number };
@@ -61,29 +82,9 @@ export const GestureSettingsState = reactive<{
   useBounds: boolean;
   restrictToBounds: boolean;
   playbackDuration: number;
-  playbackMode:
-    | StateUpdateType.INDIVIDUAL_TWEENS
-    | StateUpdateType.GROUP_TIMELINE;
   selectionLabelKey?: string;
   defaultAffect: AffectOptions;
   label: string;
-}>({
-  endKeyframe: undefined,
-  gestureName: "",
-  gestures: [],
-  dominantHand: HANDS.RIGHT,
-  listenerMode: undefined,
-  strokeTriggerName: "",
-  poseDuration: 1000,
-  resetPauseDuration: 1000,
-  triggerDuration: 1000,
-  selectionKeys: [],
-  foreshadowingStatesCount: 1,
-  foreshadowingStatesMode: ForeshadowingStatesMode.TRAJECTORY,
-  useBounds: false,
-  restrictToBounds: false,
-  playbackDuration: 5,
-  playbackMode: StateUpdateType.GROUP_TIMELINE,
-  defaultAffect: AffectOptions.NEUTRAL,
-  label: "",
-});
+}>(DEFAULT_GESTURE_SETTINGS);
+
+export const isUpdateFromAutocomplete = ref(false);

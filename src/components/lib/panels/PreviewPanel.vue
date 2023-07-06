@@ -166,8 +166,26 @@ function draw() {
   if (selectionBox.value !== null) {
     CanvasSettings.generalDrawingUtils?.modifyContextStyleAndDraw(
       {
+        strokeStyle: "grey",
+        fillStyle: "white",
+      },
+      (context) => {
+        CanvasSettings.generalDrawingUtils?.drawCircle({
+          coordinates: {
+            x: selectionBox.value!.x + selectionBox.value!.width,
+            y: selectionBox.value!.y + selectionBox.value!.height,
+          },
+          radius: 10,
+          stroke: true,
+          context,
+        });
+      },
+      ["presenter", "preview"]
+    );
+    CanvasSettings.generalDrawingUtils?.modifyContextStyleAndDraw(
+      {
         lineDash: [3, 3],
-        strokeStyle: "steelblue",
+        strokeStyle: "skyblue",
       },
       (context) => {
         CanvasSettings.generalDrawingUtils?.drawRect({
@@ -218,14 +236,28 @@ function initializeCanvasListeners() {
 
             if (modifications.isGroup) {
               selectedItems.forEach((item) => {
-                item?.layer.updatePosition(event.dx, event.dy);
+                if (modifications.isDrag) {
+                  item?.layer.updatePosition(event.dx, event.dy);
+                } else if (modifications.isResize) {
+                  item?.layer.updateSize(event.dx, event.dy);
+                }
               });
-              if (selectionBox.value) {
-                selectionBox.value = {
-                  ...selectionBox.value,
-                  x: selectionBox.value?.x + event.dx,
-                  y: selectionBox.value?.y + event.dy,
-                };
+              if (modifications.isDrag) {
+                if (selectionBox.value) {
+                  selectionBox.value = {
+                    ...selectionBox.value,
+                    x: selectionBox.value?.x + event.dx,
+                    y: selectionBox.value?.y + event.dy,
+                  };
+                }
+              } else if (modifications.isResize) {
+                if (selectionBox.value) {
+                  selectionBox.value = {
+                    ...selectionBox.value,
+                    width: selectionBox.value?.width + event.dx,
+                    height: selectionBox.value?.height + event.dy,
+                  };
+                }
               }
             } else {
               const target = layers[modifications.index];
@@ -251,9 +283,45 @@ function initializeCanvasListeners() {
           selectionBox.value &&
           isInBound(
             { x, y },
-            { position: selectionBox.value, dimensions: selectionBox.value }
+            {
+              position: selectionBox.value,
+              dimensions: {
+                width: selectionBox.value.width,
+                height: selectionBox.value.height,
+              },
+            }
           )
         ) {
+          if (
+            isInBound(
+              { x, y },
+              {
+                position: {
+                  x: selectionBox.value.x + selectionBox.value.width,
+                  y: selectionBox.value.y + selectionBox.value.height,
+                },
+                radius: 10,
+              }
+            )
+          ) {
+            event.target.setAttribute(
+              "data-index",
+              JSON.stringify({
+                isGroup: true,
+                isDrag: false,
+                isResize: true,
+              })
+            );
+          } else {
+            event.target.setAttribute(
+              "data-index",
+              JSON.stringify({
+                isGroup: true,
+                isDrag: true,
+                isResize: false,
+              })
+            );
+          }
           return;
         }
         // If there are selected items and the click is outside the selection box
@@ -331,17 +399,6 @@ function initializeCanvasListeners() {
           selectedItems = layers.filter((item) =>
             item.layer.isWithinSelectionBounds(selectionBox.value!)
           );
-
-          if (selectedItems.length > 0) {
-            event.target.setAttribute(
-              "data-index",
-              JSON.stringify({
-                isGroup: true,
-                isDrag: true,
-                isResize: false,
-              })
-            );
-          }
         } else {
           event.target.setAttribute("data-index", undefined);
         }

@@ -1,7 +1,6 @@
 import { gsap } from "gsap";
 import type { Coordinate2D } from "../../chart";
 import { LineShape, type DrawingUtils } from "../../drawing";
-import { LineCanvasElementListener } from "../../interactions";
 import { markRaw } from "vue";
 import { isInBound } from "@/utils";
 
@@ -11,7 +10,6 @@ export interface LineState {
   lineWidth: number;
   opacity: number;
   maxOpacity: number;
-  canvasListener: LineCanvasElementListener;
   arrow: boolean;
   drawingUtils: DrawingUtils;
   color?: string;
@@ -49,14 +47,6 @@ export class Line {
       lineWidth: lineWidth ?? 3,
       opacity,
       arrow: arrow ?? false,
-      canvasListener: new LineCanvasElementListener({
-        startCoord: startCoord ? { ...startCoord } : { x: 0, y: 0 },
-        endCoord: endCoord ? { ...endCoord } : { x: 50, y: 50 },
-        drawingUtils,
-        updateFn: (value) => {
-          this.updateState(value);
-        },
-      }),
       drawingUtils,
       color,
       animationDuration: animationDuration ?? 1,
@@ -130,8 +120,6 @@ export class Line {
     if (isHover !== undefined) {
       this.state.isHover = isHover;
     }
-
-    this.state.canvasListener.updateState(args);
   }
 
   handleUnveil() {
@@ -188,6 +176,9 @@ export class Line {
       x: this.state.endCoord.x + dx,
       y: this.state.endCoord.y + dy,
     } as Coordinate2D;
+
+    this.animationState.startCoord = this.state.startCoord;
+    this.animationState.endCoord = this.state.endCoord;
   }
 
   updateSize(dx: number, dy: number) {

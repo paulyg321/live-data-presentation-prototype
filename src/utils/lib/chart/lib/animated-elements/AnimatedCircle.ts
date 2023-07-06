@@ -231,32 +231,6 @@ export class AnimatedCircle extends AnimatedElement {
     if (selectionPath && selectionOpacity) {
       const key = this.controllerState.selectionLabelKey;
 
-      // this.controllerState.drawingUtils.modifyContextStyleAndDraw(
-      //   {
-      //     fillStyle: "white",
-      //     opacity: selectionOpacity,
-      //     lineWidth: 3,
-      //     shadow: true,
-      //   },
-      //   (context: CanvasRenderingContext2D) => {
-      //     selectionPath.parsedPath.forEach((parsedPath: any) => {
-      //       context.translate(
-      //         selectionPosition.x - dimensions.width / 2,
-      //         selectionPosition.y - dimensions.height / 2
-      //       );
-      //       context.scale(
-      //         selectionDims.width / path.xScale,
-      //         selectionDims.height / path.yScale
-      //       );
-      //       this.controllerState.drawingUtils.drawPath({
-      //         path: parsedPath,
-      //         mode: "fill",
-      //         context,
-      //       });
-      //     });
-      //   }
-      // );
-
       if (key) {
         this.controllerState.drawingUtils.modifyContextStyleAndDraw(
           {
@@ -288,7 +262,9 @@ export class AnimatedCircle extends AnimatedElement {
           opacity,
           strokeStyle: color,
           fillStyle: index % 2 === 0 ? color : "white",
-          shadow: !(selectionPath && selectionOpacity),
+          shadow: this.controllerState.activeSelection
+            ? !!(selectionPath && selectionOpacity)
+            : true,
         },
         (context: CanvasRenderingContext2D) => {
           context.translate(
@@ -365,7 +341,7 @@ export class AnimatedCircle extends AnimatedElement {
         {
           // for arrow head
           fillStyle: color,
-          strokeStyle: color,
+          strokeStyle: "white",
           lineWidth: 3,
           opacity,
         },
