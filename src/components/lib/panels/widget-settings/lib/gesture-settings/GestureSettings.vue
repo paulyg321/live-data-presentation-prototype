@@ -200,7 +200,7 @@ function handleUpdateGestureState() {
       <v-col>
         <v-text-field
           v-model="GestureSettingsState.poseDuration"
-          label="Pose Hold Duration"
+          label="Pose Hold Duration (milliseconds)"
           type="number"
         ></v-text-field>
       </v-col>
@@ -220,7 +220,7 @@ function handleUpdateGestureState() {
       <v-col>
         <v-text-field
           v-model="GestureSettingsState.resetPauseDuration"
-          label="After Pose Reset Timer"
+          label="After Pose Reset Timer (milliseconds)"
           type="number"
         ></v-text-field>
       </v-col>

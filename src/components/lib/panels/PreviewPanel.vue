@@ -3,7 +3,6 @@ import {
   playbackSubject,
   foreshadowingAreaSubject,
   snackbarSubject,
-  CanvasEvent,
   selectionSubject,
   type PlaybackSettingsConfig,
   StateUpdateType,
@@ -13,7 +12,6 @@ import {
   type StoryLayer,
   type LayerType,
   type Coordinate2D,
-  type Dimensions,
   isInBound,
 } from "@/utils";
 import { onMounted, ref, watch, watchEffect } from "vue";

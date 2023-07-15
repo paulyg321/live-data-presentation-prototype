@@ -17,6 +17,7 @@ export interface LineState {
   animationEase?: string;
   isPermanent?: boolean;
   isHover?: boolean;
+  resizeCoordKey?: "startCoord" | "endCoord";
 }
 
 export class Line {
@@ -75,7 +76,7 @@ export class Line {
       color,
       maxOpacity,
       isPermanent,
-      isHover
+      isHover,
     } = args;
     if (startCoord) {
       this.state.startCoord = { ...startCoord };
@@ -182,17 +183,26 @@ export class Line {
   }
 
   updateSize(dx: number, dy: number) {
-    this.state.endCoord = {
-      x: this.state.endCoord.x + dx,
-      y: this.state.endCoord.y + dy,
+    const coordinateKey = this.state.resizeCoordKey;
+
+    if (!coordinateKey) return;
+
+    this.state[coordinateKey] = {
+      x: this.state[coordinateKey].x + dx,
+      y: this.state[coordinateKey].y + dy,
     } as Coordinate2D;
+
+    this.animationState[coordinateKey] = this.state[coordinateKey];
   }
 
   isWithinObjectBounds(position: Coordinate2D) {
-    const { x: minX, y: minY } = this.state.startCoord;
+    const { x: minX, y: minY } = {
+      x: Math.min(this.state.startCoord.x, this.state.endCoord.x),
+      y: Math.min(this.state.startCoord.y, this.state.endCoord.y),
+    };
     const { maxX, maxY } = {
-      maxX: this.state.endCoord.x,
-      maxY: this.state.endCoord.y,
+      maxX: Math.max(this.state.startCoord.x, this.state.endCoord.x),
+      maxY: Math.max(this.state.startCoord.y, this.state.endCoord.y),
     };
 
     if (
@@ -208,10 +218,27 @@ export class Line {
   }
 
   isWithinResizeBounds(position: Coordinate2D) {
-    return isInBound(position, {
+    const isAroundEndCoord = isInBound(position, {
       position: this.state.endCoord,
       radius: 5,
     });
+
+    const isAroundStartCoord = isInBound(position, {
+      position: this.state.startCoord,
+      radius: 5,
+    });
+
+    if (isAroundEndCoord) {
+      this.state.resizeCoordKey = "endCoord";
+    }
+
+    if (isAroundStartCoord) {
+      this.state.resizeCoordKey = "startCoord";
+    }
+
+    const isWithinResizeBounds = isAroundEndCoord || isAroundStartCoord;
+
+    return isWithinResizeBounds;
   }
 
   isWithinSelectionBounds(selectionBounds: {

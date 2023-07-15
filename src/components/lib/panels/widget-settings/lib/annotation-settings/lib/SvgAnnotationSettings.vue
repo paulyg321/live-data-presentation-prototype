@@ -109,7 +109,7 @@ function handleSavePath() {
       <v-text-field
         v-model="svgSettings.state.animationDuration"
         type="number"
-        label="Animation Duration"
+        label="Animation Duration (seconds)"
         hint="How long the animation plays"
       ></v-text-field>
     </v-col>

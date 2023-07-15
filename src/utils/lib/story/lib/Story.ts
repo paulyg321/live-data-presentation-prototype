@@ -5,17 +5,16 @@ import {
   OpenHandPoseListener,
   StrokeListener,
   RectPoseListener,
-  CanvasEvent,
   type DrawingUtils,
   ChartType,
   Chart,
-  type Coordinate2D,
   AnnotationType,
   Line,
   Circle,
   Rect,
   Text,
   SvgAnnotation,
+  GestureListener,
 } from "@/utils";
 
 export type AnnotationLayers = Line | Circle | Rect | Text | SvgAnnotation;
@@ -249,6 +248,19 @@ export class Story {
   }
 
   removeLayer(layerId: string) {
+    const removedLayer = this.layers.find((layer) => layer.id === layerId);
+    if (
+      removedLayer?.type &&
+      [
+        ListenerType.OPEN_HAND_POSE,
+        ListenerType.POINT_POSE,
+        ListenerType.RANGE_POSE,
+        ListenerType.RECT_POSE,
+        ListenerType.STROKE_LISTENER,
+      ].includes(removedLayer.type as ListenerType)
+    ) {
+      (removedLayer.layer as GestureListener).unsubscribe();
+    }
     const updatedLayers = this.layers.filter((layer) => layer.id !== layerId);
     this.layers = updatedLayers;
 

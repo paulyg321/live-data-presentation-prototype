@@ -74,24 +74,6 @@ export class StrokeListener extends GestureListener {
     };
   }
 
-  renderBorder() {
-    const centerPoint = this.getCenterPoint();
-    this.state.drawingUtils?.modifyContextStyleAndDraw(
-      {
-        strokeStyle: "skyblue",
-      },
-      (context) => {
-        this.state.drawingUtils?.drawCircle({
-          coordinates: centerPoint,
-          radius: this.state.dimensions.width / 2,
-          stroke: true,
-          context,
-        });
-      },
-      ["preview", "presenter"]
-    );
-  }
-
   renderDetectionState() {
     if (!this.state.startDetecting) return;
 

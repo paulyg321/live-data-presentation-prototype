@@ -22,6 +22,7 @@ import {
   SELECTED_OPACITY,
   FORESHADOW_OPACITY,
   UNSELECTED_OPACITY,
+  type Point,
 } from "@/utils";
 import { markRaw } from "vue";
 import _ from "lodash";
@@ -200,11 +201,19 @@ export class ChartController {
     const activeSelection = Boolean(
       this.state.currentSelection && this.state.currentSelection.length > 0
     );
+    const quadTree = {
+      tree: d3
+        .quadtree<Point>()
+        .x((d) => d.x)
+        .y((d) => d.y),
+      set: new Map<string, { x: number; y: number }>(),
+    };
     const getSelectionInfo = (key: string) => {
       return {
         isSelected: Boolean(this.state.currentSelection?.includes(key)),
         activeSelection,
         selectionLabelKey,
+        quadTree,
       };
     };
 
@@ -660,11 +669,26 @@ export class ChartController {
           .scaleLinear<number, number, unknown>()
           .domain(args.domain)
           .range(args.range);
-      case ScaleTypes.LOG:
-        return d3
-          .scaleSymlog<number, number, unknown>()
-          .domain(args.domain)
-          .range(args.range);
+      case ScaleTypes.LOG: {
+        try {
+          const scale = d3
+            .scaleLog<number, number, unknown>()
+            .domain(args.domain)
+            .range(args.range);
+
+          // Q: provide code to check if scale(0) is not a Nan or throw error
+          if (isNaN(scale(0) as number)) {
+            throw new Error("Scale(0) is NaN");
+          }
+
+          return scale;
+        } catch (error) {
+          return d3
+            .scaleSymlog<number, number, unknown>()
+            .domain(args.domain)
+            .range(args.range);
+        }
+      }
       case ScaleTypes.TIME:
         return d3
           .scaleTime<number, number, unknown>()
@@ -802,7 +826,7 @@ export class ChartController {
     if (keyframe) {
       this.state.drawingUtils.modifyContextStyleAndDraw(
         {
-          fontSize: this.state.dimensions.width * 0.10,
+          fontSize: this.state.dimensions.width * 0.1,
           opacity: this.state.selectedOpacity * 0.5,
           fillStyle: "#fc036b",
           textAlign: "right",

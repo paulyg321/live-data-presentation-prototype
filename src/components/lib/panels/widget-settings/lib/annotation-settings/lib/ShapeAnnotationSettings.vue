@@ -82,7 +82,7 @@ watch(
       <v-text-field
         v-model="shapeSettings.state.animationDuration"
         type="number"
-        label="Animation Duration"
+        label="Animation Duration (seconds)"
         hint="How long the animation plays"
       ></v-text-field>
     </v-col>

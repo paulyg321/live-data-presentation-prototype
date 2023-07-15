@@ -37,7 +37,6 @@ export async function storeData(data: string) {
 export async function getStoredData(id: string) {
   try {
     const data = await getStoredDataRealTimeDB(id);
-    console.log(data);
     if (data) {
       return data;
     } else {

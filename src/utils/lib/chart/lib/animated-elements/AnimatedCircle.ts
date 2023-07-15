@@ -220,7 +220,7 @@ export class AnimatedCircle extends AnimatedElement {
               x: traj.x,
               y: traj.y,
             })),
-            shape: LineShape.CURVED,
+            shape: LineShape.SHARP,
             context,
             drawArrowHead: false,
           });
@@ -234,6 +234,7 @@ export class AnimatedCircle extends AnimatedElement {
       if (key) {
         this.controllerState.drawingUtils.modifyContextStyleAndDraw(
           {
+            strokeStyle: "white",
             fillStyle: "white",
             opacity: selectionOpacity,
             shadow: true,
@@ -245,10 +246,86 @@ export class AnimatedCircle extends AnimatedElement {
                 this.controllerState.currentKeyframeIndex
               ][key].toLocaleString();
 
+            // If the label has already been added, draw it at the position it was added
+            if (this.controllerState.quadTree?.set.has(labelText)) {
+              const labelPosition =
+                this.controllerState.quadTree.set.get(labelText);
+              if (!labelPosition) return;
+              this.controllerState.drawingUtils.drawText({
+                text: labelText,
+                coordinates: labelPosition,
+                context,
+              });
+
+              // Draw a line between the label position and the position
+              this.controllerState.drawingUtils.drawLine({
+                coordinates: [
+                  { x: labelPosition.x, y: labelPosition.y - 5 },
+                  { x: position.x, y: position.y - 5 },
+                ],
+                context,
+              });
+
+              return;
+            }
+
+            // Create a rectangle for the new text element
+            const textWidth = context.measureText(labelText).width;
+            const textHeight = 16; // The font size
+            const newTextElement = {
+              x: selectionLabelPosition.x,
+              y: selectionLabelPosition.y,
+              width: textWidth,
+              height: textHeight,
+            };
+
+            // Check if the new text element overlaps with any existing text elements
+            let overlappingElement = this.controllerState.quadTree?.tree.find(
+              newTextElement.x,
+              newTextElement.y,
+              newTextElement.height * 2
+            );
+
+            // If the new text element overlaps with an existing text element, adjust its position
+            let attempts = 0;
+            const maxAttempts = 100; // Limit the number of attempts to prevent an infinite loop
+            while (overlappingElement && attempts < maxAttempts) {
+              // Move the new text element in a certain direction (e.g., to the right)
+              newTextElement.y += textHeight * 2;
+
+              // Check for overlaps again
+              overlappingElement = this.controllerState.quadTree?.tree.find(
+                newTextElement.x,
+                newTextElement.y,
+                newTextElement.height * 2
+              );
+
+              attempts++;
+            }
+
+            // Draw the new text element
             this.controllerState.drawingUtils.drawText({
               text: labelText,
-              coordinates: selectionLabelPosition,
+              coordinates: { x: newTextElement.x, y: newTextElement.y },
               context,
+            });
+
+            // Draw a line between the new text element position and the position
+            this.controllerState.drawingUtils.drawLine({
+              coordinates: [
+                { x: newTextElement.x, y: newTextElement.y - 5 },
+                { x: position.x, y: position.y - 5 },
+              ],
+              context,
+            });
+
+            // Add the new text element to the Quadtree
+            this.controllerState.quadTree?.tree.add(newTextElement);
+
+            // Add the label and its position to the Map of added labels
+            this.controllerState.quadTree?.set.set(labelText, {
+              x: newTextElement.x,
+              y: newTextElement.y,
             });
           }
         );
@@ -350,8 +427,8 @@ export class AnimatedCircle extends AnimatedElement {
             coordinates: path,
             shape: LineShape.SHARP,
             context,
-            drawArrowHead: true,
-            radius: 6,
+            // drawArrowHead: true,
+            // radius: 20,
           });
         }
       );

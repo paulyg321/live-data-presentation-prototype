@@ -175,6 +175,7 @@ export class Rect {
       width: this.state.dimensions.width + dx,
       height: this.state.dimensions.height + dy,
     };
+    this.animationState.dimensions = this.state.dimensions;
   }
 
   isWithinObjectBounds(position: Coordinate2D) {

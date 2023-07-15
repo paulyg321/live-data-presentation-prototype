@@ -13,12 +13,23 @@ import {
   ForeshadowingStatesMode,
   controllerPlaySubject,
 } from "../../../gestures";
-import { FORESHADOW_OPACITY, SELECTED_OPACITY, TRANSPARENT, UNSELECTED_OPACITY, type DrawingUtils } from "@/utils";
+import {
+  FORESHADOW_OPACITY,
+  SELECTED_OPACITY,
+  TRANSPARENT,
+  UNSELECTED_OPACITY,
+  type DrawingUtils,
+} from "@/utils";
 
 export interface AnimatedElementForeshadowingSettings {
   isForeshadowed: boolean;
   foreshadowingMode: ForeshadowingStatesMode;
   foreshadowingStateCount: number;
+}
+
+export interface LabelQuadTree {
+  tree: d3.Quadtree<Point>;
+  set: Map<string, { x: number; y: number }>;
 }
 
 export type AnimatedChartElementArgs = {
@@ -41,6 +52,7 @@ export type AnimatedChartElementArgs = {
   selectedOpacity?: number;
   unselectedOpacity?: number;
   foreshadowOpacity?: number;
+  quadTree?: LabelQuadTree;
 } & AnimatedElementForeshadowingSettings;
 
 export type AnimatedElementState = AnimatedChartElementArgs & {
@@ -140,11 +152,19 @@ export type SVGPrimitive =
   | SVGPolylineElement
   | SVGLineElement;
 
+export interface Point {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export abstract class AnimatedElement {
   controllerState: AnimatedElementState & {
     selectedOpacity: number;
     unselectedOpacity: number;
     foreshadowOpacity: number;
+    quadTree?: LabelQuadTree;
   };
   animationState: AnimatedElementVisualState;
 
@@ -441,6 +461,9 @@ export abstract class AnimatedElement {
     this.updateSelection(args);
     this.updateKeyframe(args);
 
+    if (args.quadTree) {
+      this.controllerState.quadTree = args.quadTree;
+    }
     if (args.selectedOpacity) {
       this.controllerState.selectedOpacity = args.selectedOpacity;
       this.updateSelectionState(StateUpdateType.SET);
