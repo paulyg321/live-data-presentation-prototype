@@ -5,17 +5,24 @@ import * as components from "vuetify/components";
 import * as directives from "vuetify/directives";
 import "@mdi/font/css/materialdesignicons.css";
 
-import Main from "./views/Main.vue";
+import MainView from "@/MainView.vue";
 
 import "./userWorker";
 
 import "./assets/main.css";
 import router from "./router";
 
-const app = createApp(Main);
+// For copy to clipboard feature
+import Clipboard from "v-clipboard";
+
+const app = createApp(MainView);
 const vuetify = createVuetify({
   components,
   directives,
 });
 
-app.use(router).use(vuetify).mount("#app");
+app
+  .use(router)
+  .use(vuetify)
+  .use(Clipboard as any)
+  .mount("#app");

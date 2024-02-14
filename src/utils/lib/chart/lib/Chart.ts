@@ -1,104 +1,123 @@
 import * as d3 from "d3";
-import dayjs from "dayjs";
 import {
-  AnimatedLine,
-  LegendItem,
+  CanvasElementListener,
+  DrawingUtils,
   type Coordinate2D,
   type Dimensions,
+  ChartController,
+  type ChartsControllerState,
+  getStoredData,
+  storeData,
+  isInBound,
 } from "@/utils";
-import { AnimatedCircle } from "./AnimatedCircle";
 import _ from "lodash";
-import type { Subject } from "rxjs";
 
-export enum Effect {
-  DEFAULT = "default",
-  FOCUSED = "focused",
-  BACKGROUND = "background",
+export const FORESHADOW_OPACITY = 0.6;
+export const SELECTED_OPACITY = 1.0;
+export const UNSELECTED_OPACITY = 0.3;
+export const TRANSPARENT = 0.0;
+
+export enum ScaleTypes {
+  LINEAR = "scaleLinear",
+  SQRT = "scaleSqrt",
+  POW = "scalePow",
+  LOG = "scaleLog",
+  TIME = "scaleTime",
+  SEQ = "scaleSequential",
 }
 
-export interface ChartType {
-  title: "Line Chart" | "Bar Chart" | "Scatter Plot";
-  value: ChartTypeValue;
+export const scaleOptions = [
+  ScaleTypes.LINEAR,
+  ScaleTypes.SQRT,
+  ScaleTypes.POW,
+  ScaleTypes.LOG,
+  ScaleTypes.TIME,
+  ScaleTypes.SEQ,
+];
+
+export enum Affect {
+  JOY = "joy",
+  TENDERNESS = "tenderness",
+  EXCITEMENT = "excitement",
 }
 
-export interface ChartItemsMap {
-  [key: string]: AnimatedLine | AnimatedCircle;
+export const NON_FOCUSED_COLOR = "grey";
+
+// excluded
+export const MAX_DOMAIN_Y = 8;
+// included
+export const MIN_DOMAIN_Y = 1;
+
+const colorArray = d3["schemeTableau10"];
+
+export enum ChartType {
+  LINE = "line-chart",
+  SCATTER = "scatter-plot",
+  BAR = "bar-chart",
 }
 
-export interface LegendItemsMap {
-  [key: string]: LegendItem;
-}
-
-export enum ChartTypeValue {
-  LINE = "line",
-  SCATTER = "scatter",
-  BAR = "bar",
-}
+export type ScaleOrdinal = d3.ScaleOrdinal<string, string, never>;
 
 export interface NewChartArgs {
+  // Settings
   title: string;
   type: ChartType;
-  data: any;
+  data?: any;
   field: string;
   key: string;
-  step: number;
-  dataAccessor?: string;
-  xField: string;
-  yField: string;
-  zField?: string;
-  useGroups: boolean;
+  xField: string; // position
+  yField: string; // position
+  zField?: string; // size
+
+  // NEW
+  selectionField?: string; // field to use to match when selecting (default is key)
+  groupBy?: string; // grouping to use when coloring
 
   position: Coordinate2D;
   dimensions: Dimensions;
   canvasDimensions: Dimensions;
+  // Utils
+  drawingUtils: DrawingUtils;
+  currentKeyframeIndex?: number;
+  startKeyframeIndex?: number;
+  endKeyframeIndex?: number;
+  dataId?: string;
+  dataFieldNames: string[];
+  selectedOpacity?: number;
+  unselectedOpacity?: number;
+  foreshadowOpacity?: number;
+
+  xScaleType?: ScaleTypes;
+  yScaleType?: ScaleTypes;
+  isHover?: boolean;
 }
 
-const colorArray = d3["schemeCategory10"];
-const gapMinderColorFn = d3
-  .scaleOrdinal()
-  .domain([
-    "Africa",
-    "Europe",
-    "North America",
-    "Oceania",
-    "Asia",
-    "South America",
-  ])
-  .range(colorArray);
-const defaultMargins = 30;
+export type ChartState = NewChartArgs & {
+  data: any;
+  canvasListener?: CanvasElementListener;
+  selectionField?: string;
+  selectOptions: string[];
+  xScaleType: ScaleTypes;
+  yScaleType: ScaleTypes;
+  xDomain?: any[];
+  yDomain?: any[];
+  zDomain?: any[];
+  colorDomain?: any[];
+  keyframes?: any[];
+  domainPerKeyframe?: any[];
+  controller?: ChartController;
+  drawingUtils: DrawingUtils;
+  currentKeyframeIndex: number;
+  startKeyframeIndex: number;
+  endKeyframeIndex: number;
+  selectedOpacity: number;
+  unselectedOpacity: number;
+  foreshadowOpacity: number;
+  isHover?: boolean;
+};
 
 export class Chart {
-  title: string;
-  type: ChartType;
-  data: any;
-  field: string;
-  key: string;
-  step: number;
-  dataAccessor: string | undefined;
-  xField: string;
-  yField: string;
-  zField: string | undefined;
-  useGroups = false;
-
-  position: Coordinate2D;
-  dimensions: Dimensions;
-  canvasDimensions: Dimensions;
-
-  animatedItems: AnimatedLine[] | AnimatedCircle[] | undefined;
-  legendItems: LegendItem[] | undefined;
-
-  xDomain: [any, any] | undefined;
-  dataType:
-    | {
-        xType: "number" | "date" | undefined;
-        yType: "number" | "date" | undefined;
-      }
-    | undefined;
-  yDomain: [any, any] | undefined;
-
-  context: { [key: string]: CanvasRenderingContext2D | null | undefined } = {};
-
-  keyframeData: any;
+  state: ChartState;
 
   /**
    * @param type the chart type
@@ -114,527 +133,518 @@ export class Chart {
   constructor({
     title,
     type,
-    data = [],
+    data,
+    dataId,
     field,
     key,
-    step,
-    dataAccessor,
     xField,
     yField,
     zField,
-    position,
+    position = { x: 0, y: 0 },
     canvasDimensions,
     dimensions,
-    useGroups,
+    drawingUtils,
+    selectionField,
+    groupBy,
+    currentKeyframeIndex = 0,
+    startKeyframeIndex = 0,
+    endKeyframeIndex = 0,
+    dataFieldNames,
+    selectedOpacity = SELECTED_OPACITY,
+    foreshadowOpacity = FORESHADOW_OPACITY,
+    unselectedOpacity = UNSELECTED_OPACITY,
+    xScaleType = ScaleTypes.LINEAR,
+    yScaleType = ScaleTypes.LINEAR,
   }: NewChartArgs) {
-    this.title = title;
-    this.type = type;
-    this.data = data;
-    this.field = field;
-    this.key = key;
-    this.step = step;
-    this.dataAccessor = dataAccessor;
-    this.xField = xField;
-    this.yField = yField;
-    this.zField = zField;
-    this.useGroups = useGroups;
-
-    this.position = position;
-    this.dimensions = dimensions;
-    this.canvasDimensions = canvasDimensions;
-
-    this.groupDataIntoKeyFrames();
-    this.setDomain();
-    this.computeChartItems();
-  }
-
-  private setDomain() {
-    switch (this.type.value) {
-      case ChartTypeValue.LINE:
-        this.setLineChartDomain();
-        break;
-      case ChartTypeValue.SCATTER:
-        this.setScatterPlotDomain();
-        break;
-      default:
-        break;
-    }
-  }
-
-  private getDataTypeForValues(values: { x: any; y: any }) {
-    const { x, y } = values;
-
-    let xType: "date" | "number" | undefined;
-    let yType: "date" | "number" | undefined;
-
-    if (typeof x === "string") {
-      // check if it's a date, otherwise throw an error
-      if (dayjs(x).isValid()) {
-        xType = "date";
-      } else {
-        throw new Error("Type of x value unsupported");
-      }
-    } else if (typeof x === "number") {
-      xType = "number";
-    }
-
-    if (typeof y === "string") {
-      // check if it's a date, otherwise throw an error
-      if (dayjs(y).isValid()) {
-        yType = "date";
-      } else {
-        throw new Error("Type of y value unsupported");
-      }
-    } else if (typeof y === "number") {
-      yType = "number";
-    }
-
-    return {
-      xType,
-      yType,
+    this.state = {
+      title,
+      type,
+      data,
+      dataId,
+      field,
+      key,
+      xField,
+      yField,
+      zField,
+      selectionField,
+      groupBy,
+      position,
+      dimensions,
+      drawingUtils,
+      canvasListener: new CanvasElementListener({
+        position,
+        dimensions,
+        isCircle: false,
+        updateFn: (value) => {
+          this.updateState(value);
+        },
+        drawingUtils,
+      }),
+      canvasDimensions,
+      xScaleType,
+      yScaleType,
+      keyframes: [],
+      currentKeyframeIndex,
+      startKeyframeIndex,
+      endKeyframeIndex,
+      selectOptions: [],
+      dataFieldNames,
+      selectedOpacity: selectedOpacity,
+      foreshadowOpacity: foreshadowOpacity,
+      unselectedOpacity: unselectedOpacity,
     };
   }
 
-  private setScatterPlotDomain() {
-    const parseTime = d3.timeParse("%Y-%m-%d");
-    let currentState = 0;
-    if (this.animatedItems) {
-      const circle = this.animatedItems[0];
-      currentState = circle.currentState;
+  async init() {
+    if (!this.state.data && !this.state.dataId)
+      throw new Error("Unable to get the chart dataset");
+
+    if (!this.state.data && this.state.dataId) {
+      this.state.data = await getStoredData(this.state.dataId);
     }
 
-    this.xDomain = undefined;
-    this.yDomain = undefined;
-    const currentChartState = Object.entries(this.keyframeData).map(
-      ([_, value]: [string, any]) => {
-        const state: { x: any; y: any } = value[currentState].data;
-
-        if (state) {
-          this.dataType = this.getDataTypeForValues(state);
-        }
-
-        return state;
+    if (this.state.data && !this.state.dataId) {
+      // Store in DB
+      const uniqueKey = await storeData(JSON.stringify(this.state.data));
+      if (uniqueKey) {
+        this.state.dataId = uniqueKey;
       }
+    }
+
+    this.setDataDomains(this.state.type);
+    this.initializeChartItems();
+  }
+
+  updateState(args: {
+    position?: Coordinate2D;
+    dimensions?: Dimensions;
+    currentKeyframeIndex?: number;
+    startKeyframeIndex?: number;
+    endKeyframeIndex?: number;
+    selectedOpacity?: number;
+    unselectedOpacity?: number;
+    foreshadowOpacity?: number;
+    isHover?: boolean;
+  }) {
+    if (args.position) {
+      this.state.position = args.position;
+    }
+    if (args.dimensions) {
+      this.state.dimensions = {
+        ...this.state.dimensions,
+        ...args.dimensions,
+      };
+    }
+
+    if (args.startKeyframeIndex) {
+      this.state.startKeyframeIndex = args.startKeyframeIndex;
+    }
+    if (args.currentKeyframeIndex) {
+      this.state.currentKeyframeIndex = args.currentKeyframeIndex;
+    }
+    if (args.endKeyframeIndex) {
+      this.state.endKeyframeIndex = args.endKeyframeIndex;
+    }
+
+    if (args.selectedOpacity) {
+      this.state.selectedOpacity = args.selectedOpacity;
+    }
+    if (args.unselectedOpacity) {
+      this.state.unselectedOpacity = args.unselectedOpacity;
+    }
+    if (args.foreshadowOpacity) {
+      this.state.foreshadowOpacity = args.foreshadowOpacity;
+    }
+    if (args.isHover !== undefined) {
+      this.state.isHover = args.isHover;
+      return;
+    }
+
+    this.state.controller?.updateState(args);
+  }
+
+  getColorScale() {
+    const colorGroupMap = d3.group(
+      this.state.data,
+      (data: Record<string, any>) => data[this.state.groupBy ?? this.state.key]
     );
 
-    if (this.dataType?.xType && this.dataType?.yType) {
-      let xAccessor = (data: any) => data.x;
-      if (this.dataType.xType === "number") {
-        xAccessor = (data: any) => data.x;
-      } else if (this.dataType.xType === "date") {
-        xAccessor = (data) => parseTime(data.x);
-      } else {
-        throw new Error(
-          "Unable to instantiate new chart, data types unsupported"
-        );
-      }
+    this.state.colorDomain = Array.from(colorGroupMap, ([key]: any) => key);
 
-      this.xDomain = d3.extent(currentChartState, xAccessor);
+    return d3
+      .scaleOrdinal<string, string, never>()
+      .domain(this.state.colorDomain)
+      .range(colorArray);
+  }
 
-      let yAccessor = (data: any) => data.y;
-      if (this.dataType.yType === "number") {
-        yAccessor = (data: any) => data.y;
-      } else if (this.dataType.yType === "date") {
-        yAccessor = (data) => parseTime(data.y);
-      } else {
-        throw new Error(
-          "Unable to instantiate new chart, data types unsupported"
-        );
-      }
-
-      this.yDomain = d3.extent(currentChartState, yAccessor);
-    } else {
-      throw new Error(
-        "Unable to instantiate new chart, data types unsupported"
+  setDataDomains(type: ChartType) {
+    if (type === ChartType.SCATTER || type === ChartType.LINE) {
+      this.state.xDomain = d3.extent(
+        this.state.data,
+        (data: Record<string, any>) => data[this.state.xField]
       );
+
+      this.state.yDomain = d3.extent(
+        this.state.data,
+        (data: Record<string, any>) => data[this.state.yField]
+      );
+      if (this.state.zField) {
+        this.state.zDomain = d3.extent(
+          this.state.data,
+          (data: Record<string, any>) => {
+            if (!this.state.zField) return;
+            return data[this.state.zField];
+          }
+        );
+      }
+    }
+
+    if (type === ChartType.BAR) {
+      const dataDomain = d3.extent(
+        this.state.data,
+        // This will be the bars height
+        (data: Record<string, any>) => data[this.state.xField]
+      );
+
+      this.state.xDomain = [0, dataDomain[1]];
+      this.state.yDomain = [MIN_DOMAIN_Y, MAX_DOMAIN_Y];
+
+      // Group each keyframe so we can get the extent for each keyframe
+      const groupedByKeyFrame = d3.group(
+        this.state.data,
+        (d: any) => d[this.state.field]
+      );
+
+      this.state.domainPerKeyframe = [];
+
+      groupedByKeyFrame.forEach((frame: any) => {
+        const currentFrame = [...frame];
+        this.state.domainPerKeyframe?.push(
+          d3.extent(currentFrame, (d) => d[this.state.xField])
+        );
+      });
     }
   }
 
-  private setLineChartDomain() {
-    const parseTime = d3.timeParse("%Y-%m-%d");
+  parseLineOrScatterPlotData() {
+    this.setDataDomains(this.state.type);
+    // Need all keyframes so we can fill in blanks
+    const groupedByKeyFrame = d3.group(
+      this.state.data,
+      (data: any) => data[this.state.field]
+    );
 
-    let currentState = 0;
-    if (this.animatedItems) {
-      const line = this.animatedItems[0];
-      currentState = line.currentState;
-    }
+    this.state.keyframes = Array.from(
+      groupedByKeyFrame,
+      ([key]: any) => key
+    ).sort((a, b) => d3.ascending(a, b));
 
-    this.xDomain = undefined;
-    this.yDomain = undefined;
-    Object.entries(this.keyframeData).forEach(([_, value]: [string, any]) => {
-      const state: { x: any; y: any }[] = value[currentState].data;
+    this.state.endKeyframeIndex =
+      this.state.endKeyframeIndex ?? this.state.keyframes.length;
 
-      if (state[0]) {
-        this.dataType = this.getDataTypeForValues(state[0]);
-      }
+    const resultMap = d3.rollup(
+      this.state.data,
+      (groupedData) => {
+        const unscaledData: Record<string, any>[] = [];
+        let selectionKey = "";
+        let colorKey = "";
 
-      if (this.dataType?.xType && this.dataType?.yType) {
-        let xAccessor = (data: any) => data.x;
-        if (this.dataType.xType === "number") {
-          xAccessor = (data: any) => data.x;
-        } else if (this.dataType.xType === "date") {
-          xAccessor = (data) => parseTime(data.x);
-        } else {
-          throw new Error(
-            "Unable to instantiate new chart, data types unsupported"
+        this.state.keyframes?.forEach((keyframe: any) => {
+          const dataAtKeyframe = groupedData.find(
+            (value: Record<string, any>) => value[this.state.field] === keyframe
           );
-        }
 
-        const [minX, maxX] = d3.extent(state, xAccessor);
+          if (dataAtKeyframe) {
+            selectionKey =
+              dataAtKeyframe[this.state.selectionField ?? this.state.key];
+            colorKey = dataAtKeyframe[this.state.groupBy ?? this.state.key];
+            unscaledData.push({
+              x: dataAtKeyframe[this.state.xField],
+              y: dataAtKeyframe[this.state.yField],
+              size: this.state.zField ? dataAtKeyframe[this.state.zField] : 10,
+              ...dataAtKeyframe,
+              keyframe,
+            });
+          } else {
+            unscaledData.push({
+              x: undefined,
+              y: undefined,
+              ...dataAtKeyframe,
+              keyframe,
+            });
+          }
+        });
 
-        if (this.xDomain) {
-          const [currentMinX, currentMaxX] = this.xDomain;
-          this.xDomain = [
-            d3.min([minX, currentMinX]),
-            d3.max([maxX, currentMaxX]),
-          ];
-        } else {
-          this.xDomain = [minX, maxX];
-        }
+        this.state.selectOptions = _.union(this.state.selectOptions, [
+          selectionKey,
+        ]);
 
-        let yAccessor = (data: any) => data.y;
-        if (this.dataType.yType === "number") {
-          yAccessor = (data: any) => data.y;
-        } else if (this.dataType.yType === "date") {
-          yAccessor = (data) => parseTime(data.y);
-        } else {
-          throw new Error(
-            "Unable to instantiate new chart, data types unsupported"
+        return {
+          unscaledData,
+          colorKey,
+          selectionKey,
+          drawingUtils: this.state.drawingUtils,
+        };
+      },
+      (data: any) => data[this.state.key]
+    );
+
+    return Array.from(resultMap, ([key, value]: any) => ({
+      label: key,
+      ...value,
+    }));
+  }
+
+  parseBarChartData() {
+    const groupedByKeyFrame = d3.group(
+      this.state.data,
+      (d: any) => d[this.state.field]
+    );
+    const rankedData: any[] = [];
+    this.state.keyframes = [];
+
+    groupedByKeyFrame.forEach((frame: any, keyframe: string) => {
+      this.state.keyframes?.push(keyframe);
+      const currentFrame = [...frame];
+      currentFrame.sort((a, b) =>
+        d3.descending(a[this.state.xField], b[this.state.xField])
+      );
+      currentFrame.forEach((item: any, index: number) => {
+        rankedData.push({
+          ...item,
+          rank: index + 1,
+        });
+      });
+    });
+
+    this.state.keyframes = this.state.keyframes.sort((a, b) =>
+      d3.ascending(a, b)
+    );
+
+    this.state.endKeyframeIndex =
+      this.state.endKeyframeIndex ?? this.state.keyframes.length;
+
+    const resultMap = d3.rollup(
+      rankedData,
+      (groupedData) => {
+        const unscaledData: Record<string, any>[] = [];
+        let selectionKey = "";
+        let colorKey = "";
+
+        this.state.keyframes?.forEach((keyframe: any) => {
+          const dataAtKeyframe = groupedData.find(
+            (value: Record<string, any>) => value[this.state.field] === keyframe
           );
-        }
 
-        const [minY, maxY] = d3.extent(state, yAccessor);
+          if (dataAtKeyframe) {
+            selectionKey =
+              dataAtKeyframe[this.state.selectionField ?? this.state.key];
+            colorKey = dataAtKeyframe[this.state.groupBy ?? this.state.key];
 
-        if (this.yDomain) {
-          const [currentMinY, currentMaxY] = this.yDomain;
-          this.yDomain = [
-            d3.min([minY, currentMinY]),
-            d3.max([maxY, currentMaxY]),
-          ];
-        } else {
-          this.yDomain = [minY, maxY];
-        }
-      } else {
-        throw new Error(
-          "Unable to instantiate new chart, data types unsupported"
-        );
-      }
+            unscaledData.push({
+              x: dataAtKeyframe[this.state.xField],
+              y: dataAtKeyframe.rank,
+              ...dataAtKeyframe,
+              keyframe,
+            });
+          } else {
+            unscaledData.push({
+              x: undefined,
+              y: undefined,
+              keyframe,
+              ...dataAtKeyframe,
+            });
+          }
+        });
+
+        this.state.selectOptions = _.union(this.state.selectOptions, [
+          selectionKey,
+        ]);
+
+        return {
+          unscaledData,
+          colorKey,
+          selectionKey,
+          drawingUtils: this.state.drawingUtils,
+        };
+      },
+      (data: any) => data[this.state.key]
+    );
+
+    return Array.from(resultMap, ([key, value]: any) => ({
+      label: key,
+      ...value,
+    }));
+  }
+
+  isWithinObjectBounds(position: Coordinate2D) {
+    return isInBound(position, {
+      position: this.state.position,
+      dimensions: this.state.dimensions,
     });
   }
 
-  private groupDataIntoKeyFrames() {
-    const groupedData = this.data.reduce(
-      (chartItems: any, currentData: any) => {
-        const fieldVal = currentData[this.field];
-        const keyVal = currentData[this.key];
+  isWithinSelectionBounds(selectionBounds: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }) {
+    const coordinatesToCheck = [
+      { ...this.state.position },
+      {
+        x: this.state.position.x + this.state.dimensions.width,
+        y: this.state.position.y + this.state.dimensions.height,
+      },
+    ];
 
-        const exists = chartItems[keyVal];
-        // TODO: sort data by the keyframe
-
-        let keyFrame;
-        if (this.type.value === ChartTypeValue.LINE && this.dataAccessor) {
-          keyFrame = {
-            keyframe: fieldVal,
-            data: currentData[this.dataAccessor].map((datum: any) => {
-              return {
-                x: datum[this.xField],
-                y: datum[this.yField],
-              };
-            }),
-          };
-        } else {
-          keyFrame = {
-            keyframe: fieldVal,
-            ...(this.zField ? { group: currentData[this.zField] } : {}),
-            data: {
-              x: currentData[this.xField],
-              y: currentData[this.yField],
+    return coordinatesToCheck.reduce(
+      (isInSelectionBounds: boolean, coordinate: Coordinate2D) => {
+        return (
+          isInBound(coordinate, {
+            position: {
+              ...selectionBounds,
             },
-          };
-        }
-
-        // Each line is an array of its different states/keyframes
-        if (exists) {
-          chartItems[keyVal] = [...chartItems[keyVal], keyFrame];
-        } else {
-          chartItems[keyVal] = [keyFrame];
-        }
-        return chartItems;
+            dimensions: {
+              ...selectionBounds,
+            },
+          }) && isInSelectionBounds
+        );
       },
-      {}
-    );
-
-    /**
-     * The data will look somewhat like this
-     *
-     * LINE CHART:
-     *
-     * {
-     *     [key]: [
-     *         {
-     *              keyframe: 2000,
-     *              data: [ { x: 0, y: 21 }, ..., { x: 22, y: 99 } ] } ] <--- can be non array & just an object
-     *         },
-     *         {
-     *              keyframe: 2001,
-     *              data: [ { x: 0, y: 21 }, ..., { x: 22, y: 99 } ] } ]
-     *         },
-     *     ]
-     * }
-     *
-     * SCATTER PLOT:
-     *
-     * {
-     *        [key]: [
-     *         {
-     *              keyframe: 2000,
-     *              data: { x: 0, y: 21 }
-     *         },
-     *         {
-     *              keyframe: 2001,
-     *              data: { x: 22, y: 99 }
-     *         },
-     *     ]
-     * }
-     *
-     */
-    this.keyframeData = groupedData;
-  }
-
-  private setOrUpdateAnimatedCircles() {
-    if (this.animatedItems === undefined) {
-      this.animatedItems = _.slice(
-        Object.entries(this.keyframeData),
-        0,
-        20
-      ).map(([key, value]: [string, any]) => {
-        let item_group = key;
-        if (this.useGroups) {
-          item_group = value[0].group;
-        }
-        const states = value.map(({ data }: any) => {
-          return data;
-        });
-
-        return new AnimatedCircle({
-          states,
-          getScales: () => this.getScales(),
-          chartDimensions: this.getDimensions(),
-          canvasDimensions: this.canvasDimensions,
-          duration: 1000,
-          key,
-          group: item_group,
-          color: gapMinderColorFn(item_group) as string,
-          dataType: this.dataType,
-        });
-      });
-    } else {
-      this.animatedItems.forEach((circle: AnimatedCircle | AnimatedLine) => {
-        circle.updateState({
-          getScales: () => this.getScales(),
-          chartDimensions: this.getDimensions(),
-          canvasDimensions: this.canvasDimensions,
-        });
-      }, {});
-    }
-  }
-
-  private setOrUpdateAnimatedLines() {
-    if (this.animatedItems === undefined) {
-      this.animatedItems = Object.entries(this.keyframeData).map(
-        ([key, value]: [string, any], currentIndex: number) => {
-          const states = value.map(({ data }: any) => {
-            return data;
-          });
-
-          return new AnimatedLine({
-            states,
-            getScales: () => this.getScales(),
-            chartDimensions: this.getDimensions(),
-            chartPosition: this.getPosition(),
-            canvasDimensions: this.canvasDimensions,
-            duration: 1000,
-            key,
-            color: colorArray[currentIndex],
-            dataType: this.dataType,
-          });
-        }
-      );
-    } else {
-      this.animatedItems.forEach((line: AnimatedCircle | AnimatedLine) => {
-        line.updateState({
-          getScales: () => this.getScales(),
-          chartDimensions: this.getDimensions(),
-          canvasDimensions: this.canvasDimensions,
-        });
-      }, {});
-    }
-  }
-
-  setLegendItems() {
-    const groupItems = this.useGroups;
-    const existingKeys: Record<string, boolean> = {};
-    this.legendItems = this.animatedItems?.reduce<LegendItem[]>(
-      (legendItems: LegendItem[], animatedItem: any) => {
-        let item_group = animatedItem.key;
-
-        if (groupItems && this.zField) {
-          item_group = animatedItem.group;
-        }
-
-        if (!existingKeys[item_group]) {
-          existingKeys[item_group] = true;
-          return [
-            ...legendItems,
-            new LegendItem({
-              label: item_group,
-              color: animatedItem.color,
-              canvasDimensions: this.canvasDimensions,
-            }),
-          ];
-        }
-
-        return legendItems;
-      },
-      [] as LegendItem[]
+      true
     );
   }
 
-  getPosition(): Coordinate2D {
-    return this.position;
-  }
-
-  getDimensions(): Required<Dimensions> {
-    if (this.dimensions.margin) {
-      return this.dimensions as Required<Dimensions>;
-    }
-
-    return {
-      ...this.dimensions,
-      margin: {
-        left: 30,
-        right: 30,
-        top: 30,
-        bottom: 30,
+  isWithinResizeBounds(position: Coordinate2D) {
+    return isInBound(position, {
+      position: {
+        x: this.state.position.x + this.state.dimensions.width - 10,
+        y: this.state.position.y + this.state.dimensions.height - 10,
       },
-    };
-  }
-
-  getBounds() {
-    const dimensions = this.getDimensions();
-    const position = this.getPosition();
-    return {
-      x: {
-        start: position.x + dimensions.margin?.left,
-        end: position.x + (this.dimensions.width - dimensions.margin.right),
+      dimensions: {
+        width: 10,
+        height: 10,
       },
-      y: {
-        start: position.y + dimensions.height - dimensions.margin.bottom,
-        end: position.y + dimensions.margin.top,
+    });
+  }
+
+  drawHoverState() {
+    this.state.drawingUtils.modifyContextStyleAndDraw(
+      {
+        lineDash: [3, 3],
+        strokeStyle: "steelblue",
       },
+      (context) => {
+        this.state.drawingUtils.drawRect({
+          coordinates: this.state.position,
+          dimensions: this.state.dimensions,
+          stroke: true,
+          context,
+        });
+      },
+      ["presenter", "preview"]
+    );
+    this.state.drawingUtils.modifyContextStyleAndDraw(
+      {
+        fillStyle: "white",
+        strokeStyle: "grey",
+      },
+      (context) => {
+        this.state.drawingUtils.drawCircle({
+          coordinates: {
+            x: this.state.position.x + this.state.dimensions.width,
+            y: this.state.position.y + this.state.dimensions.height,
+          },
+          radius: 10,
+          stroke: true,
+          fill: true,
+          context,
+        });
+      },
+      ["presenter", "preview"]
+    );
+  }
+
+  updatePosition(dx: number, dy: number) {
+    this.state.position = {
+      x: this.state.position.x + dx,
+      y: this.state.position.y + dy,
+    } as Coordinate2D;
+
+    this.state.controller?.updateState({
+      position: this.state.position,
+    });
+  }
+
+  updateSize(dx: number, dy: number) {
+    this.state.dimensions = {
+      width: this.state.dimensions.width + dx,
+      height: this.state.dimensions.height + dy,
     };
+
+    this.state.controller?.updateState({
+      dimensions: this.state.dimensions,
+    });
   }
 
-  getRange() {
-    const chartBounds = this.getBounds();
-    return {
-      xRange: [chartBounds.x.start, chartBounds.x.end],
-      yRange: [chartBounds.y.start, chartBounds.y.end],
-    };
-  }
-
-  getScales() {
-    this.setDomain();
-    let xScaleFn: any = d3.scaleLinear;
-    let yScaleFn: any = d3.scaleLinear;
-
-    if (this.dataType?.xType === "date") {
-      xScaleFn = d3.scaleTime;
+  private initializeChartItems() {
+    const colorScale = this.getColorScale();
+    let initializeChartArgs;
+    if (
+      this.state.type === ChartType.LINE ||
+      this.state.type === ChartType.SCATTER
+    ) {
+      const parsedData = this.parseLineOrScatterPlotData();
+      initializeChartArgs = {
+        items: parsedData,
+      };
+    } else {
+      const parsedData = this.parseBarChartData();
+      initializeChartArgs = {
+        items: parsedData,
+      };
     }
 
-    if (this.dataType?.yType === "date") {
-      yScaleFn = d3.scaleTime;
+    if (!this.state.xDomain || !this.state.yDomain || !this.state.keyframes) {
+      return;
     }
+    initializeChartArgs = {
+      ...initializeChartArgs,
+      colorScale,
+      xDomain: this.state.xDomain,
+      yDomain: this.state.yDomain,
+      zDomain: this.state.zDomain,
+      dimensions: this.state.dimensions,
+      position: this.state.position,
+      canvasDimensions: this.state.canvasDimensions,
+      keyframes: this.state.keyframes,
+      domainPerKeyframe: this.state.domainPerKeyframe,
+      drawingUtils: this.state.drawingUtils,
+      xScaleType: this.state.xScaleType,
+      yScaleType: this.state.yScaleType,
+      currentKeyframeIndex: this.state.currentKeyframeIndex,
+      startKeyframeIndex: this.state.startKeyframeIndex,
+      endKeyframeIndex: this.state.endKeyframeIndex,
+      playbackExtent: 0,
+      chartType: this.state.type,
+      selectedOpacity: this.state.selectedOpacity,
+      unselectedOpacity: this.state.unselectedOpacity,
+      foreshadowOpacity: this.state.foreshadowOpacity,
+    } as ChartsControllerState;
 
-    const { xRange, yRange } = this.getRange();
-
-    return {
-      xScale: xScaleFn(this.xDomain ?? [], xRange),
-      yScale: yScaleFn(this.yDomain ?? [], yRange),
-    };
-  }
-
-  getAxesPositions() {
-    const position = this.getPosition();
-    const dimensions = this.getDimensions();
-    return {
-      xAxis: position.y + (dimensions.height - dimensions.margin.top),
-      yAxis: position.x + dimensions.margin.left,
-    };
-  }
-
-  getAnimatedElements() {
-    switch (this.type.value) {
-      case ChartTypeValue.LINE:
-      default:
-        return this.animatedItems;
-    }
-  }
-
-  getLegendItems() {
-    this.setLegendItems();
-    return this.legendItems;
-  }
-
-  updateState({
-    position,
-    dimensions,
-  }: {
-    position?: Coordinate2D;
-    dimensions?: Dimensions;
-  }) {
-    if (position) {
-      this.position = position;
-    }
-    if (dimensions) {
-      this.dimensions = dimensions;
-    }
-    this.computeChartItems();
-  }
-
-  setContext(ctxObj: {
-    [key: string]: CanvasRenderingContext2D | null | undefined;
-  }) {
-    this.context = ctxObj;
-    if (this.animatedItems) {
-      this.animatedItems.forEach((item: AnimatedCircle | AnimatedLine) => {
-        const itemContext = ctxObj[item.key];
-        if (itemContext) {
-          item.setContext(itemContext);
-        }
-      });
-    }
-  }
-
-  computeChartItems() {
-    switch (this.type.value) {
-      case ChartTypeValue.LINE: {
-        this.setOrUpdateAnimatedLines();
+    switch (this.state.type) {
+      case ChartType.LINE:
+      case ChartType.SCATTER:
+      case ChartType.BAR:
+        this.state.controller = new ChartController(initializeChartArgs);
         break;
-      }
-      case ChartTypeValue.SCATTER: {
-        this.setOrUpdateAnimatedCircles();
-        break;
-      }
-      default:
     }
   }
 
-  drawAll() {
-    if (this.animatedItems) {
-      this.animatedItems.forEach((item: AnimatedCircle | AnimatedLine) => {
-        item.drawCurrentState();
-      });
+  draw() {
+    this.state.controller?.draw();
+    if (this.state.isHover) {
+      this.drawHoverState();
     }
   }
 }

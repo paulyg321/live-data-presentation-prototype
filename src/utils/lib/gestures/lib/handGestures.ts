@@ -1,13 +1,5 @@
+import { SupportedGestures } from "@/utils";
 import fp from "fingerpose";
-
-export enum SupportedGestures {
-  POINTING = "pointing",
-  OPEN_HAND = "open-hand",
-  FORESHADOWING_LEFT_L = "foreshadowing-left-l",
-  FORESHADOWING_RIGHT_L = "foreshadowing-right-l",
-  FORESHADOWING_LEFT_C = "foreshadowing-left-c",
-  FORESHADOWING_RIGHT_C = "foreshadowing-right-c",
-}
 
 // POINTING
 export const pointingGesture = new fp.GestureDescription(
@@ -15,7 +7,7 @@ export const pointingGesture = new fp.GestureDescription(
 );
 
 for (const finger of [
-  fp.Finger.Thumb,
+  // fp.Finger.Thumb,
   fp.Finger.Middle,
   fp.Finger.Ring,
   fp.Finger.Pinky,
@@ -24,20 +16,21 @@ for (const finger of [
   pointingGesture.addCurl(finger, fp.FingerCurl.HalfCurl, 1.0);
 }
 
-pointingGesture.addCurl(fp.Finger.Thumb, fp.FingerCurl.NoCurl);
+// pointingGesture.addCurl(fp.Finger.Thumb, fp.FingerCurl.NoCurl);
 
 pointingGesture.addCurl(fp.Finger.Index, fp.FingerCurl.NoCurl);
-pointingGesture.addDirection(fp.Finger.Thumb, fp.FingerDirection.VerticalUp);
-pointingGesture.addDirection(
-  fp.Finger.Thumb,
-  fp.FingerDirection.DiagonalUpLeft,
-  0.9
-);
-pointingGesture.addDirection(
-  fp.Finger.Thumb,
-  fp.FingerDirection.DiagonalUpRight,
-  0.9
-);
+pointingGesture.addCurl(fp.Finger.Index, fp.FingerCurl.HalfCurl);
+// pointingGesture.addDirection(fp.Finger.Thumb, fp.FingerDirection.VerticalUp);
+// pointingGesture.addDirection(
+//   fp.Finger.Thumb,
+//   fp.FingerDirection.DiagonalUpLeft,
+//   0.9
+// );
+// pointingGesture.addDirection(
+//   fp.Finger.Thumb,
+//   fp.FingerDirection.DiagonalUpRight,
+//   0.9
+// );
 
 // Open Hand
 export const openHandGesture = new fp.GestureDescription(
@@ -52,17 +45,17 @@ for (const finger of [
   fp.Finger.Pinky,
 ]) {
   openHandGesture.addCurl(finger, fp.FingerCurl.NoCurl, 1.0);
-  openHandGesture.addDirection(fp.Finger.Thumb, fp.FingerDirection.VerticalUp);
-  openHandGesture.addDirection(
-    fp.Finger.Thumb,
-    fp.FingerDirection.DiagonalUpLeft,
-    0.9
-  );
-  openHandGesture.addDirection(
-    fp.Finger.Thumb,
-    fp.FingerDirection.DiagonalUpRight,
-    0.9
-  );
+  // openHandGesture.addDirection(fp.Finger.Thumb, fp.FingerDirection.VerticalUp);
+  // openHandGesture.addDirection(
+  //   fp.Finger.Thumb,
+  //   fp.FingerDirection.DiagonalUpLeft,
+  //   0.9
+  // );
+  // openHandGesture.addDirection(
+  //   fp.Finger.Thumb,
+  //   fp.FingerDirection.DiagonalUpRight,
+  //   0.9
+  // );
 }
 
 // left L - foreshadowing

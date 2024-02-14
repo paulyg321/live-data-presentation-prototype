@@ -8,7 +8,10 @@
     "paths": {
       "@/*": ["./src/*"]
     },
-    "lib": ["esnext"],
-    // "skipLibCheck": true
+    "lib": [
+      "ES2016",
+      "DOM",
+      "DOM.Iterable"
+    ],
   }
 }
