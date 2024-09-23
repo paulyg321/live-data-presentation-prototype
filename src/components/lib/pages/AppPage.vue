@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, toRaw, watch } from "vue";
+import { computed, onMounted, ref, toRaw } from "vue";
 import {
   PortalContainer,
   StoriesPanel,

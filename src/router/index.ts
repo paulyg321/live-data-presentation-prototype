@@ -7,17 +7,6 @@ const router = createRouter({
     {
       path: "/",
       component: AppPage,
-      // children: [
-      //   {
-      //     path: "present/:id",
-      //     component: PresenterMain,
-      //   },
-      //   {
-      //     path: "add-chart",
-      //     component: NewChartVue,
-      //   },
-      //   // TODO: Add route for settings
-      // ],
     },
   ],
 });
