@@ -1,18 +1,9 @@
-import { computed, reactive, ref, watchEffect } from "vue";
+import { computed, reactive } from "vue";
 import {
   Affect,
   AnimationExtentVisualizer,
-  ForeshadowingStatesMode,
-  // AnimatedCircle,
-  // AnimatedLine,
-  type Chart,
-  // DrawingMode,
-  // AnimatedLineDrawingModeToEaseFunctionMap,
-  // AnimatedCircleDrawingModeToEaseFunctionMap,
   type Coordinate2D,
   type Dimensions,
-  type PartialCoordinate2D,
-  StateUpdateType,
   type PlaybackSettingsConfig,
   type AnimatedElementPlaybackArgs,
 } from "@/utils";
